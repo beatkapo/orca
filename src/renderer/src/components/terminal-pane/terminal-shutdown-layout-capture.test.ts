@@ -137,4 +137,37 @@ describe('captureTerminalShutdownLayout', () => {
     expect(layout.ptyIdsByLeafId).toEqual({ [LEAF_ID]: 'pty-1' })
     expect(layout.titlesByLeafId).toEqual({ [LEAF_ID]: 'local shell' })
   })
+
+  it('keeps shutdown snapshots above the old 512KB ceiling while capping at 2MB', async () => {
+    const { captureTerminalShutdownLayout } = await import('./terminal-shutdown-layout-capture')
+    const bytesPerLine = 50
+    const pane = {
+      id: 1,
+      leafId: LEAF_ID,
+      stablePaneId: LEAF_ID,
+      terminal: { options: { scrollback: 50_000 } },
+      serializeAddon: {
+        serialize: vi.fn(({ scrollback }: { scrollback: number }) =>
+          'x'.repeat(scrollback * bytesPerLine)
+        )
+      }
+    }
+    const manager = {
+      getPanes: vi.fn(() => [pane]),
+      getActivePane: vi.fn(() => pane)
+    }
+
+    const layout = captureTerminalShutdownLayout({
+      manager: manager as never,
+      container: mockRootForPane(1),
+      expandedPaneId: null,
+      paneTransports: new Map(),
+      paneTitlesByPaneId: {},
+      existingLayout: undefined
+    })
+
+    const captured = layout.buffersByLeafId?.[LEAF_ID]
+    expect(captured?.length).toBeGreaterThan(512 * 1024)
+    expect(captured?.length).toBeLessThanOrEqual(2 * 1024 * 1024)
+  })
 })

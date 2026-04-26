@@ -58,6 +58,7 @@ import {
   type CloseTerminalPaneDetail
 } from '@/constants/terminal'
 import { acquireWebviewsDragPassthrough } from '../browser-pane/webview-registry'
+import { resolveEffectiveTerminalScrollbackLines } from './terminal-scrollback-limits'
 
 type UseTerminalPaneLifecycleDeps = {
   tabId: string
@@ -800,12 +801,10 @@ export function useTerminalPaneLifecycle({
           fontFamily: buildFontFamily(currentSettings?.terminalFontFamily ?? ''),
           fontWeight: terminalFontWeights.fontWeight,
           fontWeightBold: terminalFontWeights.fontWeightBold,
-          scrollback: Math.min(
-            50_000,
-            Math.max(
-              1000,
-              Math.round((currentSettings?.terminalScrollbackBytes ?? 10_000_000) / 200)
-            )
+          // Why: xterm serialize/search scan live rows linearly, so large
+          // buffers jank. Keep the byte setting authoritative below this cap.
+          scrollback: resolveEffectiveTerminalScrollbackLines(
+            currentSettings?.terminalScrollbackBytes
           ),
           cursorStyle,
           cursorInactiveStyle: resolveTerminalCursorInactiveStyle(cursorStyle),

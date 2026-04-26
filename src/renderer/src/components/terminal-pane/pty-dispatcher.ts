@@ -145,9 +145,8 @@ export function getEagerPtyBufferHandle(ptyId: string): EagerPtyHandle | undefin
   return eagerPtyHandles.get(ptyId)
 }
 
-// Why: 512 KB matches the scrollback buffer cap used by TerminalPane's
-// serialization. Prevents unbounded memory growth if a restored shell
-// runs a long-lived command (e.g. tail -f) in a worktree the user never opens.
+// Why: the pre-attach eager buffer only bridges prompt/MOTD output before UI
+// attach; durable scrollback belongs to shutdown restore.
 const EAGER_BUFFER_MAX_BYTES = 512 * 1024
 
 export function registerEagerPtyBuffer(

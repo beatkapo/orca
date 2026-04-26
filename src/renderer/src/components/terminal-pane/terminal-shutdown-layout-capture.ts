@@ -5,7 +5,9 @@ import { flushTerminalOutput } from '@/lib/pane-manager/pane-terminal-output-sch
 import { serializeTerminalLayout } from './layout-serialization'
 import { mergeCapturedLeafState } from './merge-captured-leaf-state'
 
-const MAX_BUFFER_BYTES = 512 * 1024
+// Why: shutdown snapshots are synchronous persisted session state. Larger
+// captures need streaming storage instead of one serialized payload.
+const MAX_BUFFER_BYTES = 2 * 1024 * 1024
 
 type ShutdownPane = Pick<ManagedPane, 'id' | 'leafId' | 'terminal' | 'serializeAddon'>
 
@@ -45,7 +47,7 @@ export function captureTerminalShutdownLayout({
         const leafId = pane.leafId
         let scrollback = pane.terminal.options.scrollback ?? 10_000
         let serialized = pane.serializeAddon.serialize({ scrollback })
-        // Cap at 512KB — binary search for largest scrollback that fits.
+        // Cap the persisted payload — binary search for largest scrollback that fits.
         if (serialized.length > MAX_BUFFER_BYTES && scrollback > 1) {
           let lo = 1
           let hi = scrollback

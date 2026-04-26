@@ -70,6 +70,12 @@ vi.mock('../ui/separator', () => ({
   }
 }))
 
+vi.mock('../ui/tooltip', () => ({
+  Tooltip: ({ children }: { children: unknown }) => children,
+  TooltipContent: ({ children }: { children: unknown }) => children,
+  TooltipTrigger: ({ children }: { children: unknown }) => children
+}))
+
 vi.mock('../ui/toggle-group', () => ({
   ToggleGroup: function ToggleGroup() {
     return null
@@ -252,5 +258,26 @@ describe('TerminalPane PowerShell version setting', () => {
     })
 
     expect(collectText(element)).not.toContain('WSL')
+  })
+
+  it('shows effective scrollback line guidance in the settings tooltip', () => {
+    const element = TerminalPane({
+      settings: {
+        terminalScrollbackBytes: 250_000_000,
+        terminalWindowsShell: 'powershell.exe',
+        terminalWindowsPowerShellImplementation: 'auto',
+        terminalWordSeparator: ''
+      } as never,
+      updateSettings: () => {},
+      systemPrefersDark: true,
+      terminalFontSuggestions: [],
+      scrollbackMode: 'preset',
+      setScrollbackMode: () => {},
+      ghostty: ghosttyMock,
+      wslAvailable: false,
+      pwshAvailable: false
+    })
+
+    expect(collectText(element)).toContain('Effective for new panes: about 100,000 live lines')
   })
 })

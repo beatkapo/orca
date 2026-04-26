@@ -18,8 +18,9 @@ import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Separator } from '../ui/separator'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
 import { ToggleGroup, ToggleGroupItem } from '../ui/toggle-group'
-import { Minus, Plus } from 'lucide-react'
+import { Info, Minus, Plus } from 'lucide-react'
 import {
   clampNumber,
   resolveEffectiveTerminalAppearance,
@@ -59,6 +60,11 @@ import type { UseGhosttyImportReturn } from './useGhosttyImport'
 import { ManageSessionsSection } from './ManageSessionsSection'
 import { TerminalQuickCommandsSection } from './TerminalQuickCommandsSection'
 import { getRepoIdFromWorktreeId } from '../../../../shared/worktree-id'
+import {
+  TERMINAL_SCROLLBACK_BYTES_PER_LINE_ESTIMATE,
+  TERMINAL_SCROLLBACK_MAX_LINES,
+  resolveEffectiveTerminalScrollbackLines
+} from '../terminal-pane/terminal-scrollback-limits'
 
 type TerminalPaneProps = {
   settings: GlobalSettings
@@ -115,6 +121,11 @@ export function TerminalPane({
         ? 'non-US layout — Option composes characters like @, €, [, ]'
         : 'unknown layout — Option composes characters (safe default)'
   const scrollbackMb = Math.max(1, Math.round(settings.terminalScrollbackBytes / 1_000_000))
+  const effectiveScrollbackLines = resolveEffectiveTerminalScrollbackLines(
+    settings.terminalScrollbackBytes
+  )
+  const effectiveScrollbackLinesLabel = effectiveScrollbackLines.toLocaleString('en-US')
+  const maxScrollbackLinesLabel = TERMINAL_SCROLLBACK_MAX_LINES.toLocaleString('en-US')
   const isPreset = SCROLLBACK_PRESETS_MB.includes(
     scrollbackMb as (typeof SCROLLBACK_PRESETS_MB)[number]
   )
@@ -844,7 +855,7 @@ export function TerminalPane({
         <div className="space-y-1">
           <h3 className="text-sm font-semibold">Advanced</h3>
           <p className="text-xs text-muted-foreground">
-            Scrollback is bounded for stability. This setting applies to new terminal panes.
+            This setting applies to new terminal panes.
           </p>
         </div>
 
@@ -854,7 +865,27 @@ export function TerminalPane({
           keywords={['terminal', 'scrollback', 'buffer', 'memory']}
           className="space-y-3"
         >
-          <Label>Scrollback Size</Label>
+          <div className="flex items-center gap-1.5">
+            <Label>Scrollback Size</Label>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  className="size-5 text-muted-foreground"
+                  aria-label="Show effective scrollback lines"
+                >
+                  <Info className="size-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={4} className="max-w-72 text-left">
+                Effective for new panes: about {effectiveScrollbackLinesLabel} live lines. Orca
+                estimates {TERMINAL_SCROLLBACK_BYTES_PER_LINE_ESTIMATE} bytes per line and caps live
+                history at {maxScrollbackLinesLabel} lines for stability.
+              </TooltipContent>
+            </Tooltip>
+          </div>
           <ToggleGroup
             type="single"
             value={scrollbackToggleValue}
