@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useAppStore } from '../../store'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
+import { activateTabAndFocusPane } from '@/lib/activate-tab-and-focus-pane'
 
 type DaemonSession = { id: string; cwd: string; title: string }
 
@@ -107,7 +108,6 @@ export function SessionsStatusSegment({
   const ptyIdsByTabId = useAppStore((s) => s.ptyIdsByTabId)
   const runtimePaneTitlesByTabId = useAppStore((s) => s.runtimePaneTitlesByTabId)
   const workspaceSessionReady = useAppStore((s) => s.workspaceSessionReady)
-  const setActiveTab = useAppStore((s) => s.setActiveTab)
   const setActiveView = useAppStore((s) => s.setActiveView)
 
   const boundPtyIds = useMemo(
@@ -233,9 +233,12 @@ export function SessionsStatusSegment({
         activateAndRevealWorktree(worktreeId)
       }
       setActiveView('terminal')
-      setActiveTab(tabId)
+      // Why: rows here only carry ptyId, and there's no selector that maps
+      // ptyId → numeric paneId for an unmounted tab. Pass null so the helper
+      // degrades to tab-only activation (no worse than prior behavior).
+      activateTabAndFocusPane(tabId, null)
     },
-    [tabIdToWorktreeId, setActiveView, setActiveTab]
+    [tabIdToWorktreeId, setActiveView]
   )
 
   return (
