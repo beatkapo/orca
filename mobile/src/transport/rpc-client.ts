@@ -32,7 +32,14 @@ export type RpcClient = {
   close: () => void
 }
 
-const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 16000]
+// Why: capped at 4s so the worst-case "stuck reconnecting" window the
+// user perceives is short. Prior 16s ceiling combined with Android's
+// suspended-timer behaviour during background → foreground transitions
+// often felt like the app would just sit on 'Reconnecting…' forever
+// (the timer was queued, the OS had simply not run it yet). Tapping the
+// manual Reconnect button bypassed the timer, which is why it felt
+// "magic". Shorter backoff makes the auto-recovery path feel as fast.
+const RECONNECT_DELAYS = [500, 1000, 2000, 4000]
 const REQUEST_TIMEOUT_MS = 30_000
 const HANDSHAKE_TIMEOUT_MS = 5_000
 
