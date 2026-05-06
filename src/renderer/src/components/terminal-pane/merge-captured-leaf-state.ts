@@ -22,7 +22,9 @@ export function mergeCapturedLeafState(opts: {
     }
   }
   for (const [leafId, value] of Object.entries(opts.fresh)) {
-    merged[leafId] = value
+    if (opts.currentLeafIds.has(leafId)) {
+      merged[leafId] = value
+    }
   }
   return merged
 }

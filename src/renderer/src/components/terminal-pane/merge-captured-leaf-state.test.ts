@@ -48,12 +48,13 @@ describe('mergeCapturedLeafState', () => {
     expect(result).toEqual({ 'pane:1': 'fresh' })
   })
 
-  it('does NOT include fresh entries for leaves outside currentLeafIds (defensive — fresh comes from same panes set, but stay strict)', () => {
+  it('drops fresh entries for leaves outside currentLeafIds (defense in depth)', () => {
     const result = mergeCapturedLeafState({
       prior: {},
-      fresh: { 'pane:1': 'fresh', 'pane:rogue': 'should-stay' },
-      currentLeafIds: new Set(['pane:1', 'pane:rogue'])
+      fresh: { 'pane:1': 'fresh', 'pane:rogue': 'should-be-dropped' },
+      currentLeafIds: new Set(['pane:1'])
     })
-    expect(result).toEqual({ 'pane:1': 'fresh', 'pane:rogue': 'should-stay' })
+    expect(result).toEqual({ 'pane:1': 'fresh' })
+    expect(result).not.toHaveProperty('pane:rogue')
   })
 })
