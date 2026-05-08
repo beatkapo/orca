@@ -1277,31 +1277,24 @@
   gap: 6px;
 }
 
-/* Why: surface the keyboard shortcuts next to Cancel/Save so users know Enter
-   submits and Escape cancels without trial and error. mr:auto pushes the hint
-   to the left so the action buttons stay right-aligned. */
-.orca-diff-comment-shortcut-hint {
-  margin-right: auto;
-  font-size: 10.5px;
-  color: var(--muted-foreground);
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  user-select: none;
-}
-
-.orca-diff-comment-shortcut-hint kbd {
+/* Why: trailing kbd pill inside Save/Cancel so the keyboard shortcut sits on
+   the action it triggers — same pattern as the Search row in SidebarNav. The
+   pill uses a translucent background so it adapts to both the primary
+   (filled) Save button and the ghost Cancel button. */
+.orca-diff-comment-kbd {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border: 1px solid color-mix(in srgb, var(--foreground) 22%, transparent);
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  margin-left: 2px;
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
   border-radius: 3px;
-  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+  background: color-mix(in srgb, currentColor 10%, transparent);
   font-family: inherit;
-  font-size: 10px;
+  font-size: 9.5px;
   line-height: 1;
-  color: var(--muted-foreground);
+  font-weight: 500;
+  opacity: 0.75;
 }

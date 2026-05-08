@@ -237,11 +237,9 @@ export function DiffCommentCard({
             rows={3}
           />
           <div className="orca-diff-comment-popover-footer">
-            <span className="orca-diff-comment-shortcut-hint" aria-hidden="true">
-              <kbd>↵</kbd> to save · <kbd>Esc</kbd> to cancel
-            </span>
             <Button variant="ghost" size="sm" onClick={handleCancel} disabled={submitting}>
               Cancel
+              <kbd className="orca-diff-comment-kbd">Esc</kbd>
             </Button>
             <Button
               size="sm"
@@ -254,6 +252,7 @@ export function DiffCommentCard({
               title={submitting ? 'Saving…' : undefined}
             >
               Save
+              <kbd className="orca-diff-comment-kbd">↵</kbd>
             </Button>
           </div>
         </>
