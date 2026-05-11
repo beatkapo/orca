@@ -62,7 +62,23 @@ const AddRepoDialog = React.memo(function AddRepoDialog() {
     handleOpenRemoteStep,
     handleAddRemoteRepo,
     handleConnectTarget
-  } = useRemoteRepo(fetchWorktrees, setStep, setAddedRepo, closeModal)
+  } = useRemoteRepo(fetchWorktrees, {
+    onOpenRemoteStep: () => setStep('remote'),
+    onRemoteAdded: (repo) => {
+      setAddedRepo(repo)
+      setStep('setup')
+    },
+    onNonGitFolder: ({ remotePath, connectionId }) => {
+      // Why: match the local add-project flow — show confirmation dialog so
+      // users understand git features will be unavailable, rather than
+      // silently adding as a folder.
+      closeModal()
+      useAppStore.getState().openModal('confirm-non-git-folder', {
+        folderPath: remotePath,
+        connectionId
+      })
+    }
+  })
 
   const {
     createName,

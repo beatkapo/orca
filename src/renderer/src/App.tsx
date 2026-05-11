@@ -276,7 +276,24 @@ function App(): React.JSX.Element {
           await actions.fetchBrowserSessionProfiles()
           const onboardingState = await window.api.onboarding.get()
           if (!cancelled) {
-            setOnboarding(onboardingState)
+            // Why: PR #1677 made the repo step unskippable. Users who
+            // started onboarding under the previous soft-skip build are
+            // marked legacySoftSkipEligible by the persistence migration so
+            // shouldShowOnboarding can auto-suppress the wizard for them.
+            // Persist closedAt + clear the flag so the auto-suppression
+            // sticks across launches without re-running the migration.
+            if (
+              onboardingState.legacySoftSkipEligible === true &&
+              onboardingState.closedAt === null
+            ) {
+              const sealed = await window.api.onboarding.update({
+                closedAt: Date.now(),
+                legacySoftSkipEligible: false
+              })
+              setOnboarding(sealed)
+            } else {
+              setOnboarding(onboardingState)
+            }
           }
 
           // Why: SSH connections must be re-established BEFORE terminal

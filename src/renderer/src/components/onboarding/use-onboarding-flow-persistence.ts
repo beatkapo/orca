@@ -36,7 +36,7 @@ export function useCloseWith({
     async (
       outcome: 'completed',
       checklist: Partial<OnboardingState['checklist']>,
-      completedPath?: 'open_folder' | 'clone_url'
+      completedPath?: 'open_folder' | 'clone_url' | 'ssh'
     ): Promise<boolean> => {
       let nextState: OnboardingState
       try {

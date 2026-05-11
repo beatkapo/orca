@@ -64,6 +64,19 @@ export function track<N extends EventName>(name: N, props: EventProps<N>): void 
   }
 }
 
+// Why: synchronous track for shutdown signals (beforeunload). Async telemetry
+// IPC is fire-and-forget and would be cancelled before delivery on a real
+// shutdown — the renderer process exits before the event reaches main. Use
+// only for shutdown-time events; the synchronous block stalls the renderer
+// thread for the duration of the IPC round-trip.
+export function trackSync<N extends EventName>(name: N, props: EventProps<N>): void {
+  try {
+    window.api?.telemetryTrackSync?.(name, props as Record<string, unknown>)
+  } catch (err) {
+    console.warn('[telemetry] IPC trackSync threw', err)
+  }
+}
+
 // Returns a Promise so callers that need to order a subsequent settings
 // write after the opt-in event can `await` it. Most call sites ignore the
 // return value; the fire-and-forget contract is preserved by resolving

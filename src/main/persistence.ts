@@ -14,7 +14,6 @@ import type {
   WorktreeMeta,
   GlobalSettings,
   OnboardingChecklistState,
-  OnboardingOutcome,
   OnboardingState
 } from '../shared/types'
 import type { SshTarget } from '../shared/ssh-types'
@@ -141,9 +140,13 @@ export function sanitizeOnboardingUpdate(
   }
   if ('outcome' in raw) {
     const v = raw.outcome
-    if (v === 'completed' || v === 'dismissed') {
-      out.outcome = v as OnboardingOutcome
-    } else if (v === null) {
+    if (v === 'completed') {
+      out.outcome = v
+    } else if (v === null || v === 'dismissed') {
+      // Why: legacy soft-dismiss rows on disk (pre-#1677) coerce to null at
+      // the parse boundary so they don't poison the narrowed
+      // OnboardingOutcome = 'completed' union. They still count as "wizard
+      // closed" via closedAt, just without a winning outcome.
       out.outcome = null
     }
     // else: omit.
@@ -152,6 +155,18 @@ export function sanitizeOnboardingUpdate(
     const v = raw.lastCompletedStep
     if (typeof v === 'number' && Number.isInteger(v) && v >= -1 && v <= ONBOARDING_FINAL_STEP) {
       out.lastCompletedStep = v
+    }
+    // else: omit.
+  }
+  if ('legacySoftSkipEligible' in raw) {
+    if (typeof raw.legacySoftSkipEligible === 'boolean') {
+      out.legacySoftSkipEligible = raw.legacySoftSkipEligible
+    }
+    // else: omit.
+  }
+  if ('_legacySoftSkipMigrationDone' in raw) {
+    if (typeof raw._legacySoftSkipMigrationDone === 'boolean') {
+      out._legacySoftSkipMigrationDone = raw._legacySoftSkipMigrationDone
     }
     // else: omit.
   }
@@ -377,14 +392,38 @@ export class Store {
             // key) is dropped or coerced to the default rather than poisoning
             // in-memory state.
             const sanitized = sanitizeOnboardingUpdate(parsed.onboarding)
-            return {
+            // Why: read the migration discriminator off the *raw* parsed
+            // value, not the merged-with-defaults shape — defaults stamp it
+            // true for new rows, which would otherwise short-circuit the
+            // legacy migration on every load.
+            const rawOnboarding = parsed.onboarding as Record<string, unknown> | undefined
+            const migrationDone = rawOnboarding?._legacySoftSkipMigrationDone === true
+            const merged: OnboardingState = {
               ...defaults.onboarding,
               ...sanitized,
               checklist: {
                 ...defaults.onboarding.checklist,
                 ...sanitized.checklist
-              }
+              },
+              // Why: defaults stamp this true; only carry forward an
+              // explicit on-disk value so a legacy row without the field
+              // triggers the migration below.
+              _legacySoftSkipMigrationDone: migrationDone || undefined
             }
+            // Why: PR #1677 made the repo step unskippable. On the first
+            // load of the new build for any pre-existing row, mark in-flight
+            // onboarding (closedAt === null) as legacy-eligible so the
+            // shouldShowOnboarding predicate can auto-complete them rather
+            // than trapping them on the now-unskippable gate. The
+            // discriminator is one-shot — subsequent loads see
+            // _legacySoftSkipMigrationDone === true and skip the migration.
+            if (!migrationDone) {
+              if (merged.closedAt === null) {
+                merged.legacySoftSkipEligible = true
+              }
+              merged._legacySoftSkipMigrationDone = true
+            }
+            return merged
           })()
         }
       }

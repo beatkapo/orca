@@ -287,7 +287,7 @@ const agentHookInstallFailedSchema = z
 // only requires bumping the constant. Zod can't build a literal-union from a
 // numeric constant without runtime gymnastics, so we use a clamped int range.
 const onboardingStepSchema = z.number().int().min(1).max(ONBOARDING_FINAL_STEP)
-const onboardingPathSchema = z.enum(['open_folder', 'clone_url'])
+const onboardingPathSchema = z.enum(['open_folder', 'clone_url', 'ssh'])
 const onboardingFailureReasonSchema = z.enum([
   'invalid_path',
   'clone_failed',
@@ -374,10 +374,28 @@ const onboardingStepSkippedSchema = z
 const onboardingStep4PathClickedSchema = z
   .object({ path: onboardingPathSchema, cohort: cohortSchema })
   .strict()
+// Why: distinct from `path_clicked` because revealing the SSH CTA happens
+// before any repo-add attempt — it tells us whether SSH-only users actually
+// discover the third CTA, separate from whether they then succeed.
+const onboardingStep4PathRevealedSchema = z
+  .object({ path: onboardingPathSchema, cohort: cohortSchema })
+  .strict()
 const onboardingStep4PathFailedSchema = z
   .object({
     path: onboardingPathSchema,
     reason: onboardingFailureReasonSchema,
+    cohort: cohortSchema
+  })
+  .strict()
+// Why: shutdown-time signal for users who quit while still on step 4. Emitted
+// from the renderer's beforeunload handler via sync IPC so it lands before
+// the renderer process exits. Captures Cmd+Q, native window close, and
+// renderer reload; does NOT capture crashes/force-kill (those need a
+// main-process recovery check on next launch — out of scope here).
+const onboardingStep4AbandonedSchema = z
+  .object({
+    duration_ms: z.number().int().nonnegative().optional(),
+    path_revealed_ssh: z.boolean(),
     cohort: cohortSchema
   })
   .strict()
@@ -539,7 +557,9 @@ export const eventSchemas = {
   onboarding_step_completed: onboardingStepCompletedSchema,
   onboarding_step_skipped: onboardingStepSkippedSchema,
   onboarding_step4_path_clicked: onboardingStep4PathClickedSchema,
+  onboarding_step4_path_revealed: onboardingStep4PathRevealedSchema,
   onboarding_step4_path_failed: onboardingStep4PathFailedSchema,
+  onboarding_step4_abandoned: onboardingStep4AbandonedSchema,
   onboarding_completed: onboardingCompletedSchema,
   onboarding_dismissed: onboardingDismissedSchema,
   onboarding_agent_picked: onboardingAgentPickedSchema,
@@ -633,7 +653,9 @@ type _OnboardingCohortRoster =
   | 'onboarding_step_completed'
   | 'onboarding_step_skipped'
   | 'onboarding_step4_path_clicked'
+  | 'onboarding_step4_path_revealed'
   | 'onboarding_step4_path_failed'
+  | 'onboarding_step4_abandoned'
   | 'onboarding_completed'
   | 'onboarding_dismissed'
   | 'onboarding_agent_picked'

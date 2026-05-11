@@ -1,12 +1,14 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { isEditableTarget } from '@/lib/editable-target'
+import { track, trackSync } from '@/lib/telemetry'
 import type { OnboardingState } from '../../../../shared/types'
 import { AgentStep } from './AgentStep'
 import { ThemeStep } from './ThemeStep'
 import { NotificationStep } from './NotificationStep'
 import { RepoStep } from './RepoStep'
+import { RemoteRepoStep } from './RemoteRepoStep'
 import { STEPS, useOnboardingFlow } from './use-onboarding-flow'
 import logo from '../../../../../resources/logo.svg'
 
@@ -46,6 +48,26 @@ export default function OnboardingFlow({
   const flow = useOnboardingFlow(onboarding, onOnboardingChange)
   const { currentStep, stepIndex, busyLabel } = flow
   const copy = stepCopy[currentStep.id]
+  // Why: in-place sub-step within step 4. The wizard stays mounted (no top-
+  // level step transition) so the gate's progress dots and state don't reset.
+  const [repoSubstep, setRepoSubstep] = useState<'main' | 'remote'>('main')
+  // Why: pinned at first arrival on step 4 so the abandoned event reports
+  // total time on the gate, even if the user stepped back.
+  const step4StartedAtRef = useRef<number | null>(null)
+  // Why: latched true the first time the user lands on step 4 with the SSH
+  // CTA visible; the abandoned event reports whether the user saw the third
+  // path. Today the CTA is always rendered on RepoStep, so first arrival on
+  // step 4 in the 'main' substep counts as the reveal.
+  const sshRevealedRef = useRef(false)
+  useEffect(() => {
+    if (currentStep.id === 'repo' && step4StartedAtRef.current === null) {
+      step4StartedAtRef.current = Date.now()
+    }
+    if (currentStep.id === 'repo' && !sshRevealedRef.current) {
+      sshRevealedRef.current = true
+      track('onboarding_step4_path_revealed', { path: 'ssh' })
+    }
+  }, [currentStep.id])
   // Why: depend on stable callbacks + step id only so the listener doesn't
   // re-bind on every render of the parent (flow object identity changes).
   const { next: flowNext, openFolder: flowOpenFolder } = flow
@@ -63,6 +85,12 @@ export default function OnboardingFlow({
       }
       event.preventDefault()
       if (currentStep.id === 'repo') {
+        // Why: when the user is in the SSH sub-step, the Enter handler in
+        // the remote path input handles its own submit; don't fire a folder
+        // picker behind their back.
+        if (repoSubstep === 'remote') {
+          return
+        }
         void flowOpenFolder()
       } else {
         void flowNext('keyboard')
@@ -70,7 +98,27 @@ export default function OnboardingFlow({
     }
     window.addEventListener('keydown', onKeyDown, { capture: true })
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true })
-  }, [currentStep.id, flowNext, flowOpenFolder])
+  }, [currentStep.id, flowNext, flowOpenFolder, repoSubstep])
+
+  // Why: shutdown signal for users who quit while still gated on step 4.
+  // Sync IPC because async fire-and-forget would be cancelled before delivery
+  // when the renderer exits. Only fires on the repo step, so completed
+  // wizards don't emit a spurious abandonment.
+  useEffect(() => {
+    const onBeforeUnload = (): void => {
+      if (currentStep.id !== 'repo') {
+        return
+      }
+      const startedAt = step4StartedAtRef.current
+      const duration = startedAt !== null ? Math.max(0, Date.now() - startedAt) : undefined
+      trackSync('onboarding_step4_abandoned', {
+        duration_ms: duration,
+        path_revealed_ssh: sshRevealedRef.current
+      })
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [currentStep.id])
 
   return (
     <div className="fixed inset-0 z-[100] overflow-auto bg-background text-foreground">
@@ -155,15 +203,30 @@ export default function OnboardingFlow({
           {currentStep.id === 'notifications' && (
             <NotificationStep value={flow.notifications} onChange={flow.setNotifications} />
           )}
-          {currentStep.id === 'repo' && (
+          {currentStep.id === 'repo' && repoSubstep === 'main' && (
             <RepoStep
               cloneUrl={flow.cloneUrl}
               onCloneUrlChange={flow.setCloneUrl}
               onOpenFolder={() => void flow.openFolder()}
               onClone={() => void flow.clone()}
+              onConnectRemote={() => {
+                track('onboarding_step4_path_clicked', { path: 'ssh' })
+                setRepoSubstep('remote')
+              }}
               workspaceDir={flow.settings?.workspaceDir ?? ''}
               busyLabel={flow.busyLabel}
               error={flow.error}
+            />
+          )}
+          {currentStep.id === 'repo' && repoSubstep === 'remote' && (
+            <RemoteRepoStep
+              onBack={() => setRepoSubstep('main')}
+              onRemoteAdded={async (repo) => {
+                await flow.completeRepoFromRemote(repo)
+              }}
+              onRetryAsFolder={async ({ connectionId, remotePath }) => {
+                await flow.retryRemoteAsFolder({ connectionId, remotePath })
+              }}
             />
           )}
         </div>

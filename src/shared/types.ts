@@ -1369,7 +1369,12 @@ export type NotificationSoundPathResult =
   | { ok: true; path: string }
   | { ok: false; reason: 'missing-path' | 'invalid-path' | 'unsupported-type' }
 
-export type OnboardingOutcome = 'completed' | 'dismissed'
+// Why: PR #1677 made the repo step a hard gate and removed every renderer
+// `closeWith('dismissed', ...)` writer. New writes are 'completed' or null;
+// legacy 'dismissed' rows on disk are coerced to null at the persistence
+// parse boundary (see src/main/persistence.ts) so they don't poison this
+// narrowed union.
+export type OnboardingOutcome = 'completed'
 
 export type OnboardingChecklistState = {
   addedRepo: boolean
@@ -1395,6 +1400,20 @@ export type OnboardingState = {
   // finished. Kept as `number` (not a literal union) because callers clamp
   // via `Math.max`/`Math.min` against arbitrary numerics.
   lastCompletedStep: number
+  // Why: PR #1677 made the repo step a hard gate, but users who started
+  // onboarding under the previous "I'll add one later" build need a way to
+  // exit. Set true at first-load under the new build for any in-flight
+  // `OnboardingState` row (closedAt === null) so `shouldShowOnboarding` can
+  // auto-complete them rather than trapping them on the now-unskippable gate.
+  // The migration is one-shot, gated by `_legacySoftSkipMigrationDone` so
+  // subsequent loads (and new users who close the wizard mid-flow on this
+  // build) never re-acquire the flag.
+  legacySoftSkipEligible?: boolean
+  // Why: one-shot migration discriminator for `legacySoftSkipEligible`.
+  // Stamped true the first time the new build loads any persisted onboarding
+  // row, so the migration runs exactly once per install. New rows created
+  // by the new build are stamped at write time via the default state.
+  _legacySoftSkipMigrationDone?: boolean
   checklist: OnboardingChecklistState
 }
 

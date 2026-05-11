@@ -8,7 +8,7 @@ import { applyDocumentTheme } from '@/lib/document-theme'
 import { track } from '@/lib/telemetry'
 import { buildAgentPickedPayload } from './agent-picked-payload'
 import { isGitRepoKind } from '../../../../shared/repo-kind'
-import type { GlobalSettings, OnboardingState, TuiAgent } from '../../../../shared/types'
+import type { GlobalSettings, OnboardingState, Repo, TuiAgent } from '../../../../shared/types'
 import type { NotificationDraft } from './NotificationStep'
 import { STEPS, type StepNumber } from './use-onboarding-flow-types'
 import { persistStep, useCloseWith, usePersistCurrentStep } from './use-onboarding-flow-persistence'
@@ -32,6 +32,7 @@ export function useOnboardingFlow(
   const fetchRepos = useAppStore((s) => s.fetchRepos)
   const fetchWorktrees = useAppStore((s) => s.fetchWorktrees)
   const openModal = useAppStore((s) => s.openModal)
+  const setActiveRepo = useAppStore((s) => s.setActiveRepo)
 
   const initialStep = Math.min(Math.max(onboarding.lastCompletedStep, 0), STEPS.length - 1)
   const [stepIndex, setStepIndex] = useState(initialStep)
@@ -238,14 +239,29 @@ export function useOnboardingFlow(
     setError
   })
 
-  const completeRepo = useCallback(
-    async (repoId: string, isGit: boolean, path: 'open_folder' | 'clone_url') => {
-      await fetchRepos()
-      await fetchWorktrees(repoId)
+  // Why: single primitive for "the user has added a repo, get them onto a
+  // usable surface." Folders synthesize a worktree via the IPC handler and
+  // hit the worktree-present branch; SSH-remote git with a transient
+  // connection failure during fetchWorktrees can return [], in which case we
+  // fall back to setActiveRepo so the user lands on the home view with the
+  // repo selected and worktrees populate on reconnect.
+  const activateRepoForUser = useCallback(
+    (repoId: string) => {
       const worktree = useAppStore.getState().worktreesByRepo[repoId]?.[0]
       if (worktree) {
         activateAndRevealWorktree(worktree.id)
+        return
       }
+      setActiveRepo(repoId)
+    },
+    [setActiveRepo]
+  )
+
+  const completeRepo = useCallback(
+    async (repoId: string, isGit: boolean, path: 'open_folder' | 'clone_url' | 'ssh') => {
+      await fetchRepos()
+      await fetchWorktrees(repoId)
+      activateRepoForUser(repoId)
       // Why: next() short-circuits step 4, so emit step_completed here once the
       // repo is successfully added to keep the funnel consistent. Gate on
       // closeWith's success so a persistence failure doesn't double-count.
@@ -280,7 +296,43 @@ export function useOnboardingFlow(
         })
       }
     },
-    [closeWith, consumeStepDurationMs, fetchRepos, fetchWorktrees, openModal]
+    [activateRepoForUser, closeWith, consumeStepDurationMs, fetchRepos, fetchWorktrees, openModal]
+  )
+
+  const completeRepoFromRemote = useCallback(
+    async (repo: Repo) => {
+      await completeRepo(repo.id, isGitRepoKind(repo), 'ssh')
+    },
+    [completeRepo]
+  )
+
+  // Why: mirrors the local 'Open a folder' silent-fallback at openFolder()
+  // when the remote path is not a git repository. The wizard does not show
+  // a confirmation dialog (the existing AddRepoDialog does, but a Radix
+  // Dialog would render under the wizard's z-[100] overlay) — the user
+  // already chose 'Connect a remote' on a step they cannot dismiss.
+  const retryRemoteAsFolder = useCallback(
+    async (args: { connectionId: string; remotePath: string }) => {
+      setError(null)
+      setBusyLabel('Adding folder…')
+      try {
+        const result = await window.api.repos.addRemote({
+          connectionId: args.connectionId,
+          remotePath: args.remotePath,
+          kind: 'folder'
+        })
+        if ('error' in result) {
+          throw new Error(result.error)
+        }
+        await completeRepo(result.repo.id, false, 'ssh')
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err))
+        track('onboarding_step4_path_failed', { path: 'ssh', reason: 'invalid_path' })
+      } finally {
+        setBusyLabel(null)
+      }
+    },
+    [completeRepo]
   )
 
   const persistCurrentStep = usePersistCurrentStep({
@@ -460,6 +512,8 @@ export function useOnboardingFlow(
     skip,
     back,
     openFolder,
-    clone
+    clone,
+    completeRepoFromRemote,
+    retryRemoteAsFolder
   }
 }

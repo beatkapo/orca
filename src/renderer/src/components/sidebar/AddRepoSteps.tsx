@@ -19,12 +19,25 @@ import type { SshTarget, SshConnectionState } from '../../../../shared/ssh-types
 
 // ── Remote project hook ─────────────────────────────────────────────
 
+// Why: the hook pushes its success/non-git outcomes through a callback object
+// instead of writing directly into parent state. AddRepoDialog supplies setters
+// that drive its dialog-internal step machine; the onboarding wizard supplies
+// callbacks that route into completeRepo / a wizard-internal folder fallback.
+// The shape lets both surfaces share the SSH-target listing + addRemote logic
+// without dragging the dialog's 'setup' confirmation step into the wizard.
+export type UseRemoteRepoCallbacks = {
+  /** Called when the remote step is opened. The dialog uses this to navigate;
+   * the wizard ignores it (its parent already opens the step view). */
+  onOpenRemoteStep?: () => void
+  onRemoteAdded: (repo: Repo) => void | Promise<void>
+  onNonGitFolder: (args: { remotePath: string; connectionId: string }) => void
+}
+
 export function useRemoteRepo(
   fetchWorktrees: (repoId: string) => Promise<void>,
-  setStep: (step: 'add' | 'clone' | 'remote' | 'create' | 'setup') => void,
-  setAddedRepo: (repo: Repo | null) => void,
-  closeModal: () => void
+  callbacks: UseRemoteRepoCallbacks
 ) {
+  const { onOpenRemoteStep, onRemoteAdded, onNonGitFolder } = callbacks
   const [sshTargets, setSshTargets] = useState<(SshTarget & { state?: SshConnectionState })[]>([])
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null)
   const [remotePath, setRemotePath] = useState('~/')
@@ -43,7 +56,7 @@ export function useRemoteRepo(
 
   const handleOpenRemoteStep = useCallback(async () => {
     const gen = ++remoteGenRef.current
-    setStep('remote')
+    onOpenRemoteStep?.()
     try {
       const targets = (await window.api.ssh.listTargets()) as SshTarget[]
       if (gen !== remoteGenRef.current) {
@@ -71,7 +84,7 @@ export function useRemoteRepo(
       }
       setSshTargets([])
     }
-  }, [setStep])
+  }, [onOpenRemoteStep])
 
   // Why: keep the target list's connection state in sync while the dialog is
   // open, so clicking the inline Connect button below updates the dot/label
@@ -125,27 +138,19 @@ export function useRemoteRepo(
       }
 
       toast.success('Remote project added', { description: repo.displayName })
-      setAddedRepo(repo)
       await fetchWorktrees(repo.id)
-      setStep('setup')
+      await onRemoteAdded(repo)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       if (message.includes('Not a valid git repository')) {
-        // Why: match the local add-project flow — show confirmation dialog so
-        // users understand git features will be unavailable, rather than
-        // silently adding as a folder.
-        closeModal()
-        useAppStore.getState().openModal('confirm-non-git-folder', {
-          folderPath: remotePath.trim(),
-          connectionId: selectedTargetId
-        })
+        onNonGitFolder({ remotePath: remotePath.trim(), connectionId: selectedTargetId })
         return
       }
       setRemoteError(message)
     } finally {
       setIsAddingRemote(false)
     }
-  }, [selectedTargetId, remotePath, fetchWorktrees, setStep, setAddedRepo, closeModal])
+  }, [selectedTargetId, remotePath, fetchWorktrees, onRemoteAdded, onNonGitFolder])
 
   return {
     sshTargets,
@@ -178,7 +183,18 @@ type RemoteStepProps = {
   onConnectTarget: (id: string) => Promise<void>
 }
 
-export function RemoteStep({
+// Why: header rendering is split from the body so the onboarding wizard can
+// reuse RemoteStepBody under its own <h2>/<p> heading. Radix's <DialogTitle>
+// / <DialogDescription> require a Dialog.Root ancestor and emit a11y warnings
+// otherwise — the wizard's <OnboardingFlow> overlay is not a Radix Dialog.
+type RemoteStepBodyProps = RemoteStepProps & {
+  // Why: the wizard wraps the file-browser branch with its own back/heading,
+  // while AddRepoDialog wraps it with DialogHeader. Both render the body, so
+  // the header is supplied externally.
+  renderBrowseHeader?: () => React.ReactNode
+}
+
+export function RemoteStepBody({
   sshTargets,
   selectedTargetId,
   remotePath,
@@ -188,19 +204,15 @@ export function RemoteStep({
   onRemotePathChange,
   onAdd,
   onOpenSshSettings,
-  onConnectTarget
-}: RemoteStepProps): React.JSX.Element {
+  onConnectTarget,
+  renderBrowseHeader
+}: RemoteStepBodyProps): React.JSX.Element {
   const [browsing, setBrowsing] = useState(false)
 
   if (browsing && selectedTargetId) {
     return (
       <>
-        <DialogHeader>
-          <DialogTitle>Browse remote filesystem</DialogTitle>
-          <DialogDescription>
-            Navigate to a directory and click Select to choose it.
-          </DialogDescription>
-        </DialogHeader>
+        {renderBrowseHeader?.()}
         <RemoteFileBrowser
           targetId={selectedTargetId}
           initialPath={remotePath || '~'}
@@ -215,6 +227,82 @@ export function RemoteStep({
   }
 
   return (
+    <div className="space-y-3 pt-1">
+      <div className="space-y-1">
+        <label className="text-[11px] font-medium text-muted-foreground">SSH target</label>
+        {sshTargets.length === 0 ? (
+          <div className="space-y-1.5 py-1">
+            <p className="text-xs text-muted-foreground">No SSH targets configured.</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={onOpenSshSettings}
+            >
+              <Settings className="size-3.5" />
+              Add in Settings
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+            {sshTargets.map((target) => (
+              <SshTargetRow
+                key={target.id}
+                target={target}
+                isSelected={selectedTargetId === target.id}
+                onSelect={onSelectTarget}
+                onConnect={onConnectTarget}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-[11px] font-medium text-muted-foreground">Remote path</label>
+        <div className="flex gap-2">
+          <Input
+            value={remotePath}
+            onChange={(e) => onRemotePathChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                e.preventDefault()
+                if (selectedTargetId && remotePath.trim() && !isAddingRemote) {
+                  onAdd()
+                }
+              }
+            }}
+            placeholder="/home/user/project"
+            className="h-8 text-xs flex-1"
+            disabled={isAddingRemote || !selectedTargetId}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-2 shrink-0"
+            onClick={() => setBrowsing(true)}
+            disabled={!selectedTargetId || isAddingRemote}
+          >
+            <FolderOpen className="size-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {remoteError && <p className="text-[11px] text-destructive">{remoteError}</p>}
+
+      <Button
+        onClick={onAdd}
+        disabled={!selectedTargetId || !remotePath.trim() || isAddingRemote}
+        className="w-full"
+      >
+        {isAddingRemote ? 'Adding...' : 'Add remote project'}
+      </Button>
+    </div>
+  )
+}
+
+export function RemoteStep(props: RemoteStepProps): React.JSX.Element {
+  return (
     <>
       <DialogHeader>
         <DialogTitle>Open remote project</DialogTitle>
@@ -222,78 +310,17 @@ export function RemoteStep({
           Choose a connected SSH target and enter the path to a Git repository.
         </DialogDescription>
       </DialogHeader>
-
-      <div className="space-y-3 pt-1">
-        <div className="space-y-1">
-          <label className="text-[11px] font-medium text-muted-foreground">SSH target</label>
-          {sshTargets.length === 0 ? (
-            <div className="space-y-1.5 py-1">
-              <p className="text-xs text-muted-foreground">No SSH targets configured.</p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={onOpenSshSettings}
-              >
-                <Settings className="size-3.5" />
-                Add in Settings
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
-              {sshTargets.map((target) => (
-                <SshTargetRow
-                  key={target.id}
-                  target={target}
-                  isSelected={selectedTargetId === target.id}
-                  onSelect={onSelectTarget}
-                  onConnect={onConnectTarget}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-1">
-          <label className="text-[11px] font-medium text-muted-foreground">Remote path</label>
-          <div className="flex gap-2">
-            <Input
-              value={remotePath}
-              onChange={(e) => onRemotePathChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-                  e.preventDefault()
-                  if (selectedTargetId && remotePath.trim() && !isAddingRemote) {
-                    onAdd()
-                  }
-                }
-              }}
-              placeholder="/home/user/project"
-              className="h-8 text-xs flex-1"
-              disabled={isAddingRemote || !selectedTargetId}
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 px-2 shrink-0"
-              onClick={() => setBrowsing(true)}
-              disabled={!selectedTargetId || isAddingRemote}
-            >
-              <FolderOpen className="size-3.5" />
-            </Button>
-          </div>
-        </div>
-
-        {remoteError && <p className="text-[11px] text-destructive">{remoteError}</p>}
-
-        <Button
-          onClick={onAdd}
-          disabled={!selectedTargetId || !remotePath.trim() || isAddingRemote}
-          className="w-full"
-        >
-          {isAddingRemote ? 'Adding...' : 'Add remote project'}
-        </Button>
-      </div>
+      <RemoteStepBody
+        {...props}
+        renderBrowseHeader={() => (
+          <DialogHeader>
+            <DialogTitle>Browse remote filesystem</DialogTitle>
+            <DialogDescription>
+              Navigate to a directory and click Select to choose it.
+            </DialogDescription>
+          </DialogHeader>
+        )}
+      />
     </>
   )
 }

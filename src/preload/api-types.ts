@@ -728,6 +728,10 @@ export type PreloadApi = {
    *  sites should import `track<N>()` from `src/renderer/src/lib/telemetry.ts`
    *  for the `EventMap`-based type safety, not reach for this directly. */
   telemetryTrack: (name: string, props: Record<string, unknown>) => Promise<void>
+  /** Synchronous track for the renderer's beforeunload handler. Async
+   *  fire-and-forget IPC is cancelled before delivery during a real
+   *  shutdown — sendSync blocks the renderer until the event reaches main. */
+  telemetryTrackSync: (name: string, props: Record<string, unknown>) => void
   /** Flip the persisted opt-in preference. Subject to a per-session
    *  consent-mutation rate limit on the main side (≤5/session). */
   telemetrySetOptIn: (optedIn: boolean) => Promise<void>

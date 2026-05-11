@@ -861,6 +861,12 @@ const api = {
   // src/renderer/src/lib/telemetry.ts, which is what call sites import.
   telemetryTrack: (name: string, props: Record<string, unknown>): Promise<void> =>
     ipcRenderer.invoke('telemetry:track', name, props),
+  /** Synchronous track for the renderer's beforeunload handler — async
+   * telemetry IPC is fire-and-forget and would be cancelled before delivery
+   * during a real shutdown. */
+  telemetryTrackSync: (name: string, props: Record<string, unknown>): void => {
+    ipcRenderer.sendSync('telemetry:track-sync', name, props)
+  },
   telemetrySetOptIn: (optedIn: boolean): Promise<void> =>
     ipcRenderer.invoke('telemetry:setOptIn', optedIn),
   telemetryAcknowledgeBanner: (): Promise<void> =>

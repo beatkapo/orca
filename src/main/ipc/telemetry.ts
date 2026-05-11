@@ -102,20 +102,24 @@ function deriveOptInVia(store: Store, incomingOptedIn: boolean): OptInVia {
 export function registerTelemetryHandlers(store: Store): void {
   storeRef = store
 
-  ipcMain.handle('telemetry:track', (_event, name: unknown, props: unknown): void => {
+  // Why: shared validate-and-track core so the async `invoke` and the sync
+  // `sendSync` paths can't drift. Returns true on a successful track (so the
+  // sync caller can inspect via event.returnValue if it ever needs to);
+  // returns false on input boundary failures.
+  const trackOne = (name: unknown, props: unknown): boolean => {
     // Strict input typing: non-string names are dropped at the boundary
     // before the validator even sees them. The validator would also drop
     // (unknown event name), but the main-side narrow keeps the attack
     // surface minimal — a flood of bogus payloads does not exercise the
     // Zod parser for no reason.
     if (typeof name !== 'string') {
-      return
+      return false
     }
     // `props` may legitimately be omitted; treat `undefined`/`null` as an
     // empty object before the validator. Anything else non-object (e.g.
     // a string, a number) is a boundary violation.
     if (props !== null && props !== undefined && typeof props !== 'object') {
-      return
+      return false
     }
     // Inject cohort here, at the IPC entry, only for events whose schemas
     // declare `nth_repo_added` (see `COHORT_EXTENDED` in telemetry-events.ts).
@@ -144,6 +148,22 @@ export function registerTelemetryHandlers(store: Store): void {
     // single enforcement point at runtime; these casts only feed the
     // typed channel that the validator will re-check.
     track(eventName, finalProps as EventProps<EventName>)
+    return true
+  }
+
+  ipcMain.handle('telemetry:track', (_event, name: unknown, props: unknown): void => {
+    trackOne(name, props)
+  })
+
+  // Why: synchronous variant for the renderer's beforeunload handler. The
+  // async invoke path is fire-and-forget IPC, which is cancelled before
+  // delivery during a real shutdown — the renderer process exits before the
+  // event lands. sendSync blocks the renderer until this returns, so the
+  // event reaches the validator and PostHog client before window close.
+  // Same validation discipline as the async path; consult eventReturnValue
+  // only as a debug aid (the renderer fires-and-forgets either way).
+  ipcMain.on('telemetry:track-sync', (event, name: unknown, props: unknown) => {
+    event.returnValue = trackOne(name, props)
   })
 
   ipcMain.handle('telemetry:setOptIn', (_event, optedIn: unknown): Promise<void> | void => {

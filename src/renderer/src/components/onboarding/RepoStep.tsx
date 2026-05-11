@@ -5,6 +5,7 @@ type RepoStepProps = {
   onCloneUrlChange: (value: string) => void
   onOpenFolder: () => void
   onClone: () => void
+  onConnectRemote: () => void
   workspaceDir: string
   busyLabel: string | null
   error: string | null
@@ -15,6 +16,7 @@ export function RepoStep({
   onCloneUrlChange,
   onOpenFolder,
   onClone,
+  onConnectRemote,
   workspaceDir,
   busyLabel,
   error
@@ -78,14 +80,30 @@ export function RepoStep({
         </div>
       </form>
 
+      <button
+        type="button"
+        className="group flex w-full items-center gap-4 rounded-xl border border-border bg-muted/30 p-5 text-left transition hover:border-foreground/40 hover:bg-muted/60 disabled:opacity-60"
+        disabled={disabled}
+        onClick={onConnectRemote}
+      >
+        <div className="grid size-11 shrink-0 place-items-center rounded-lg bg-muted text-foreground">
+          <Server className="size-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-base font-semibold text-foreground">Connect a remote (SSH)</div>
+          <div className="mt-0.5 text-[13px] text-muted-foreground">
+            Open a project on a remote machine over SSH.
+          </div>
+        </div>
+        <span className="shrink-0 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition group-hover:border-foreground/40">
+          Connect…
+        </span>
+      </button>
+
       <div className="flex flex-wrap items-center justify-between gap-3 px-1 pt-1 text-xs text-muted-foreground">
         <div className="flex min-w-0 items-center gap-2">
           <span>Workspace</span>
           <span className="truncate font-mono text-foreground">{workspaceDir}</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Server className="size-3.5" />
-          <span>SSH? Set hosts up in Settings</span>
         </div>
       </div>
 

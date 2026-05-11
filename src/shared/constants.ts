@@ -122,6 +122,11 @@ export function getDefaultOnboardingState(): OnboardingState {
     closedAt: null,
     outcome: null,
     lastCompletedStep: -1,
+    // Why: stamp the legacy migration as already-done for new rows created
+    // under the gate-required build. Without this, the migration would mark
+    // a user who closes the wizard mid-flow on this build as legacy-eligible
+    // on next launch and let them bypass the gate.
+    _legacySoftSkipMigrationDone: true,
     checklist: {
       addedRepo: false,
       choseAgent: false,

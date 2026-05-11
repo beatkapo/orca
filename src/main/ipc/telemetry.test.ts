@@ -12,8 +12,10 @@ import type { GlobalSettings } from '../../shared/types'
 import type { Store } from '../persistence'
 
 const handlers = new Map<string, (_event: unknown, ...args: unknown[]) => unknown>()
+const syncHandlers = new Map<string, (_event: unknown, ...args: unknown[]) => unknown>()
 const {
   handleMock,
+  onMock,
   trackMock,
   setOptInMock,
   persistBannerAcknowledgeMock,
@@ -22,6 +24,7 @@ const {
   getOnboardingCohortAtEmitMock
 } = vi.hoisted(() => ({
   handleMock: vi.fn(),
+  onMock: vi.fn(),
   trackMock: vi.fn(),
   setOptInMock: vi.fn(),
   persistBannerAcknowledgeMock: vi.fn(),
@@ -30,7 +33,7 @@ const {
   getOnboardingCohortAtEmitMock: vi.fn()
 }))
 
-vi.mock('electron', () => ({ ipcMain: { handle: handleMock } }))
+vi.mock('electron', () => ({ ipcMain: { handle: handleMock, on: onMock } }))
 vi.mock('../telemetry/client', () => ({
   track: trackMock,
   setOptIn: setOptInMock,
@@ -56,6 +59,14 @@ function captureHandlers(): void {
       typeof handlers extends Map<string, infer V> ? V : never
     ]
     handlers.set(channel, handler)
+  }
+  syncHandlers.clear()
+  for (const call of onMock.mock.calls) {
+    const [channel, handler] = call as [
+      string,
+      typeof syncHandlers extends Map<string, infer V> ? V : never
+    ]
+    syncHandlers.set(channel, handler)
   }
 }
 
@@ -88,6 +99,7 @@ function registerWith(telemetry: GlobalSettings['telemetry']): FakeStoreState {
 describe('telemetry IPC handlers', () => {
   beforeEach(() => {
     handleMock.mockReset()
+    onMock.mockReset()
     trackMock.mockReset()
     setOptInMock.mockReset()
     persistBannerAcknowledgeMock.mockReset()
