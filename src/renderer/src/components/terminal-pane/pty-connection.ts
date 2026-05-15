@@ -26,6 +26,7 @@ import {
   waitForTerminalOutputParsed,
   writeTerminalOutput
 } from '@/lib/pane-manager/pane-terminal-output-scheduler'
+import { createTerminalCommandLifecycle } from './terminal-command-lifecycle'
 
 const pendingSpawnByPaneKey = new Map<string, Promise<string | null>>()
 const SSH_SESSION_EXPIRED_ERROR = 'SSH_SESSION_EXPIRED'
@@ -149,6 +150,19 @@ export function connectPanePty(
   // can track each Claude session independently without overwriting each other.
   const cacheKey = `${deps.tabId}:${pane.id}`
   const pendingSpawnKey = `${deps.tabId}:${paneLeafId(pane.id)}`
+  const commandLifecycle = createTerminalCommandLifecycle({
+    onCommandFinished: () => {
+      const state = useAppStore.getState()
+      const entry = state.agentStatusByPaneKey[cacheKey]
+      // Why: OSC 133 D marks the foreground shell command exiting. Remove the
+      // row without retaining a done snapshot; this section represents a live
+      // agent process, and the shell prompt means that process is gone.
+      if (entry) {
+        state.dropAgentStatus(cacheKey)
+      }
+    }
+  })
+  commandLifecycle.attachXtermConsumer(pane.terminal)
 
   const onExit = (ptyId: string): void => {
     deps.syncPanePtyLayoutBinding(pane.id, null)
@@ -634,6 +648,7 @@ export function connectPanePty(
     }
 
     const dataCallback = (data: string): void => {
+      commandLifecycle.handlePtyData(data)
       if (terminalOutputPrefersDomRenderer(data)) {
         manager.markPaneHasComplexScriptOutput(pane.id)
       }
@@ -1246,6 +1261,7 @@ export function connectPanePty(
         cancelAnimationFrame(pendingGeometryReportRaf)
         pendingGeometryReportRaf = null
       }
+      commandLifecycle.dispose()
     }
   }
 }

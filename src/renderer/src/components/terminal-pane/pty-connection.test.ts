@@ -35,6 +35,9 @@ type StoreState = {
   removeDeferredSshSessionId: ReturnType<typeof vi.fn>
   consumePendingColdRestore: ReturnType<typeof vi.fn>
   consumePendingSnapshot: ReturnType<typeof vi.fn>
+  agentStatusByPaneKey: Record<string, unknown>
+  removeAgentStatus: ReturnType<typeof vi.fn>
+  dropAgentStatus: ReturnType<typeof vi.fn>
 }
 
 type ConnectCallbacks = {
@@ -163,7 +166,10 @@ function createPane(paneId: number) {
       write: vi.fn(),
       onData: vi.fn(() => ({ dispose: vi.fn() })),
       onResize: vi.fn(() => ({ dispose: vi.fn() })),
-      onTitleChange: vi.fn(() => ({ dispose: vi.fn() }))
+      onTitleChange: vi.fn(() => ({ dispose: vi.fn() })),
+      parser: {
+        registerOscHandler: vi.fn(() => ({ dispose: vi.fn() }))
+      }
     },
     container: { dataset: {} },
     fitAddon: {
@@ -253,7 +259,9 @@ describe('connectPanePty', () => {
       removeDeferredSshSessionId: vi.fn(),
       consumePendingColdRestore: vi.fn(() => null),
       consumePendingSnapshot: vi.fn(() => null),
-      removeAgentStatus: vi.fn()
+      agentStatusByPaneKey: {},
+      removeAgentStatus: vi.fn(),
+      dropAgentStatus: vi.fn()
     } as StoreState
     ;(globalThis as unknown as { window: unknown }).window = {
       api: {
@@ -553,6 +561,43 @@ describe('connectPanePty', () => {
     } finally {
       globalThis.setTimeout = originalSetTimeout
     }
+  })
+
+  it('drops agent status without retaining when OSC 133 reports the command finished', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+
+    const capturedDataCallback: { current: ((data: string) => void) | null } = { current: null }
+    const transport = createMockTransport()
+    transport.connect.mockImplementation(async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+      capturedDataCallback.current = callbacks.onData ?? null
+      return 'pty-local-1'
+    })
+    transportFactoryQueue.push(transport)
+    mockStoreState = {
+      ...mockStoreState,
+      agentStatusByPaneKey: {
+        'tab-1:1': {
+          paneKey: 'tab-1:1',
+          state: 'done',
+          prompt: 'hi',
+          updatedAt: 1000,
+          stateStartedAt: 1000,
+          agentType: 'codex',
+          stateHistory: []
+        }
+      }
+    }
+
+    const pane = createPane(1)
+    const manager = createManager(1)
+    const deps = createDeps({ isVisibleRef: { current: false } })
+
+    connectPanePty(pane as never, manager as never, deps as never)
+
+    capturedDataCallback.current?.('\x1b]133;D;130\x07thebr ~/repo $ ')
+
+    expect(mockStoreState.dropAgentStatus).toHaveBeenCalledWith('tab-1:1')
+    expect(mockStoreState.removeAgentStatus).not.toHaveBeenCalled()
   })
 
   it('reattaches a remounted split pane to its restored leaf PTY instead of the tab-level PTY', async () => {
