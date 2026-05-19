@@ -67,6 +67,10 @@ import {
   createWebRuntimeSessionTerminal,
   isWebRuntimeSessionActive
 } from '@/runtime/web-runtime-session'
+import {
+  observeAgentHookCompletionForNotification,
+  resetAgentHookCompletionNotificationCoordinators
+} from './agent-hook-completion-notifications'
 
 export { resolveZoomTarget } from './resolve-zoom-target'
 
@@ -1835,6 +1839,17 @@ export function useIpcEvents(): void {
         updatedAt: data.receivedAt,
         stateStartedAt: data.stateStartedAt
       })
+      const statusWorktreeId = data.worktreeId ?? owningWorktreeId
+      if (options?.replay !== true && statusWorktreeId) {
+        // Why: local Codex/Claude hooks arrive through this main-process IPC
+        // path, not the PTY OSC fallback, so task-complete notifications must
+        // observe accepted hook state here as well.
+        observeAgentHookCompletionForNotification({
+          paneKey: data.paneKey,
+          worktreeId: statusWorktreeId,
+          payload
+        })
+      }
     }
 
     let snapshotRequestedForReadyWindow = false
@@ -2036,7 +2051,10 @@ export function useIpcEvents(): void {
         })
     }
 
-    return () => unsubs.forEach((fn) => fn())
+    return () => {
+      unsubs.forEach((fn) => fn())
+      resetAgentHookCompletionNotificationCoordinators()
+    }
   }, [])
 }
 

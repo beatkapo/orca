@@ -15,7 +15,10 @@ import type {
   AgentCompletionCoordinatorOptions
 } from './agent-completion-coordinator-types'
 import type { RuntimeTerminalProcessInspection } from '@/runtime/runtime-terminal-inspection'
-import { titleHasExplicitAgentIdentity } from './title-agent-identity'
+import {
+  titleHasExplicitAgentIdentity,
+  titleIsInconclusiveNativeDroidTitle
+} from './title-agent-identity'
 
 type CompletionSource = 'hook' | 'title' | 'process-exit'
 
@@ -284,7 +287,8 @@ export function createAgentCompletionCoordinator(
 
   function observeTitle(title: string): void {
     const status = detectAgentStatusFromTitle(title)
-    if (titleHasExplicitAgentIdentity(title)) {
+    const isInconclusiveNativeDroidTitle = titleIsInconclusiveNativeDroidTitle(title)
+    if (titleHasExplicitAgentIdentity(title) && !isInconclusiveNativeDroidTitle) {
       establishAgentEvidence()
     }
 
@@ -293,6 +297,10 @@ export function createAgentCompletionCoordinator(
         return
       }
     } else if (lastTitleStatus === 'working') {
+      if (isInconclusiveNativeDroidTitle) {
+        lastTitleStatus = status
+        return
+      }
       if (agentIdentityEstablished && hasAgentRunEvidence) {
         dispatchCompletion('title', title)
       } else {

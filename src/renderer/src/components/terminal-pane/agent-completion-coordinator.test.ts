@@ -356,7 +356,18 @@ describe('agent completion coordinator', () => {
     expect(dispatchCompletion).toHaveBeenCalledTimes(2)
   })
 
-  it('recognizes hook agent ids even when the binary name differs', () => {
+  it.each([
+    'claude',
+    'codex',
+    'gemini',
+    'opencode',
+    'cursor',
+    'pi',
+    'droid',
+    'grok',
+    'copilot',
+    'hermes'
+  ])('recognizes %s hook agent ids even when the binary name differs', (agentType) => {
     const dispatchCompletion = vi.fn()
     const coordinator = createAgentCompletionCoordinator({
       paneKey: 'tab-1:leaf-1',
@@ -370,10 +381,10 @@ describe('agent completion coordinator', () => {
     coordinator.observeHookStatus({
       state: 'done',
       prompt: '',
-      agentType: 'cursor'
+      agentType
     })
 
-    expect(dispatchCompletion).toHaveBeenCalledWith('cursor')
+    expect(dispatchCompletion).toHaveBeenCalledWith(agentType)
   })
 
   it('keeps a generic title completion pending long enough for the first remote inspection', async () => {
