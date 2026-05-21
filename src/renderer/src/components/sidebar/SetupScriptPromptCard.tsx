@@ -326,36 +326,52 @@ function SetupScriptPromptCard(): React.JSX.Element | null {
 
   return (
     <div className="px-3 pb-2">
-      <div className="relative rounded-lg border border-sidebar-border bg-card p-3 text-card-foreground shadow-xs">
-        <Badge variant="outline" className="h-5 px-1.5 text-[11px]">
-          Setup
-        </Badge>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              aria-label="Dismiss setup scripts"
-              className="absolute right-2 top-2 text-muted-foreground"
-              onClick={handleDismiss}
-            >
-              <X className="size-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="top" sideOffset={4}>
-            Dismiss
-          </TooltipContent>
-        </Tooltip>
+      <div className="rounded-lg border border-sidebar-border bg-sidebar-accent p-3 text-sidebar-accent-foreground shadow-xs">
+        <div className="flex items-center justify-between gap-2">
+          <Badge
+            variant="outline"
+            className="h-5 border-transparent bg-foreground/10 px-1.5 text-[11px] text-foreground"
+          >
+            Setup
+          </Badge>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Dismiss setup scripts"
+                className="-mr-1 text-muted-foreground"
+                onClick={handleDismiss}
+              >
+                <X className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top" sideOffset={4}>
+              Dismiss
+            </TooltipContent>
+          </Tooltip>
+        </div>
 
-        <p className="mt-2 pr-6 text-sm font-semibold leading-snug">{title}</p>
+        <p className="mt-2 text-sm font-semibold leading-snug">{title}</p>
         <p className="mt-1 text-xs leading-snug text-muted-foreground">
           {candidateSource ? (
             <>
               Detected setup config from <span className="break-words">{candidateSource}</span>.
             </>
           ) : (
-            <>Automate workspace setup for {activeRepo.displayName}.</>
+            <>
+              Automate workspace setup for{' '}
+              <span className="inline-flex items-center gap-1.5 align-baseline px-1.5 py-0.5 rounded-[4px] bg-accent border border-border dark:bg-accent/50 dark:border-border/60">
+                <span
+                  className="size-1.5 rounded-full"
+                  style={{ backgroundColor: activeRepo.badgeColor }}
+                />
+                <span className="text-[10px] font-semibold text-foreground truncate max-w-[8rem] leading-none lowercase">
+                  {activeRepo.displayName}
+                </span>
+              </span>
+            </>
           )}
         </p>
 
