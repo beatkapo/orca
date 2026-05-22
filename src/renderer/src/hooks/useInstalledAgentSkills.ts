@@ -1,7 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { DiscoveredSkill, SkillDiscoveryResult } from '../../../shared/skills'
+import type { DiscoveredSkill, SkillDiscoveryResult, SkillSourceKind } from '../../../shared/skills'
 
 const INSTALLED_AGENT_SKILLS_CHANGED_EVENT = 'orca:installed-agent-skills-changed'
+export const GLOBAL_AGENT_SKILL_SOURCE_KINDS = [
+  'home'
+] as const satisfies readonly SkillSourceKind[]
+
+type InstalledAgentSkillOptions = {
+  enabled?: boolean
+  sourceKinds?: readonly SkillSourceKind[]
+}
+
+type InstalledAgentSkillMatchOptions = {
+  sourceKinds?: readonly SkillSourceKind[]
+}
 
 let cachedDiscovery: SkillDiscoveryResult | null = null
 let pendingDiscovery: Promise<SkillDiscoveryResult> | null = null
@@ -16,11 +28,15 @@ function basenameFromPath(pathValue: string): string {
 
 export function hasInstalledAgentSkill(
   skills: readonly DiscoveredSkill[],
-  skillName: string
+  skillName: string,
+  options: InstalledAgentSkillMatchOptions = {}
 ): boolean {
   const expected = normalizeSkillName(skillName)
   return skills.some((skill) => {
     if (!skill.installed) {
+      return false
+    }
+    if (options.sourceKinds && !options.sourceKinds.includes(skill.sourceKind)) {
       return false
     }
     return (
@@ -56,14 +72,14 @@ async function discoverInstalledAgentSkills(force: boolean): Promise<SkillDiscov
 
 export function useInstalledAgentSkill(
   skillName: string,
-  options: { enabled?: boolean } = {}
+  options: InstalledAgentSkillOptions = {}
 ): {
   installed: boolean
   loading: boolean
   error: string | null
   refresh: () => Promise<void>
 } {
-  const { enabled = true } = options
+  const { enabled = true, sourceKinds } = options
   const [result, setResult] = useState<SkillDiscoveryResult | null>(cachedDiscovery)
   const [loading, setLoading] = useState(enabled && !cachedDiscovery)
   const [error, setError] = useState<string | null>(null)
@@ -112,8 +128,9 @@ export function useInstalledAgentSkill(
   }, [enabled, refresh])
 
   const installed = useMemo(
-    () => (enabled && result ? hasInstalledAgentSkill(result.skills, skillName) : false),
-    [enabled, result, skillName]
+    () =>
+      enabled && result ? hasInstalledAgentSkill(result.skills, skillName, { sourceKinds }) : false,
+    [enabled, result, skillName, sourceKinds]
   )
 
   const forceRefresh = useCallback(() => refresh(true), [refresh])

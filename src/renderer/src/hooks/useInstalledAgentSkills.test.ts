@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { DiscoveredSkill } from '../../../shared/skills'
-import { hasInstalledAgentSkill } from './useInstalledAgentSkills'
+import { GLOBAL_AGENT_SKILL_SOURCE_KINDS, hasInstalledAgentSkill } from './useInstalledAgentSkills'
 
 function skill(overrides: Partial<DiscoveredSkill>): DiscoveredSkill {
   return {
@@ -43,5 +43,41 @@ describe('hasInstalledAgentSkill', () => {
     expect(
       hasInstalledAgentSkill([skill({ name: 'orca-cli', installed: false })], 'orca-cli')
     ).toBe(false)
+  })
+
+  it('does not count repo or plugin skills when matching global installs', () => {
+    expect(
+      hasInstalledAgentSkill(
+        [
+          skill({
+            name: 'orca-cli',
+            sourceKind: 'repo',
+            sourceLabel: 'Repo test .agents',
+            rootPath: '/repo/.agents/skills',
+            directoryPath: '/repo/.agents/skills/orca-cli',
+            skillFilePath: '/repo/.agents/skills/orca-cli/SKILL.md'
+          }),
+          skill({
+            id: 'skill-2',
+            name: 'orca-cli',
+            sourceKind: 'plugin',
+            sourceLabel: 'Codex plugin cache',
+            rootPath: '/Users/test/.codex/plugins/cache',
+            directoryPath: '/Users/test/.codex/plugins/cache/vendor/orca-cli',
+            skillFilePath: '/Users/test/.codex/plugins/cache/vendor/orca-cli/SKILL.md'
+          })
+        ],
+        'orca-cli',
+        { sourceKinds: GLOBAL_AGENT_SKILL_SOURCE_KINDS }
+      )
+    ).toBe(false)
+  })
+
+  it('counts home skills when matching global installs', () => {
+    expect(
+      hasInstalledAgentSkill([skill({ name: 'orca-cli' })], 'orca-cli', {
+        sourceKinds: GLOBAL_AGENT_SKILL_SOURCE_KINDS
+      })
+    ).toBe(true)
   })
 })

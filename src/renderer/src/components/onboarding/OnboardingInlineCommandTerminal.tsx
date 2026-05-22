@@ -6,7 +6,7 @@ import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
 import { useAppStore } from '@/store'
 
 const ONBOARDING_INLINE_TERMINAL_WORKTREE_ID = 'onboarding-inline-terminal'
-const AUTO_INSERT_DELAY_MS = 700
+const AUTO_INSERT_DELAY_MS = 250
 const READY_RETRY_MS = 100
 const READY_MAX_ATTEMPTS = 50
 
@@ -15,6 +15,7 @@ type OnboardingInlineCommandTerminalProps = {
   title: string
   description: string
   ariaLabel: string
+  worktreeId?: string
   onOpened?: () => void
   onInteracted?: (method: 'keyboard' | 'pointer', event?: KeyboardEvent<HTMLElement>) => void
 }
@@ -24,6 +25,7 @@ export function OnboardingInlineCommandTerminal({
   title,
   description,
   ariaLabel,
+  worktreeId = ONBOARDING_INLINE_TERMINAL_WORKTREE_ID,
   onOpened,
   onInteracted
 }: OnboardingInlineCommandTerminalProps): React.JSX.Element {
@@ -56,13 +58,13 @@ export function OnboardingInlineCommandTerminal({
   }, [])
 
   useEffect(() => {
-    const tab = createTab(ONBOARDING_INLINE_TERMINAL_WORKTREE_ID, undefined, undefined, {
+    const tab = createTab(worktreeId, undefined, undefined, {
       activate: false
     })
-    setActiveTabForWorktree(ONBOARDING_INLINE_TERMINAL_WORKTREE_ID, tab.id)
+    setActiveTabForWorktree(worktreeId, tab.id)
     setTabCustomTitle(tab.id, title)
     setTabId(tab.id)
-  }, [createTab, setActiveTabForWorktree, setTabCustomTitle, title])
+  }, [createTab, setActiveTabForWorktree, setTabCustomTitle, title, worktreeId])
 
   useEffect(() => {
     if (prefersReducedMotion) {
@@ -129,7 +131,9 @@ export function OnboardingInlineCommandTerminal({
       if (canceled) {
         return
       }
-      if (findTerminalTabElement(tabId)?.querySelector('[data-pty-id]')) {
+      const terminalElement = findTerminalTabElement(tabId)
+      const hasPty = Boolean(terminalElement?.querySelector('[data-pty-id]'))
+      if (terminalReadyForCommand(terminalElement) || (hasPty && attempt >= READY_MAX_ATTEMPTS)) {
         insertionTimer = window.setTimeout(() => {
           if (!canceled) {
             autoInsertedRef.current = command
@@ -182,7 +186,7 @@ export function OnboardingInlineCommandTerminal({
           {cwd && tabId ? (
             <TerminalPane
               tabId={tabId}
-              worktreeId={ONBOARDING_INLINE_TERMINAL_WORKTREE_ID}
+              worktreeId={worktreeId}
               cwd={cwd}
               isActive
               isVisible
@@ -208,4 +212,14 @@ function findTerminalTabElement(tabId: string): HTMLElement | null {
     }
   }
   return null
+}
+
+function terminalReadyForCommand(element: HTMLElement | null): boolean {
+  if (!element?.querySelector('[data-pty-id]')) {
+    return false
+  }
+  // Why: pasting before the login shell renders a prompt can double-echo the
+  // draft command. Visible terminal text is the least intrusive readiness signal.
+  const renderedText = element.querySelector('.xterm-rows')?.textContent?.trim() ?? ''
+  return renderedText.length > 0
 }
