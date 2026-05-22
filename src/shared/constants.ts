@@ -72,7 +72,8 @@ function defaultTerminalFontFamily(): string {
 
 export const getDefaultPrimarySelectionMiddleClickPaste = (
   platform = typeof process !== 'undefined' ? process.platform : ''
-): boolean => platform === 'linux'
+): boolean => platform === 'linux' || platform === 'darwin'
+
 /**
  * Why: ProseMirror builds an in-memory tree for the entire document, so large
  * markdown files cause noticeable typing lag in the rich editor. Files above
@@ -161,6 +162,10 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     editorMinimapEnabled: false,
     markdownReviewToolsEnabled: true,
     primarySelectionMiddleClickPaste: getDefaultPrimarySelectionMiddleClickPaste(),
+    primarySelectionMiddleClickPasteDefaultedForLinux:
+      typeof process !== 'undefined' && process.platform === 'linux',
+    primarySelectionMiddleClickPasteDefaultedForTerminalDefaults:
+      getDefaultPrimarySelectionMiddleClickPaste(),
     terminalFontSize: 14,
     terminalFontFamily: defaultTerminalFontFamily(),
     terminalFontWeight: DEFAULT_TERMINAL_FONT_WEIGHT,
@@ -212,6 +217,9 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     showTitlebarAppName: true,
     showTasksButton: true,
     ctrlTabOrderMode: 'mru',
+    // Why: switching worktrees and opening command surfaces from a focused
+    // terminal is a core Orca workflow; users who prefer TUI ownership opt in.
+    terminalShortcutPolicy: 'orca-first',
     floatingTerminalEnabled: true,
     floatingTerminalDefaultedForAllUsers: true,
     floatingTerminalCwd: '~',
@@ -308,7 +316,6 @@ export function getDefaultRepoHookSettings(): RepoHookSettings {
   return {
     mode: 'auto',
     setupRunPolicy: 'run-by-default',
-    commandSourcePolicy: 'shared-only',
     scripts: {
       setup: '',
       archive: ''

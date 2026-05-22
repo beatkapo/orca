@@ -11,6 +11,7 @@ import { SSH_TERMINATE_RECONNECT_REQUIRED } from '../../../../shared/constants'
 import { useAppStore } from '@/store'
 import { Button } from '../ui/button'
 import type { SettingsSearchEntry } from './settings-search'
+import { removeSshTargetWithBestEffortCleanup } from './ssh-target-remove'
 import { SshTargetCard } from './SshTargetCard'
 import { SshTargetDestructiveActions } from './SshTargetDestructiveActions'
 import { SshTargetForm, EMPTY_FORM, type EditingTarget } from './SshTargetForm'
@@ -150,10 +151,7 @@ export function SshPane(_props: SshPaneProps): React.JSX.Element {
 
   const handleRemove = async (id: string): Promise<void> => {
     try {
-      // Why: removing a target is destructive even after non-destructive
-      // disconnect, when remote PTYs can still be alive in the grace window.
-      await terminateSessionsWithReconnect(id)
-      await window.api.ssh.removeTarget({ id })
+      await removeSshTargetWithBestEffortCleanup(window.api.ssh, id)
       toast.success('Target removed')
       await loadTargets()
     } catch (err) {

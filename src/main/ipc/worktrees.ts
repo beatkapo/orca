@@ -22,10 +22,8 @@ import {
 } from '../git/worktree'
 import { gitExecFileAsync } from '../git/runner'
 import { withWorktreeSpan } from '../observability/instrumentation'
-import { getDefaultRemote } from '../git/repo'
 import { resolveGitHubPrStartPoint } from '../github/pr-start-point'
-import { getProjectRef as getGlabProjectRef, getGlabKnownHosts } from '../gitlab/gl-utils'
-import { getWorkItemByProjectRef as getGitLabWorkItemByProjectRef } from '../gitlab/client'
+import { getDefaultRemote } from '../git/repo'
 import { listRepoWorktrees, createFolderWorktree } from '../repo-worktrees'
 import { getSshGitProvider, requireSshGitProvider } from '../providers/ssh-git-dispatch'
 import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
@@ -71,7 +69,8 @@ import { workspaceSourceSchema, type WorkspaceSource } from '../../shared/teleme
 import { classifyWorkspaceCreateError } from './workspace-create-error-classifier'
 import {
   canSafelyRemoveOrphanedWorktreeDirectory,
-  getRegisteredDeletableWorktree
+  findRegisteredDeletableWorktree,
+  isWorktreePathMissing
 } from '../worktree-removal-safety'
 
 // Why: worktrees discovered on disk (not created via Orca's UI) have no
@@ -92,6 +91,29 @@ function resolveWorktreeMetaWithDiscoveryStamp(store: Store, worktreeId: string)
     return existing
   }
   return store.setWorktreeMeta(worktreeId, { lastActivityAt: Date.now() })
+}
+
+async function isAlreadyRemovedWorktreePath(repo: Repo, worktreePath: string): Promise<boolean> {
+  if (!repo.connectionId) {
+    return isWorktreePathMissing(worktreePath)
+  }
+
+  const fsProvider = getSshFilesystemProvider(repo.connectionId)
+  if (!fsProvider) {
+    return false
+  }
+  return isWorktreePathMissing(worktreePath, (path) => fsProvider.stat(path))
+}
+
+function getWorktreeRemovalOptionsKey(args: { force?: boolean; skipArchive?: boolean }): string {
+  const forceKey = args.force === true ? 'force' : 'normal'
+  const archiveKey = args.skipArchive === true ? 'skip-archive' : 'run-archive'
+  return `${forceKey}:${archiveKey}`
+}
+
+type WorktreeRemovalInFlight = {
+  optionsKey: string
+  promise: Promise<void>
 }
 
 const loggedUnavailableSshGitProviders = new Set<string>()
@@ -234,6 +256,7 @@ export function registerWorktreeHandlers(
   ipcMain.removeHandler('worktrees:list')
   ipcMain.removeHandler('worktrees:create')
   ipcMain.removeHandler('worktrees:resolvePrBase')
+  ipcMain.removeHandler('worktrees:resolveMrBase')
   ipcMain.removeHandler('worktrees:remove')
   ipcMain.removeHandler('worktrees:updateMeta')
   ipcMain.removeHandler('worktrees:listLineage')
@@ -488,13 +511,8 @@ export function registerWorktreeHandlers(
     }
   )
 
-  // Why: GitLab parallel of worktrees:resolvePrBase. Same shape, same
-  // semantics — caller passes mrIid (with optional source_branch +
-  // isCrossRepository hints from the picker) and we return either a
-  // `<remote>/<source_branch>` ref (same-project MRs) or a SHA fetched
-  // from refs/merge-requests/<iid>/head (fork MRs). The returned value
-  // is the workspace's base ref; the new worktree branch derives from
-  // the workspace name, not from the source ref.
+  // Why: keep desktop IPC and mobile/runtime RPC on the same MR base
+  // resolution path so SSH repos do not regress differently by surface.
   ipcMain.handle(
     'worktrees:resolveMrBase',
     async (
@@ -505,216 +523,95 @@ export function registerWorktreeHandlers(
         sourceBranch?: string
         isCrossRepository?: boolean
       }
-    ): Promise<{ baseBranch: string } | { error: string }> => {
-      const repo = store.getRepo(args.repoId)
-      if (!repo) {
-        return { error: 'Repo not found' }
-      }
-      // Why: parity with the gh-side guard above. Remote SSH repos are
-      // out of v1 scope; the picker disables the GitLab tab for them too.
-      if (repo.connectionId) {
-        return { error: 'MR start points are not supported for remote repos yet.' }
-      }
-      if (isFolderRepo(repo)) {
-        return { error: 'Folder mode does not support creating worktrees.' }
-      }
-
-      let sourceBranch = args.sourceBranch?.trim() ?? ''
-      let isCrossRepository = args.isCrossRepository === true
-
-      if (!sourceBranch) {
-        const knownHosts = await getGlabKnownHosts()
-        const projectRef = await getGlabProjectRef(repo.path, knownHosts)
-        if (!projectRef) {
-          return { error: 'No GitLab project found for this repository.' }
-        }
-        const item = await getGitLabWorkItemByProjectRef(repo.path, projectRef, args.mrIid, 'mr')
-        if (!item || item.type !== 'mr') {
-          return { error: `MR !${args.mrIid} not found.` }
-        }
-        sourceBranch = (item.branchName ?? '').trim()
-        if (!sourceBranch) {
-          return { error: `MR !${args.mrIid} has no source branch.` }
-        }
-        if (item.isCrossRepository === true) {
-          isCrossRepository = true
-        }
-      }
-
-      let remote: string
-      try {
-        remote = await getDefaultRemote(repo.path)
-      } catch (error) {
-        return { error: error instanceof Error ? error.message : 'Could not resolve git remote.' }
-      }
-
-      // Why: GitLab exposes every MR head (fork or same-project) as
-      // refs/merge-requests/<iid>/head on the target project. Using that
-      // ref lets us snapshot fork MRs without configuring the fork as a
-      // remote — same SHA-as-baseBranch shape as the gh-side branch above.
-      if (isCrossRepository) {
-        const mrRef = `refs/merge-requests/${args.mrIid}/head`
-        try {
-          await gitExecFileAsync(['fetch', remote, mrRef], { cwd: repo.path })
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error)
-          return { error: `Failed to fetch ${mrRef}: ${message.split('\n')[0]}` }
-        }
-        let sha: string
-        try {
-          const { stdout } = await gitExecFileAsync(['rev-parse', '--verify', 'FETCH_HEAD'], {
-            cwd: repo.path
-          })
-          sha = stdout.trim()
-        } catch {
-          return { error: `Could not resolve fork MR !${args.mrIid} head after fetch.` }
-        }
-        if (!sha) {
-          return { error: `Empty SHA resolving fork MR !${args.mrIid} head.` }
-        }
-        return { baseBranch: sha }
-      }
-
-      try {
-        await gitExecFileAsync(['fetch', remote, sourceBranch], { cwd: repo.path })
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        return { error: `Failed to fetch ${remote}/${sourceBranch}: ${message.split('\n')[0]}` }
-      }
-
-      const remoteRef = `${remote}/${sourceBranch}`
-      try {
-        await gitExecFileAsync(['rev-parse', '--verify', remoteRef], { cwd: repo.path })
-      } catch {
-        return { error: `Remote ref ${remoteRef} does not exist after fetch.` }
-      }
-
-      return { baseBranch: remoteRef }
+    ): Promise<{ baseBranch: string; pushTarget?: GitPushTarget } | { error: string }> => {
+      return runtime.resolveManagedMrBase({
+        repoSelector: `id:${args.repoId}`,
+        mrIid: args.mrIid,
+        sourceBranch: args.sourceBranch,
+        isCrossRepository: args.isCrossRepository
+      })
     }
   )
+
+  const worktreeRemovalsInFlight = new Map<string, WorktreeRemovalInFlight>()
 
   ipcMain.handle(
     'worktrees:remove',
     async (_event, args: { worktreeId: string; force?: boolean; skipArchive?: boolean }) => {
-      const { repoId, worktreePath } = parseWorktreeId(args.worktreeId)
-      const repo = store.getRepo(repoId)
-      if (!repo) {
-        throw new Error(`Repo not found: ${repoId}`)
-      }
-      if (isFolderRepo(repo)) {
-        throw new Error('Folder mode does not support deleting worktrees.')
+      const optionsKey = getWorktreeRemovalOptionsKey(args)
+      const inFlightRemoval = worktreeRemovalsInFlight.get(args.worktreeId)
+      if (inFlightRemoval) {
+        if (inFlightRemoval.optionsKey === optionsKey) {
+          return inFlightRemoval.promise
+        }
+        throw new Error(`Worktree deletion already in progress: ${args.worktreeId}`)
       }
 
-      // Why: the renderer-supplied worktreeId contains a filesystem path.
-      // Re-derive the canonical path from git before any destructive action.
-      const provider = repo.connectionId ? requireSshGitProvider(repo.connectionId) : null
-      const registeredWorktrees = repo.connectionId
-        ? await provider!.listWorktrees(repo.path)
-        : await listGitWorktrees(repo.path)
-      const canonicalWorktreePath = getRegisteredDeletableWorktree(
-        repo.path,
-        worktreePath,
-        registeredWorktrees
-      ).path
-      const removedMeta = store.getWorktreeMeta(args.worktreeId)
-      const removedPushTarget = removedMeta?.pushTarget
-      const deleteBranch = removedMeta?.preserveBranchOnDelete !== true
+      // Why: stale toast actions, double-clicks, and Space/sidebar races can
+      // target the same worktree concurrently. Share the destructive backend
+      // operation so only one path touches Git and the filesystem.
+      const removal = (async (): Promise<void> => {
+        const { repoId, worktreePath } = parseWorktreeId(args.worktreeId)
+        const repo = store.getRepo(repoId)
+        if (!repo) {
+          throw new Error(`Repo not found: ${repoId}`)
+        }
+        if (isFolderRepo(repo)) {
+          throw new Error('Folder mode does not support deleting worktrees.')
+        }
 
-      if (repo.connectionId) {
-        await (deleteBranch
-          ? provider!.removeWorktree(canonicalWorktreePath, args.force)
-          : provider!.removeWorktree(canonicalWorktreePath, args.force, { deleteBranch }))
-        await cleanupUnusedWorktreePushTargetRemoteSsh(
-          provider!,
+        // Why: the renderer-supplied worktreeId contains a filesystem path.
+        // Re-derive the canonical path from git before any destructive action.
+        const provider = repo.connectionId ? requireSshGitProvider(repo.connectionId) : null
+        const registeredWorktrees = repo.connectionId
+          ? await provider!.listWorktrees(repo.path)
+          : await listGitWorktrees(repo.path)
+        const removedMeta = store.getWorktreeMeta(args.worktreeId)
+        const removedPushTarget = removedMeta?.pushTarget
+        const registeredWorktree = findRegisteredDeletableWorktree(
           repo.path,
-          args.worktreeId,
-          removedPushTarget,
-          store
+          worktreePath,
+          registeredWorktrees
         )
-        runtime.clearOptimisticReconcileToken(args.worktreeId)
-        store.removeWorktreeMeta(args.worktreeId)
-        deleteWorktreeHistoryDir(args.worktreeId)
-        notifyWorktreesChanged(mainWindow, repoId)
-        return
-      }
-
-      // Run archive hook before removal
-      const hooks = getEffectiveHooks(repo)
-      if (hooks?.scripts.archive && !args.skipArchive) {
-        const result = await runHook('archive', canonicalWorktreePath, repo)
-        if (!result.success) {
-          console.error(`[hooks] archive hook failed for ${canonicalWorktreePath}:`, result.output)
-        }
-      }
-
-      // Why: `git worktree remove` (non-force) refuses to delete a worktree
-      // that has untracked files, and a symlink pointing into the primary
-      // checkout looks untracked to git. Unlink the user-configured symlinks
-      // first so the normal delete path keeps working — otherwise every
-      // deletion would require the Force Delete toast once the feature is on.
-      if (repo.symlinkPaths && repo.symlinkPaths.length > 0) {
-        await removeWorktreeSymlinks(canonicalWorktreePath, repo.symlinkPaths)
-      }
-
-      let shouldTearDownPtys = true
-      try {
-        await assertWorktreeCleanForRemoval(canonicalWorktreePath, args.force ?? false)
-      } catch (error) {
-        if (!isOrphanCompatiblePreflightError(error)) {
-          throw new Error(
-            formatWorktreeRemovalError(error, canonicalWorktreePath, args.force ?? false)
-          )
-        }
-        // Why: orphan cleanup does not need live shells to be killed first,
-        // and preflight did not prove the worktree is cleanly removable.
-        shouldTearDownPtys = false
-      }
-
-      if (shouldTearDownPtys) {
-        // Why: once preflight proves normal deletion is clean, kill PTYs before
-        // git-level removal so shells cannot keep the directory busy.
-        await killAllProcessesForWorktree(args.worktreeId, {
-          runtime,
-          localProvider: getLocalPtyProvider()
-        })
-          .then((r) => {
-            const total = r.runtimeStopped + r.providerStopped + r.registryStopped
-            if (total > 0) {
-              console.info(
-                `[worktree-teardown] ${args.worktreeId} killed runtime=${r.runtimeStopped} provider=${r.providerStopped} registry=${r.registryStopped}`
+        if (!registeredWorktree) {
+          if (args.force && (await isAlreadyRemovedWorktreePath(repo, worktreePath))) {
+            // Why: Force-delete can be retried from stale UI after a prior delete
+            // already removed the directory and Git registration. Treat that as
+            // successful cleanup, but do not delete any unregistered existing path.
+            if (repo.connectionId) {
+              await cleanupUnusedWorktreePushTargetRemoteSsh(
+                provider!,
+                repo.path,
+                args.worktreeId,
+                removedPushTarget,
+                store
               )
+            } else {
+              await cleanupUnusedWorktreePushTargetRemote(
+                repo.path,
+                args.worktreeId,
+                removedPushTarget,
+                store
+              )
+              invalidateAuthorizedRootsCache()
             }
-          })
-          .catch((err) => {
-            console.warn(`[worktree-teardown] failed for ${args.worktreeId}:`, err)
-          })
-      }
-
-      try {
-        await (deleteBranch
-          ? removeWorktree(repo.path, canonicalWorktreePath, args.force ?? false)
-          : removeWorktree(repo.path, canonicalWorktreePath, args.force ?? false, {
-              deleteBranch
-            }))
-      } catch (error) {
-        // If git no longer tracks this worktree, clean up the directory and metadata
-        if (isOrphanedWorktreeError(error)) {
-          console.warn(
-            `[worktrees] Orphaned worktree detected at ${canonicalWorktreePath}, cleaning up`
-          )
-          if (await canSafelyRemoveOrphanedWorktreeDirectory(canonicalWorktreePath, repo.path)) {
-            await rm(canonicalWorktreePath, { recursive: true, force: true }).catch(() => {})
-          } else {
-            console.warn(
-              `[worktrees] Refusing recursive cleanup for unproven worktree directory: ${canonicalWorktreePath}`
-            )
+            runtime.clearOptimisticReconcileToken(args.worktreeId)
+            store.removeWorktreeMeta(args.worktreeId)
+            deleteWorktreeHistoryDir(args.worktreeId)
+            notifyWorktreesChanged(mainWindow, repoId)
+            return
           }
-          // Why: `git worktree remove` failed, so git's internal worktree tracking
-          // (`.git/worktrees/<name>`) is still intact. Without pruning, `git worktree
-          // list` continues to show the stale entry and the branch it had checked out
-          // remains locked — other worktrees cannot check it out.
-          await gitExecFileAsync(['worktree', 'prune'], { cwd: repo.path }).catch(() => {})
-          await cleanupUnusedWorktreePushTargetRemote(
+          throw new Error(`Refusing to delete unregistered worktree path: ${worktreePath}`)
+        }
+        const canonicalWorktreePath = registeredWorktree.path
+        const deleteBranch = removedMeta?.preserveBranchOnDelete !== true
+
+        if (repo.connectionId) {
+          await (deleteBranch
+            ? provider!.removeWorktree(canonicalWorktreePath, args.force)
+            : provider!.removeWorktree(canonicalWorktreePath, args.force, { deleteBranch }))
+          await cleanupUnusedWorktreePushTargetRemoteSsh(
+            provider!,
             repo.path,
             args.worktreeId,
             removedPushTarget,
@@ -723,26 +620,127 @@ export function registerWorktreeHandlers(
           runtime.clearOptimisticReconcileToken(args.worktreeId)
           store.removeWorktreeMeta(args.worktreeId)
           deleteWorktreeHistoryDir(args.worktreeId)
-          invalidateAuthorizedRootsCache()
           notifyWorktreesChanged(mainWindow, repoId)
           return
         }
-        throw new Error(
-          formatWorktreeRemovalError(error, canonicalWorktreePath, args.force ?? false)
-        )
-      }
-      await cleanupUnusedWorktreePushTargetRemote(
-        repo.path,
-        args.worktreeId,
-        removedPushTarget,
-        store
-      )
-      runtime.clearOptimisticReconcileToken(args.worktreeId)
-      store.removeWorktreeMeta(args.worktreeId)
-      deleteWorktreeHistoryDir(args.worktreeId)
-      invalidateAuthorizedRootsCache()
 
-      notifyWorktreesChanged(mainWindow, repoId)
+        // Run archive hook before removal
+        const hooks = getEffectiveHooks(repo)
+        if (hooks?.scripts.archive && !args.skipArchive) {
+          const result = await runHook('archive', canonicalWorktreePath, repo)
+          if (!result.success) {
+            console.error(
+              `[hooks] archive hook failed for ${canonicalWorktreePath}:`,
+              result.output
+            )
+          }
+        }
+
+        // Why: `git worktree remove` (non-force) refuses to delete a worktree
+        // that has untracked files, and a symlink pointing into the primary
+        // checkout looks untracked to git. Unlink the user-configured symlinks
+        // first so the normal delete path keeps working — otherwise every
+        // deletion would require the Force Delete toast once the feature is on.
+        if (repo.symlinkPaths && repo.symlinkPaths.length > 0) {
+          await removeWorktreeSymlinks(canonicalWorktreePath, repo.symlinkPaths)
+        }
+
+        let shouldTearDownPtys = true
+        try {
+          await assertWorktreeCleanForRemoval(canonicalWorktreePath, args.force ?? false)
+        } catch (error) {
+          if (!isOrphanCompatiblePreflightError(error)) {
+            throw new Error(
+              formatWorktreeRemovalError(error, canonicalWorktreePath, args.force ?? false)
+            )
+          }
+          // Why: orphan cleanup does not need live shells to be killed first,
+          // and preflight did not prove the worktree is cleanly removable.
+          shouldTearDownPtys = false
+        }
+
+        if (shouldTearDownPtys) {
+          // Why: once preflight proves normal deletion is clean, kill PTYs before
+          // git-level removal so shells cannot keep the directory busy.
+          await killAllProcessesForWorktree(args.worktreeId, {
+            runtime,
+            localProvider: getLocalPtyProvider()
+          })
+            .then((r) => {
+              const total = r.runtimeStopped + r.providerStopped + r.registryStopped
+              if (total > 0) {
+                console.info(
+                  `[worktree-teardown] ${args.worktreeId} killed runtime=${r.runtimeStopped} provider=${r.providerStopped} registry=${r.registryStopped}`
+                )
+              }
+            })
+            .catch((err) => {
+              console.warn(`[worktree-teardown] failed for ${args.worktreeId}:`, err)
+            })
+        }
+
+        try {
+          await (deleteBranch
+            ? removeWorktree(repo.path, canonicalWorktreePath, args.force ?? false)
+            : removeWorktree(repo.path, canonicalWorktreePath, args.force ?? false, {
+                deleteBranch
+              }))
+        } catch (error) {
+          // If git no longer tracks this worktree, clean up the directory and metadata
+          if (isOrphanedWorktreeError(error)) {
+            console.warn(
+              `[worktrees] Orphaned worktree detected at ${canonicalWorktreePath}, cleaning up`
+            )
+            if (await canSafelyRemoveOrphanedWorktreeDirectory(canonicalWorktreePath, repo.path)) {
+              await rm(canonicalWorktreePath, { recursive: true, force: true }).catch(() => {})
+            } else {
+              console.warn(
+                `[worktrees] Refusing recursive cleanup for unproven worktree directory: ${canonicalWorktreePath}`
+              )
+            }
+            // Why: `git worktree remove` failed, so git's internal worktree tracking
+            // (`.git/worktrees/<name>`) is still intact. Without pruning, `git worktree
+            // list` continues to show the stale entry and the branch it had checked out
+            // remains locked — other worktrees cannot check it out.
+            await gitExecFileAsync(['worktree', 'prune'], { cwd: repo.path }).catch(() => {})
+            await cleanupUnusedWorktreePushTargetRemote(
+              repo.path,
+              args.worktreeId,
+              removedPushTarget,
+              store
+            )
+            runtime.clearOptimisticReconcileToken(args.worktreeId)
+            store.removeWorktreeMeta(args.worktreeId)
+            deleteWorktreeHistoryDir(args.worktreeId)
+            invalidateAuthorizedRootsCache()
+            notifyWorktreesChanged(mainWindow, repoId)
+            return
+          }
+          throw new Error(
+            formatWorktreeRemovalError(error, canonicalWorktreePath, args.force ?? false)
+          )
+        }
+        await cleanupUnusedWorktreePushTargetRemote(
+          repo.path,
+          args.worktreeId,
+          removedPushTarget,
+          store
+        )
+        runtime.clearOptimisticReconcileToken(args.worktreeId)
+        store.removeWorktreeMeta(args.worktreeId)
+        deleteWorktreeHistoryDir(args.worktreeId)
+        invalidateAuthorizedRootsCache()
+
+        notifyWorktreesChanged(mainWindow, repoId)
+      })()
+      worktreeRemovalsInFlight.set(args.worktreeId, { optionsKey, promise: removal })
+      try {
+        await removal
+      } finally {
+        if (worktreeRemovalsInFlight.get(args.worktreeId)?.promise === removal) {
+          worktreeRemovalsInFlight.delete(args.worktreeId)
+        }
+      }
     }
   )
 

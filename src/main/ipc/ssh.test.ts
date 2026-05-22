@@ -275,6 +275,20 @@ describe('SSH IPC handlers', () => {
     expect(mockSshStore.removeTarget).toHaveBeenCalledWith('ssh-1')
   })
 
+  it('ssh:removeTarget removes metadata when disconnect fails', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    mockConnectionManager.disconnect.mockRejectedValueOnce(new Error('host unreachable'))
+    try {
+      await handlers.get('ssh:removeTarget')!(null, { id: 'ssh-1' })
+
+      expect(mockConnectionManager.disconnect).toHaveBeenCalledWith('ssh-1')
+      expect(mockStore.removeSshRemotePtyLeases).toHaveBeenCalledWith('ssh-1')
+      expect(mockSshStore.removeTarget).toHaveBeenCalledWith('ssh-1')
+    } finally {
+      warnSpy.mockRestore()
+    }
+  })
+
   it('ssh:removeTarget tears down an active relay before deleting the target', async () => {
     const target: SshTarget = {
       id: 'ssh-1',

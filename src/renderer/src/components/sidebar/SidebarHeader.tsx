@@ -6,11 +6,10 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 import { isGitRepoKind } from '../../../../shared/repo-kind'
 import SidebarWorkspaceOptionsMenu from './SidebarWorkspaceOptionsMenu'
 import WorkspaceKanbanDrawer from './WorkspaceKanbanDrawer'
-
-const isMac = navigator.userAgent.includes('Mac')
-const newWorktreeShortcutLabel = isMac ? '⌘N' : 'Ctrl+N'
+import { useShortcutLabel } from '@/hooks/useShortcutLabel'
 
 const SidebarHeader = React.memo(function SidebarHeader() {
+  const newWorktreeShortcutLabel = useShortcutLabel('workspace.create')
   const [workspaceBoardOpen, setWorkspaceBoardOpen] = useState(false)
   const [workspaceBoardMenuOpen, setWorkspaceBoardMenuOpen] = useState(false)
   const openModal = useAppStore((s) => s.openModal)

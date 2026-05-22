@@ -107,6 +107,7 @@ import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
 import { DiffNotesSendMenu } from '@/components/editor/DiffNotesSendMenu'
 import { AGENT_CATALOG } from '@/lib/agent-catalog'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
+import { installWindowVisibilityInterval } from '@/lib/window-visibility-interval'
 import {
   notifyEditorExternalFileChange,
   requestEditorSaveQuiesce
@@ -142,7 +143,6 @@ import type {
   GitConflictKind,
   GitConflictOperation,
   GitStatusEntry,
-  GitUpstreamStatus,
   GlobalSettings,
   SourceControlViewMode,
   TuiAgent
@@ -160,6 +160,9 @@ import { hasExpandedCommitFailureDetails, summarizeCommitFailure } from './commi
 
 export type SourceControlScope = 'all' | 'uncommitted'
 type RemoteActionError = { kind: RemoteOpKind; message: string }
+
+const EMPTY_GIT_STATUS_ENTRIES: GitStatusEntry[] = []
+const EMPTY_BRANCH_CHANGE_ENTRIES: GitBranchChangeEntry[] = []
 
 // Why: directional signifiers ahead of each primary action label. Commit
 // (✓) is affirmative; Push (↑) points in the direction data flows; Sync
@@ -672,7 +675,8 @@ function resolveRemoteActionError(kind: RemoteOpKind, error: unknown): string {
     publish: kind === 'publish',
     isPush: kind === 'push',
     isSync: kind === 'sync',
-    isFetch: kind === 'fetch'
+    isFetch: kind === 'fetch',
+    isRebase: kind === 'rebase'
   })
 }
 
@@ -764,11 +768,27 @@ function SourceControlInner(): React.JSX.Element {
   const worktreeMap = useWorktreeMap()
   const rightSidebarTab = useAppStore((s) => s.rightSidebarTab)
   const activeRepo = useRepoById(activeWorktree?.repoId ?? null)
-  const gitStatusByWorktree = useAppStore((s) => s.gitStatusByWorktree)
-  const gitConflictOperationByWorktree = useAppStore((s) => s.gitConflictOperationByWorktree)
-  const gitBranchChangesByWorktree = useAppStore((s) => s.gitBranchChangesByWorktree)
-  const gitBranchCompareSummaryByWorktree = useAppStore((s) => s.gitBranchCompareSummaryByWorktree)
-  const remoteStatusesByWorktree = useAppStore((s) => s.remoteStatusesByWorktree)
+  const entries = useAppStore((s) =>
+    activeWorktreeId
+      ? (s.gitStatusByWorktree[activeWorktreeId] ?? EMPTY_GIT_STATUS_ENTRIES)
+      : EMPTY_GIT_STATUS_ENTRIES
+  )
+  const branchEntries = useAppStore((s) =>
+    activeWorktreeId
+      ? (s.gitBranchChangesByWorktree[activeWorktreeId] ?? EMPTY_BRANCH_CHANGE_ENTRIES)
+      : EMPTY_BRANCH_CHANGE_ENTRIES
+  )
+  const branchSummary = useAppStore((s) =>
+    activeWorktreeId ? (s.gitBranchCompareSummaryByWorktree[activeWorktreeId] ?? null) : null
+  )
+  const conflictOperation = useAppStore((s) =>
+    activeWorktreeId ? (s.gitConflictOperationByWorktree[activeWorktreeId] ?? 'unknown') : 'unknown'
+  )
+  // Why: leave undefined until fetchUpstreamStatus resolves for this worktree.
+  // A synthetic "no upstream" flashes "Publish Branch" during worktree switches.
+  const remoteStatus = useAppStore((s) =>
+    activeWorktreeId ? s.remoteStatusesByWorktree[activeWorktreeId] : undefined
+  )
   const isRemoteOperationActive = useAppStore((s) => s.isRemoteOperationActive)
   const inFlightRemoteOpKind = useAppStore((s) => s.inFlightRemoteOpKind)
   const settings = useAppStore((s) => s.settings)
@@ -793,6 +813,7 @@ function SourceControlInner(): React.JSX.Element {
   const pushBranch = useAppStore((s) => s.pushBranch)
   const pullBranch = useAppStore((s) => s.pullBranch)
   const syncBranch = useAppStore((s) => s.syncBranch)
+  const rebaseFromBase = useAppStore((s) => s.rebaseFromBase)
   const fetchBranch = useAppStore((s) => s.fetchBranch)
   const revealInExplorer = useAppStore((s) => s.revealInExplorer)
   const trackConflictPath = useAppStore((s) => s.trackConflictPath)
@@ -1015,6 +1036,7 @@ function SourceControlInner(): React.JSX.Element {
   const gitHistoryState = activeWorktreeId
     ? (gitHistoryByWorktree[activeWorktreeId] ?? EMPTY_GIT_HISTORY_STATE)
     : EMPTY_GIT_HISTORY_STATE
+  const isGitHistoryExpanded = !collapsedSections.has('history')
 
   const isFolder = activeRepo ? isFolderRepo(activeRepo) : false
   const worktreePath = activeWorktree?.path ?? null
@@ -1035,27 +1057,6 @@ function SourceControlInner(): React.JSX.Element {
     activePullRequestGenerationRecordCandidate.context.branch === branchName
       ? activePullRequestGenerationRecordCandidate
       : null
-  const entries = useMemo(
-    () => (activeWorktreeId ? (gitStatusByWorktree[activeWorktreeId] ?? []) : []),
-    [activeWorktreeId, gitStatusByWorktree]
-  )
-  const branchEntries = useMemo(
-    () => (activeWorktreeId ? (gitBranchChangesByWorktree[activeWorktreeId] ?? []) : []),
-    [activeWorktreeId, gitBranchChangesByWorktree]
-  )
-  const branchSummary = activeWorktreeId
-    ? (gitBranchCompareSummaryByWorktree[activeWorktreeId] ?? null)
-    : null
-  const conflictOperation = activeWorktreeId
-    ? (gitConflictOperationByWorktree[activeWorktreeId] ?? 'unknown')
-    : 'unknown'
-  // Why: leave undefined until fetchUpstreamStatus resolves for this worktree.
-  // Substituting a synthetic { hasUpstream: false } flashes "Publish Branch"
-  // on every worktree switch — resolvePrimaryAction treats it as an
-  // unpublished branch until the real status lands a moment later.
-  const remoteStatus: GitUpstreamStatus | undefined = activeWorktreeId
-    ? remoteStatusesByWorktree[activeWorktreeId]
-    : undefined
   const rightSidebarOpen = useAppStore((s) => s.rightSidebarOpen)
   // Why: gate polling on both the active tab AND the sidebar being open.
   // The sidebar now stays mounted when closed (for performance), so without
@@ -1073,6 +1074,7 @@ function SourceControlInner(): React.JSX.Element {
       worktreeId: activeWorktreeId,
       worktreePath,
       connectionId,
+      pushTarget: activeWorktree?.pushTarget,
       deps: {
         setGitStatus,
         updateWorktreeGitIdentity,
@@ -1082,6 +1084,7 @@ function SourceControlInner(): React.JSX.Element {
     })
   }, [
     activeWorktreeId,
+    activeWorktree?.pushTarget,
     fetchUpstreamStatus,
     isFolder,
     setGitStatus,
@@ -1109,6 +1112,7 @@ function SourceControlInner(): React.JSX.Element {
           worktreeId: context.worktreeId,
           worktreePath: context.worktreePath,
           connectionId: context.connectionId,
+          pushTarget: worktreeMap[context.worktreeId]?.pushTarget,
           deps: {
             setGitStatus,
             updateWorktreeGitIdentity,
@@ -1120,7 +1124,14 @@ function SourceControlInner(): React.JSX.Element {
         console.warn('[SourceControl] post-generation git status refresh failed', error)
       }
     },
-    [fetchUpstreamStatus, isFolder, setGitStatus, setUpstreamStatus, updateWorktreeGitIdentity]
+    [
+      fetchUpstreamStatus,
+      isFolder,
+      setGitStatus,
+      setUpstreamStatus,
+      updateWorktreeGitIdentity,
+      worktreeMap
+    ]
   )
 
   useEffect(() => {
@@ -1274,6 +1285,8 @@ function SourceControlInner(): React.JSX.Element {
   }, [entries])
 
   const normalizedFilter = filterQuery.toLowerCase()
+  const isGitHistoryVisible =
+    scope === 'all' && !normalizedFilter && Boolean(activeWorktreeId && worktreePath && !isFolder)
 
   const filteredGrouped = useMemo(() => {
     if (!normalizedFilter) {
@@ -1707,7 +1720,7 @@ function SourceControlInner(): React.JSX.Element {
   // place — store slices already surface actionable toasts, so additional
   // try/catch here would duplicate the notification.
   const runRemoteAction = useCallback(
-    async (kind: 'push' | 'pull' | 'sync' | 'fetch' | 'publish'): Promise<void> => {
+    async (kind: 'push' | 'pull' | 'sync' | 'fetch' | 'publish' | 'rebase'): Promise<void> => {
       if (!activeWorktreeId || !worktreePath) {
         return
       }
@@ -1737,11 +1750,29 @@ function SourceControlInner(): React.JSX.Element {
           return
         }
         if (kind === 'pull') {
-          await pullBranch(activeWorktreeId, worktreePath, connectionId)
+          await pullBranch(activeWorktreeId, worktreePath, connectionId, activeWorktree?.pushTarget)
           return
         }
         if (kind === 'fetch') {
-          await fetchBranch(activeWorktreeId, worktreePath, connectionId)
+          await fetchBranch(
+            activeWorktreeId,
+            worktreePath,
+            connectionId,
+            activeWorktree?.pushTarget
+          )
+          return
+        }
+        if (kind === 'rebase') {
+          if (!effectiveBaseRef) {
+            return
+          }
+          await rebaseFromBase(
+            activeWorktreeId,
+            worktreePath,
+            effectiveBaseRef,
+            connectionId,
+            activeWorktree?.pushTarget
+          )
           return
         }
         await syncBranch(activeWorktreeId, worktreePath, connectionId, activeWorktree?.pushTarget)
@@ -1770,8 +1801,10 @@ function SourceControlInner(): React.JSX.Element {
       activeWorktree?.pushTarget,
       activeWorktreeId,
       fetchBranch,
+      effectiveBaseRef,
       pullBranch,
       pushBranch,
+      rebaseFromBase,
       refreshActiveGitStatusAfterMutation,
       remoteStatus,
       syncBranch,
@@ -2260,12 +2293,6 @@ function SourceControlInner(): React.JSX.Element {
       })
 
       if (result.ok) {
-        toast.success(`Pull request #${result.number} created`, {
-          action: {
-            label: 'Open on GitHub',
-            onClick: () => window.api.shell.openUrl(result.url)
-          }
-        })
         await handlePullRequestCreated(result)
         return
       }
@@ -2376,7 +2403,8 @@ function SourceControlInner(): React.JSX.Element {
         hostedReviewCreation,
         isPullRequestOperationActive: prGenerating || isCreatingPr,
         branchCommitsAhead:
-          branchSummary?.status === 'ready' ? (branchSummary.commitsAhead ?? 0) : undefined
+          branchSummary?.status === 'ready' ? (branchSummary.commitsAhead ?? 0) : undefined,
+        rebaseBaseRef: effectiveBaseRef
       }),
     [
       commitMessage,
@@ -2393,6 +2421,7 @@ function SourceControlInner(): React.JSX.Element {
       prGenerating,
       branchSummary?.commitsAhead,
       branchSummary?.status,
+      effectiveBaseRef,
       remoteStatus,
       unresolvedConflicts.length
     ]
@@ -2428,7 +2457,8 @@ function SourceControlInner(): React.JSX.Element {
         case 'sync':
         case 'fetch':
         case 'publish':
-          void runRemoteAction(kind)
+        case 'rebase_base':
+          void runRemoteAction(kind === 'rebase_base' ? 'rebase' : kind)
           return
         default: {
           // Why: exhaustiveness check — if a new DropdownActionKind is added
@@ -2810,7 +2840,12 @@ function SourceControlInner(): React.JSX.Element {
     refreshActiveGitStatusAfterMutation
   ])
 
-  const refreshBranchCompare = useCallback(async () => {
+  const branchCompareInFlightRef = useRef(false)
+  const branchCompareRerunRef = useRef(false)
+  const branchCompareRunPromiseRef = useRef<Promise<void> | null>(null)
+  const refreshBranchCompareRef = useRef<() => Promise<void>>(async () => {})
+
+  const runBranchCompare = useCallback(async () => {
     if (!activeWorktreeId || !worktreePath || !effectiveBaseRef || isFolder) {
       return
     }
@@ -2876,11 +2911,49 @@ function SourceControlInner(): React.JSX.Element {
     worktreePath
   ])
 
-  const refreshBranchCompareRef = useRef(refreshBranchCompare)
+  const refreshBranchCompare = useCallback(async () => {
+    if (branchCompareInFlightRef.current) {
+      branchCompareRerunRef.current = true
+      return branchCompareRunPromiseRef.current ?? undefined
+    }
+
+    branchCompareInFlightRef.current = true
+    const runPromise = (async (): Promise<void> => {
+      // Why: branch compare shells out to git on a timer and can exceed the
+      // 5s poll interval on large repos. Keep one compare chain in flight and
+      // collapse skipped ticks into one trailing refresh instead of stacking
+      // subprocesses while preserving the await contract for direct callers.
+      try {
+        await runBranchCompare()
+      } finally {
+        branchCompareInFlightRef.current = false
+        if (branchCompareRerunRef.current) {
+          branchCompareRerunRef.current = false
+          await refreshBranchCompareRef.current()
+        }
+      }
+    })()
+    branchCompareRunPromiseRef.current = runPromise
+    try {
+      await runPromise
+    } finally {
+      if (branchCompareRunPromiseRef.current === runPromise) {
+        branchCompareRunPromiseRef.current = null
+      }
+    }
+  }, [runBranchCompare])
+
   refreshBranchCompareRef.current = refreshBranchCompare
 
   const refreshGitHistory = useCallback(async (): Promise<void> => {
-    if (!activeWorktreeId || !worktreePath || isFolder || !isBranchVisible) {
+    if (
+      !activeWorktreeId ||
+      !worktreePath ||
+      isFolder ||
+      !isBranchVisible ||
+      !isGitHistoryExpanded ||
+      !isGitHistoryVisible
+    ) {
       return
     }
 
@@ -2928,7 +3001,15 @@ function SourceControlInner(): React.JSX.Element {
         }
       })
     }
-  }, [activeWorktreeId, effectiveBaseRef, isBranchVisible, isFolder, worktreePath])
+  }, [
+    activeWorktreeId,
+    effectiveBaseRef,
+    isBranchVisible,
+    isFolder,
+    isGitHistoryExpanded,
+    isGitHistoryVisible,
+    worktreePath
+  ])
 
   const refreshGitHistoryRef = useRef(refreshGitHistory)
   refreshGitHistoryRef.current = refreshGitHistory
@@ -2938,32 +3019,31 @@ function SourceControlInner(): React.JSX.Element {
       return
     }
 
-    void refreshBranchCompareRef.current()
-    const refreshIfFocused = (): void => {
-      if (document.hasFocus()) {
-        void refreshBranchCompareRef.current()
-      }
-    }
     // Why: branch compare shells out to git every tick. The panel only needs
-    // background freshness while Orca is focused; on focus we refresh
-    // immediately so hidden-window time does not burn subprocess work.
-    const intervalId = window.setInterval(refreshIfFocused, BRANCH_REFRESH_INTERVAL_MS)
-    window.addEventListener('focus', refreshIfFocused)
-    return () => {
-      window.clearInterval(intervalId)
-      window.removeEventListener('focus', refreshIfFocused)
-    }
+    // background freshness while Orca is visible; hidden-window time should not
+    // burn subprocess work or timer wakeups.
+    return installWindowVisibilityInterval({
+      run: () => void refreshBranchCompareRef.current(),
+      intervalMs: BRANCH_REFRESH_INTERVAL_MS
+    })
   }, [activeWorktreeId, effectiveBaseRef, isBranchVisible, isFolder, worktreePath])
 
   useEffect(() => {
-    // Why: history shells out to git, but unlike branch compare it only needs
-    // visible-load and mutation refreshes. Avoid polling so long sessions don't
-    // spawn git processes for a decorative graph.
-    if (!isBranchVisible) {
+    // Why: history shells out to git. Defer the first load until the user
+    // expands Graph so source control stays cheap for large/remote repos.
+    if (!isBranchVisible || !isGitHistoryExpanded || !isGitHistoryVisible) {
       return
     }
     void refreshGitHistoryRef.current()
-  }, [activeWorktreeId, effectiveBaseRef, isBranchVisible, isFolder, worktreePath])
+  }, [
+    activeWorktreeId,
+    effectiveBaseRef,
+    isBranchVisible,
+    isFolder,
+    isGitHistoryExpanded,
+    isGitHistoryVisible,
+    worktreePath
+  ])
 
   useEffect(() => {
     // Why: gate on isBranchVisible so we don't spawn git processes while the
@@ -2974,8 +3054,20 @@ function SourceControlInner(): React.JSX.Element {
       return
     }
     const connectionId = getConnectionId(activeWorktreeId) ?? undefined
-    void fetchUpstreamStatus(activeWorktreeId, worktreePath, connectionId)
-  }, [activeWorktreeId, fetchUpstreamStatus, isBranchVisible, isFolder, worktreePath])
+    void fetchUpstreamStatus(
+      activeWorktreeId,
+      worktreePath,
+      connectionId,
+      activeWorktree?.pushTarget
+    )
+  }, [
+    activeWorktree?.pushTarget,
+    activeWorktreeId,
+    fetchUpstreamStatus,
+    isBranchVisible,
+    isFolder,
+    worktreePath
+  ])
 
   const toggleSection = useCallback((section: string) => {
     setCollapsedSections((prev) => {
@@ -3624,7 +3716,7 @@ function SourceControlInner(): React.JSX.Element {
         </div>
 
         <div
-          className="relative flex flex-1 flex-col overflow-auto scrollbar-sleek py-1"
+          className="relative flex flex-1 flex-col overflow-auto scrollbar-sleek pt-1"
           style={{ paddingBottom: selectedKeys.size > 0 ? 50 : undefined }}
         >
           {unresolvedConflictReviewEntries.length > 0 && (
@@ -4043,11 +4135,11 @@ function SourceControlInner(): React.JSX.Element {
             </div>
           )}
 
-          {scope === 'all' && !normalizedFilter && (
+          {isGitHistoryVisible && (
             // Why: the graph is reference context for the whole panel, so when
-            // file sections are short it should occupy the bottom instead of
-            // crowding the commit controls.
-            <div className="mt-auto">
+            // file sections are short it should occupy the bottom, and when the
+            // pane scrolls it should remain docked as branch context.
+            <div className="sticky bottom-0 z-10 mt-auto shrink-0 border-t border-border bg-sidebar/95 backdrop-blur-sm">
               <GitHistoryPanel
                 state={gitHistoryState}
                 collapsed={collapsedSections.has('history')}
@@ -4955,7 +5047,7 @@ export function CompareSummary({
     <div className="flex items-center gap-2 text-xs text-muted-foreground">
       {summary.commitsAhead !== undefined && (
         <span title={`Comparing against ${summary.baseRef}`}>
-          {summary.commitsAhead} commits ahead
+          {summary.commitsAhead} commits ahead of {summary.baseRef}
         </span>
       )}
       <div className="ml-auto flex shrink-0 items-center gap-2">

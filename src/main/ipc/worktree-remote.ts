@@ -45,6 +45,7 @@ import { getActiveMultiplexer } from './ssh'
 import type { SshGitProvider } from '../providers/ssh-git-provider'
 import { isTuiAgent } from '../../shared/tui-agent-config'
 import { isWindowsAbsolutePathLike } from '../../shared/cross-platform-path'
+import { getSshGitUsername } from '../git/git-username'
 import {
   sanitizeWorktreeName,
   sanitizeWorktreeDisplayName,
@@ -550,9 +551,9 @@ async function readRemoteEffectiveHooks(
   try {
     const result = await fsProvider.readFile(joinWorktreeRelativePath(hooksRootPath, 'orca.yaml'))
     const yamlHooks = result.isBinary ? null : parseOrcaYaml(result.content)
-    return getEffectiveHooksFromConfig(repo, yamlHooks, true)
+    return getEffectiveHooksFromConfig(repo, yamlHooks)
   } catch {
-    return getEffectiveHooksFromConfig(repo, null, false)
+    return getEffectiveHooksFromConfig(repo, null)
   }
 }
 
@@ -643,10 +644,6 @@ export async function createRemoteWorktree(
   store: Store,
   mainWindow: BrowserWindow
 ): Promise<CreateWorktreeResult> {
-  if (args.sparseCheckout) {
-    throw new Error('Sparse checkout is not supported for remote SSH repos yet.')
-  }
-
   const provider = requireSshGitProvider(repo.connectionId!)
 
   const settings = store.getSettings()
@@ -656,14 +653,9 @@ export async function createRemoteWorktree(
     ? sanitizeWorktreeDisplayName(args.displayName)
     : undefined
 
-  // Get git username from remote
-  let username = ''
-  try {
-    const { stdout } = await provider.exec(['config', 'user.name'], repo.path)
-    username = stdout.trim()
-  } catch {
-    /* no username configured */
-  }
+  // Why: SSH targets cannot use the local `gh` account, and git email/name are
+  // commit author identity rather than hosted-account usernames.
+  const username = await getSshGitUsername(provider, repo.path)
 
   const branchName = await resolveCreateBranchNameSsh(
     provider,
@@ -717,6 +709,31 @@ export async function createRemoteWorktree(
     } catch (e) {
       if (e instanceof Error && e.message.includes('already exists')) {
         throw e
+      }
+    }
+  }
+
+  const sparseDirectories = args.sparseCheckout
+    ? normalizeSparseDirectories(args.sparseCheckout.directories)
+    : []
+  if (args.sparseCheckout && sparseDirectories.length === 0) {
+    throw new Error('Sparse checkout requires at least one repo-relative directory.')
+  }
+  let sparsePresetId: string | undefined
+  if (args.sparseCheckout?.presetId) {
+    const preset = store
+      .getSparsePresets(repo.id)
+      .find((entry) => entry.id === args.sparseCheckout?.presetId)
+    if (preset?.repoId === repo.id) {
+      try {
+        const presetDirectories = normalizeSparseDirectories(preset.directories)
+        const presetSet = new Set(presetDirectories)
+        const directoriesMatch =
+          presetDirectories.length === sparseDirectories.length &&
+          sparseDirectories.every((entry) => presetSet.has(entry))
+        sparsePresetId = directoriesMatch ? preset.id : undefined
+      } catch {
+        // Why: corrupt preset data should not block creation or falsely label the new worktree.
       }
     }
   }
@@ -799,7 +816,9 @@ export async function createRemoteWorktree(
       repo.path,
       branchName,
       remotePath,
-      checkoutExistingBranch ? { checkoutExistingBranch } : { base: baseBranch }
+      checkoutExistingBranch
+        ? { checkoutExistingBranch }
+        : { base: baseBranch, ...(sparseDirectories.length > 0 ? { noCheckout: true } : {}) }
     )
   } catch (err) {
     if (
@@ -818,6 +837,18 @@ export async function createRemoteWorktree(
       )
     }
     throw err
+  }
+  if (sparseDirectories.length > 0) {
+    try {
+      // Why: SSH providers expose generic git exec, so the remote sparse flow
+      // can mirror local addSparseWorktree without adding a relay method.
+      await provider.exec(['sparse-checkout', 'init', '--cone'], remotePath)
+      await provider.exec(['sparse-checkout', 'set', '--', ...sparseDirectories], remotePath)
+      await provider.exec(['checkout', branchName], remotePath)
+    } catch (err) {
+      await provider.removeWorktree(remotePath, true).catch(() => undefined)
+      throw err
+    }
   }
 
   // Re-list to get the created worktree info
@@ -862,12 +893,19 @@ export async function createRemoteWorktree(
         ? { displayName: requestedName }
         : {}),
     ...(isTuiAgent(args.createdWithAgent) ? { createdWithAgent: args.createdWithAgent } : {}),
+    ...(sparseDirectories.length > 0
+      ? {
+          sparseDirectories,
+          sparseBaseRef: baseBranch,
+          sparsePresetId
+        }
+      : {}),
     ...(args.linkedIssue !== undefined ? { linkedIssue: args.linkedIssue } : {}),
     ...(args.linkedPR !== undefined ? { linkedPR: args.linkedPR } : {}),
     ...(args.linkedLinearIssue !== undefined ? { linkedLinearIssue: args.linkedLinearIssue } : {}),
     ...(args.manualOrder !== undefined ? { manualOrder: args.manualOrder } : {}),
-    ...(args.linkedGitLabMR !== undefined ? { linkedGitLabMR: args.linkedGitLabMR } : {}),
     ...(args.linkedGitLabIssue !== undefined ? { linkedGitLabIssue: args.linkedGitLabIssue } : {}),
+    ...(args.linkedGitLabMR !== undefined ? { linkedGitLabMR: args.linkedGitLabMR } : {}),
     ...(args.workspaceStatus !== undefined ? { workspaceStatus: args.workspaceStatus } : {})
   }
   const meta = store.setWorktreeMeta(worktreeId, metaUpdates)
@@ -1249,8 +1287,8 @@ export async function createLocalWorktree(
     ...(args.linkedPR !== undefined ? { linkedPR: args.linkedPR } : {}),
     ...(args.linkedLinearIssue !== undefined ? { linkedLinearIssue: args.linkedLinearIssue } : {}),
     ...(args.manualOrder !== undefined ? { manualOrder: args.manualOrder } : {}),
-    ...(args.linkedGitLabMR !== undefined ? { linkedGitLabMR: args.linkedGitLabMR } : {}),
     ...(args.linkedGitLabIssue !== undefined ? { linkedGitLabIssue: args.linkedGitLabIssue } : {}),
+    ...(args.linkedGitLabMR !== undefined ? { linkedGitLabMR: args.linkedGitLabMR } : {}),
     ...(args.workspaceStatus !== undefined ? { workspaceStatus: args.workspaceStatus } : {})
   }
   const meta = store.setWorktreeMeta(worktreeId, metaUpdates)

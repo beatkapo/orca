@@ -28,6 +28,18 @@ import { relativePathInsideRoot } from '../../../shared/cross-platform-path'
 import type { RateLimitState } from '../../../shared/rate-limit-types'
 import type { RuntimeStatus, RuntimeSyncWindowGraph } from '../../../shared/runtime-types'
 import {
+  findKeybindingConflicts,
+  formatKeybindingList,
+  getKeybindingPlatform,
+  isKeybindingActionId,
+  normalizeKeybindingArrayForAction,
+  type KeybindingActionId,
+  type KeybindingFileDiagnostic,
+  type KeybindingFileSnapshot,
+  type KeybindingOverrides,
+  type KeybindingPlatform
+} from '../../../shared/keybindings'
+import {
   clearStoredWebRuntimeEnvironment,
   createStoredWebRuntimeEnvironment,
   getPreferredWebPairingOffer,
@@ -47,6 +59,7 @@ const UI_STORAGE_KEY = 'orca.web.ui.v1'
 const SESSION_STORAGE_KEY = 'orca.web.workspaceSession.v1'
 const ONBOARDING_STORAGE_KEY = 'orca.web.onboarding.v1'
 const GITHUB_CACHE_STORAGE_KEY = 'orca.web.githubCache.v1'
+const KEYBINDINGS_STORAGE_KEY = 'orca.web.keybindings.v1'
 // Why: browser-paired clients need desktop parity for large dev sessions; the
 // runtime's no-limit default remains capped for lower-level RPC callers.
 const WEB_RUNTIME_WORKTREE_LIST_LIMIT = 10_000
@@ -58,6 +71,15 @@ let cachedWorktrees: { loadedAt: number; worktrees: Worktree[] } | null = null
 const runtimeCallQueuePool = new RuntimeRpcCallQueuePool()
 
 type WebSettingsApi = NonNullable<PreloadApi['settings']>
+type WebKeybindingsApi = NonNullable<PreloadApi['keybindings']>
+type WebKeybindingDocument = {
+  version: 1
+  keybindings: KeybindingOverrides
+  platforms: Partial<Record<KeybindingPlatform, KeybindingOverrides>>
+}
+
+const WEB_KEYBINDING_PLATFORMS: readonly KeybindingPlatform[] = ['darwin', 'linux', 'win32']
+const webKeybindingListeners = new Set<(snapshot: KeybindingFileSnapshot) => void>()
 
 export function installWebPreloadApi(): void {
   activeEnvironment = readStoredWebRuntimeEnvironment()
@@ -106,6 +128,7 @@ function createWebPreloadApi(): Partial<PreloadApi> {
       listFonts: () => Promise.resolve([]),
       onChanged: () => noopUnsubscribe
     } satisfies Partial<WebSettingsApi> as unknown as WebSettingsApi,
+    keybindings: createWebKeybindingsApi(),
     ui: createWebUiApi(),
     crashReports: {
       getLatestPending: () => Promise.resolve(null),
@@ -243,6 +266,276 @@ function createWebPreloadApi(): Partial<PreloadApi> {
   }
 }
 
+function createEmptyWebKeybindingDocument(): WebKeybindingDocument {
+  return {
+    version: 1,
+    keybindings: {},
+    platforms: {
+      darwin: {},
+      linux: {},
+      win32: {}
+    }
+  }
+}
+
+function getWebKeybindingPlatform(): KeybindingPlatform {
+  return getKeybindingPlatform(getBrowserPlatform())
+}
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function normalizeStoredWebOverrides(
+  value: unknown,
+  section: string,
+  diagnostics: KeybindingFileDiagnostic[]
+): KeybindingOverrides {
+  if (value === undefined) {
+    return {}
+  }
+  if (!isJsonObject(value)) {
+    diagnostics.push({ severity: 'error', section, message: `${section} must be an object.` })
+    return {}
+  }
+
+  const overrides: KeybindingOverrides = {}
+  for (const [actionId, rawBindings] of Object.entries(value)) {
+    if (!isKeybindingActionId(actionId)) {
+      diagnostics.push({
+        severity: 'warning',
+        section,
+        actionId,
+        message: `Unknown keybinding action "${actionId}" was ignored.`
+      })
+      continue
+    }
+    if (
+      !Array.isArray(rawBindings) ||
+      !rawBindings.every((binding) => typeof binding === 'string')
+    ) {
+      diagnostics.push({
+        severity: 'error',
+        section,
+        actionId,
+        message: `Shortcut for "${actionId}" was ignored: Use a string array.`
+      })
+      continue
+    }
+    const normalized = normalizeKeybindingArrayForAction(actionId, rawBindings)
+    if (!Array.isArray(normalized)) {
+      const error = normalized.ok ? 'Unable to parse shortcut.' : normalized.error
+      diagnostics.push({
+        severity: 'error',
+        section,
+        actionId,
+        message: `Shortcut for "${actionId}" was ignored: ${error}`
+      })
+      continue
+    }
+    overrides[actionId] = normalized
+  }
+  return overrides
+}
+
+function normalizeWebPlatformOverrides(
+  value: unknown,
+  diagnostics: KeybindingFileDiagnostic[]
+): Partial<Record<KeybindingPlatform, KeybindingOverrides>> {
+  if (value === undefined) {
+    return {}
+  }
+  if (!isJsonObject(value)) {
+    diagnostics.push({
+      severity: 'error',
+      section: 'platforms',
+      message: 'platforms must be an object with darwin, linux, or win32 sections.'
+    })
+    return {}
+  }
+
+  const result: Partial<Record<KeybindingPlatform, KeybindingOverrides>> = {}
+  for (const [platform, overrides] of Object.entries(value)) {
+    if (!WEB_KEYBINDING_PLATFORMS.includes(platform as KeybindingPlatform)) {
+      diagnostics.push({
+        severity: 'warning',
+        section: `platforms.${platform}`,
+        message: `Unknown platform "${platform}" was ignored.`
+      })
+      continue
+    }
+    result[platform as KeybindingPlatform] = normalizeStoredWebOverrides(
+      overrides,
+      `platforms.${platform}`,
+      diagnostics
+    )
+  }
+  return result
+}
+
+function removeConflictingWebOverrides(
+  platform: KeybindingPlatform,
+  overrides: KeybindingOverrides,
+  diagnostics: KeybindingFileDiagnostic[]
+): KeybindingOverrides {
+  let next = { ...overrides }
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const conflicts = findKeybindingConflicts(platform, next)
+    const conflictingOverrides = new Set<KeybindingActionId>()
+    for (const conflict of conflicts) {
+      for (const actionId of conflict.actionIds) {
+        if (Object.prototype.hasOwnProperty.call(next, actionId)) {
+          conflictingOverrides.add(actionId)
+        }
+      }
+    }
+    if (conflictingOverrides.size === 0) {
+      return next
+    }
+    for (const actionId of conflictingOverrides) {
+      delete next[actionId]
+    }
+    diagnostics.push({
+      severity: 'error',
+      message: `Conflicting custom shortcuts were ignored: ${Array.from(conflictingOverrides)
+        .map((actionId) => actionId)
+        .join(', ')}.`
+    })
+  }
+  return next
+}
+
+function readWebKeybindingDocument(): WebKeybindingDocument {
+  const document = readJson(KEYBINDINGS_STORAGE_KEY, createEmptyWebKeybindingDocument())
+  return {
+    version: 1,
+    keybindings: isJsonObject(document.keybindings)
+      ? (document.keybindings as KeybindingOverrides)
+      : {},
+    platforms: isJsonObject(document.platforms)
+      ? (document.platforms as Partial<Record<KeybindingPlatform, KeybindingOverrides>>)
+      : {}
+  }
+}
+
+function getWebKeybindingSnapshot(): KeybindingFileSnapshot {
+  const platform = getWebKeybindingPlatform()
+  const diagnostics: KeybindingFileDiagnostic[] = []
+  const document = readWebKeybindingDocument()
+  const commonOverrides = normalizeStoredWebOverrides(
+    document.keybindings,
+    'keybindings',
+    diagnostics
+  )
+  const platformOverrides = normalizeWebPlatformOverrides(document.platforms, diagnostics)
+  const overrides = removeConflictingWebOverrides(
+    platform,
+    {
+      ...commonOverrides,
+      ...platformOverrides[platform]
+    },
+    diagnostics
+  )
+
+  return {
+    path: 'Browser local storage',
+    platform,
+    exists: window.localStorage.getItem(KEYBINDINGS_STORAGE_KEY) !== null,
+    overrides,
+    commonOverrides,
+    platformOverrides,
+    diagnostics
+  }
+}
+
+function writeWebKeybindingAction(
+  actionId: KeybindingActionId,
+  bindings: string[] | null
+): KeybindingFileSnapshot {
+  if (!isKeybindingActionId(actionId)) {
+    throw new Error(`Unknown keybinding action "${actionId}".`)
+  }
+  const normalizedBindings =
+    bindings === null ? null : normalizeKeybindingArrayForAction(actionId, bindings)
+  if (normalizedBindings !== null && !Array.isArray(normalizedBindings)) {
+    throw new Error(normalizedBindings.ok ? 'Unable to parse shortcut.' : normalizedBindings.error)
+  }
+
+  const platform = getWebKeybindingPlatform()
+  const currentSnapshot = getWebKeybindingSnapshot()
+  const candidateOverrides = { ...currentSnapshot.overrides }
+  if (normalizedBindings === null) {
+    delete candidateOverrides[actionId]
+  } else {
+    candidateOverrides[actionId] = normalizedBindings
+  }
+  const blockingConflict = findKeybindingConflicts(platform, candidateOverrides).find((conflict) =>
+    conflict.actionIds.includes(actionId)
+  )
+  if (blockingConflict) {
+    throw new Error(
+      `${formatKeybindingList([blockingConflict.binding], platform)} conflicts with another shortcut.`
+    )
+  }
+
+  const activePlatform: KeybindingOverrides = { ...currentSnapshot.platformOverrides[platform] }
+  if (normalizedBindings === null) {
+    delete activePlatform[actionId]
+  } else {
+    activePlatform[actionId] = normalizedBindings
+  }
+
+  writeJson(KEYBINDINGS_STORAGE_KEY, {
+    version: 1,
+    keybindings: currentSnapshot.commonOverrides,
+    platforms: {
+      ...currentSnapshot.platformOverrides,
+      darwin: currentSnapshot.platformOverrides.darwin ?? {},
+      linux: currentSnapshot.platformOverrides.linux ?? {},
+      win32: currentSnapshot.platformOverrides.win32 ?? {},
+      [platform]: activePlatform
+    }
+  } satisfies WebKeybindingDocument)
+
+  const snapshot = getWebKeybindingSnapshot()
+  notifyWebKeybindingListeners(snapshot)
+  return snapshot
+}
+
+function notifyWebKeybindingListeners(snapshot: KeybindingFileSnapshot): void {
+  for (const listener of webKeybindingListeners) {
+    listener(snapshot)
+  }
+}
+
+function createWebKeybindingsApi(): WebKeybindingsApi {
+  return {
+    get: () => Promise.resolve(getWebKeybindingSnapshot()),
+    ensureFile: () => Promise.resolve(getWebKeybindingSnapshot()),
+    setAction: async ({ actionId, bindings }) => writeWebKeybindingAction(actionId, bindings),
+    reload: () => {
+      const snapshot = getWebKeybindingSnapshot()
+      notifyWebKeybindingListeners(snapshot)
+      return Promise.resolve(snapshot)
+    },
+    openFile: () => Promise.resolve(getWebKeybindingSnapshot()),
+    revealFile: () => Promise.resolve(getWebKeybindingSnapshot()),
+    onChanged: (callback) => {
+      webKeybindingListeners.add(callback)
+      const onStorage = (event: StorageEvent): void => {
+        if (event.key === KEYBINDINGS_STORAGE_KEY) {
+          callback(getWebKeybindingSnapshot())
+        }
+      }
+      window.addEventListener('storage', onStorage)
+      return () => {
+        webKeybindingListeners.delete(callback)
+        window.removeEventListener('storage', onStorage)
+      }
+    }
+  }
+}
+
 function createRuntimeApi(): NonNullable<Partial<PreloadApi>['runtime']> {
   return {
     syncWindowGraph: async (_graph: RuntimeSyncWindowGraph) => getRemoteRuntimeStatus(),
@@ -376,6 +669,8 @@ function createWorktreesApi(): NonNullable<Partial<PreloadApi>['worktrees']> {
         linkedIssue: args.linkedIssue,
         linkedPR: args.linkedPR,
         linkedLinearIssue: args.linkedLinearIssue,
+        linkedGitLabIssue: args.linkedGitLabIssue,
+        linkedGitLabMR: args.linkedGitLabMR,
         displayName: args.displayName,
         sparseCheckout: args.sparseCheckout,
         pushTarget: args.pushTarget,
@@ -392,9 +687,13 @@ function createWorktreesApi(): NonNullable<Partial<PreloadApi>['worktrees']> {
         headRefName,
         isCrossRepository
       }),
-    resolveMrBase: async () => ({
-      error: 'GitLab merge request base resolution is unavailable on web.'
-    }),
+    resolveMrBase: async ({ repoId, mrIid, sourceBranch, isCrossRepository }) =>
+      callRuntimeResult('worktree.resolveMrBase', {
+        repo: repoId,
+        mrIid,
+        sourceBranch,
+        isCrossRepository
+      }),
     remove: async ({ worktreeId, force }) => {
       cachedWorktrees = null
       await callRuntimeResult('worktree.rm', { worktree: worktreeId, force })
@@ -576,21 +875,25 @@ function createGitApi(): NonNullable<Partial<PreloadApi>['git']> {
       const worktree = await resolveRuntimeWorktreeByPath(worktreePath)
       return callRuntimeResult('git.commitCompare', { worktree: worktree.id, commitId })
     },
-    upstreamStatus: async ({ worktreePath }) => {
+    upstreamStatus: async ({ worktreePath, pushTarget }) => {
       const worktree = await resolveRuntimeWorktreeByPath(worktreePath)
-      return callRuntimeResult('git.upstreamStatus', { worktree: worktree.id })
+      return callRuntimeResult('git.upstreamStatus', { worktree: worktree.id, pushTarget })
     },
-    fetch: async ({ worktreePath }) => {
+    fetch: async ({ worktreePath, pushTarget }) => {
       const worktree = await resolveRuntimeWorktreeByPath(worktreePath)
-      await callRuntimeResult('git.fetch', { worktree: worktree.id })
+      await callRuntimeResult('git.fetch', { worktree: worktree.id, pushTarget })
     },
     push: async ({ worktreePath, publish, pushTarget }) => {
       const worktree = await resolveRuntimeWorktreeByPath(worktreePath)
       await callRuntimeResult('git.push', { worktree: worktree.id, publish, pushTarget })
     },
-    pull: async ({ worktreePath }) => {
+    pull: async ({ worktreePath, pushTarget }) => {
       const worktree = await resolveRuntimeWorktreeByPath(worktreePath)
-      await callRuntimeResult('git.pull', { worktree: worktree.id })
+      await callRuntimeResult('git.pull', { worktree: worktree.id, pushTarget })
+    },
+    rebaseFromBase: async ({ worktreePath, baseRef }) => {
+      const worktree = await resolveRuntimeWorktreeByPath(worktreePath)
+      await callRuntimeResult('git.rebaseFromBase', { worktree: worktree.id, baseRef })
     },
     branchDiff: async ({ worktreePath, filePath, compare, oldPath }) => {
       const file = await resolveRuntimeFilePath(filePath, worktreePath)
@@ -856,7 +1159,9 @@ function createWebUiApi(): NonNullable<Partial<PreloadApi>['ui']> {
     onToggleRightSidebar: () => noopUnsubscribe,
     onToggleWorktreePalette: () => noopUnsubscribe,
     onToggleFloatingTerminal: () => noopUnsubscribe,
+    onTerminalShortcutCaptured: () => noopUnsubscribe,
     onOpenQuickOpen: () => noopUnsubscribe,
+    onOpenTasks: () => noopUnsubscribe,
     onOpenNewWorkspace: () => noopUnsubscribe,
     onJumpToWorktreeIndex: () => noopUnsubscribe,
     onWorktreeHistoryNavigate: () => noopUnsubscribe,
@@ -875,6 +1180,7 @@ function createWebUiApi(): NonNullable<Partial<PreloadApi>['ui']> {
     onCloseActiveTab: () => noopUnsubscribe,
     onSwitchTab: () => noopUnsubscribe,
     onSwitchTabAcrossAllTypes: () => noopUnsubscribe,
+    onSwitchRecentTab: () => noopUnsubscribe,
     onSwitchTerminalTab: () => noopUnsubscribe,
     onCtrlTabKeyDown: () => noopUnsubscribe,
     onCtrlTabKeyUp: () => noopUnsubscribe,
@@ -901,6 +1207,9 @@ function createWebUiApi(): NonNullable<Partial<PreloadApi>['ui']> {
     onFileDrop: () => noopUnsubscribe,
     syncTrafficLights: () => {},
     setMarkdownEditorFocused: () => {},
+    setTerminalInputFocused: () => {},
+    setFloatingTerminalInputFocused: () => {},
+    setShortcutRecorderFocused: () => {},
     onRichMarkdownContextCommand: () => noopUnsubscribe,
     onFullscreenChanged: () => noopUnsubscribe,
     minimize: () => {},
@@ -1467,9 +1776,13 @@ function mapRepoPathArg(args: unknown): unknown {
     return args
   }
   const record = args as Record<string, unknown>
+  const repoId = typeof record.repoId === 'string' && record.repoId.trim() ? record.repoId : null
   return {
     ...record,
-    repo: record.repoPath
+    // Why: runtime repo selectors accept loose path/name forms, but duplicate
+    // checked-out repos can make those ambiguous. The renderer already passes
+    // Orca's repo id on task calls, so prefer the explicit selector.
+    repo: repoId ? `id:${repoId}` : record.repoPath
   }
 }
 

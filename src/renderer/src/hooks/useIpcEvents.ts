@@ -34,6 +34,7 @@ import { zoomLevelToPercent, ZOOM_MIN, ZOOM_MAX } from '@/components/settings/Se
 import { dispatchZoomLevelChanged } from '@/lib/zoom-events'
 import { resolveZoomTarget } from './resolve-zoom-target'
 import {
+  handleSwitchRecentTab,
   handleSwitchTab,
   handleSwitchTabAcrossAllTypes,
   handleSwitchTerminalTab
@@ -77,6 +78,17 @@ import {
   resetAgentHookCompletionNotificationCoordinators,
   syncAgentHookCompletionNotificationSettings
 } from './agent-hook-completion-notifications'
+import { showTerminalShortcutCaptureNotification } from '@/lib/terminal-shortcut-capture-notification'
+
+function getShortcutPlatform(): NodeJS.Platform {
+  if (navigator.userAgent.includes('Mac')) {
+    return 'darwin'
+  }
+  if (navigator.userAgent.includes('Windows')) {
+    return 'win32'
+  }
+  return 'linux'
+}
 
 export { resolveZoomTarget } from './resolve-zoom-target'
 
@@ -129,10 +141,15 @@ function addSplitLeafToLayout(
   newLeafId: string,
   ptyId: string,
   direction: TerminalSplitDirection,
-  title?: string | null
+  title?: string | null,
+  activateNewLeaf = true
 ): TerminalLayoutSnapshot {
   const root = layout?.root ?? { type: 'leaf', leafId: sourceLeafId }
   const existingLeafIds = collectLeafIdsInOrder(root)
+  const nextActiveLeafId =
+    activateNewLeaf || !layout?.activeLeafId || !existingLeafIds.includes(layout.activeLeafId)
+      ? newLeafId
+      : layout.activeLeafId
   const nextRoot = existingLeafIds.includes(newLeafId)
     ? root
     : (() => {
@@ -151,7 +168,7 @@ function addSplitLeafToLayout(
   return {
     ...(layout ?? { root: null, activeLeafId: null, expandedLeafId: null }),
     root: nextRoot,
-    activeLeafId: newLeafId,
+    activeLeafId: nextActiveLeafId,
     expandedLeafId: null,
     ptyIdsByLeafId: {
       ...layout?.ptyIdsByLeafId,
@@ -617,6 +634,14 @@ export function useIpcEvents(): void {
       })
     )
 
+    if (window.api.keybindings) {
+      unsubs.push(
+        window.api.keybindings.onChanged((snapshot) => {
+          useAppStore.getState().setKeybindingSnapshot(snapshot)
+        })
+      )
+    }
+
     unsubs.push(
       window.api.ui.onToggleLeftSidebar(() => {
         useAppStore.getState().toggleSidebar()
@@ -646,6 +671,18 @@ export function useIpcEvents(): void {
       })
     )
 
+    if (window.api.ui.onTerminalShortcutCaptured) {
+      unsubs.push(
+        window.api.ui.onTerminalShortcutCaptured(({ actionId }) => {
+          showTerminalShortcutCaptureNotification({
+            actionId,
+            platform: getShortcutPlatform(),
+            keybindings: useAppStore.getState().keybindings
+          })
+        })
+      )
+    }
+
     unsubs.push(
       window.api.ui.onOpenQuickOpen(() => {
         const store = useAppStore.getState()
@@ -668,6 +705,16 @@ export function useIpcEvents(): void {
           return
         }
         store.openModal('new-workspace-composer', { telemetrySource: 'shortcut' })
+      })
+    )
+
+    unsubs.push(
+      window.api.ui.onOpenTasks(() => {
+        const store = useAppStore.getState()
+        if (store.activeView === 'settings' || !store.repos.some((repo) => isGitRepoKind(repo))) {
+          return
+        }
+        store.openTaskPage()
       })
     )
 
@@ -831,7 +878,8 @@ export function useIpcEvents(): void {
                     leafId,
                     ptyId,
                     splitDirection ?? 'horizontal',
-                    title
+                    title,
+                    shouldActivate
                   )
                 )
                 window.dispatchEvent(
@@ -1544,6 +1592,7 @@ export function useIpcEvents(): void {
 
     unsubs.push(window.api.ui.onSwitchTab(handleSwitchTab))
     unsubs.push(window.api.ui.onSwitchTabAcrossAllTypes(handleSwitchTabAcrossAllTypes))
+    unsubs.push(window.api.ui.onSwitchRecentTab(handleSwitchRecentTab))
     unsubs.push(window.api.ui.onSwitchTerminalTab(handleSwitchTerminalTab))
 
     // Hydrate initial rate limit state then subscribe to push updates
@@ -2195,24 +2244,6 @@ function resolvePaneKey(
   }
   const { tabId, leafId } = parsed
   const layout = store.terminalLayoutsByTabId?.[tabId]
-  const leafExists = collectLeafIdsInOrder(layout?.root).includes(leafId)
-  if (!leafExists) {
-    return {
-      exists: false,
-      title: undefined,
-      repoConnectionId: null,
-      repoConnectionResolved: false,
-      owningWorktreeId: undefined
-    }
-  }
-  // Why: replay can remint numeric pane ids, so status title recovery must use
-  // persisted leaf-keyed titles when crossing from hook state into tab state.
-  const rawPaneTitle = layout?.titlesByLeafId?.[leafId]
-  // Why: treat an empty-string paneTitle as "no title" so the tab-level
-  // fallback still fires. `paneTitle ?? tabTitle` alone would short-circuit on
-  // '' and also erase any previously-cached terminalTitle in the store
-  // (`terminalTitle ?? existing?.terminalTitle` resolves to '').
-  const paneTitle = rawPaneTitle && rawPaneTitle.length > 0 ? rawPaneTitle : undefined
   let exists = false
   let tabTitle: string | undefined
   let owningWorktreeId: string | undefined
@@ -2243,6 +2274,33 @@ function resolvePaneKey(
       repoConnectionId = repo?.connectionId ?? null
     }
   }
+  if (!exists) {
+    return {
+      exists: false,
+      title: undefined,
+      repoConnectionId,
+      repoConnectionResolved,
+      owningWorktreeId
+    }
+  }
+  const leafExists = layout ? collectLeafIdsInOrder(layout.root).includes(leafId) : true
+  if (!leafExists) {
+    return {
+      exists: false,
+      title: undefined,
+      repoConnectionId,
+      repoConnectionResolved,
+      owningWorktreeId
+    }
+  }
+  // Why: inactive worktrees can have a durable tab and live PTY while their
+  // terminal layout is temporarily unmounted. Hook state must still land there.
+  const rawPaneTitle = layout?.titlesByLeafId?.[leafId]
+  // Why: treat an empty-string paneTitle as "no title" so the tab-level
+  // fallback still fires. `paneTitle ?? tabTitle` alone would short-circuit on
+  // '' and also erase any previously-cached terminalTitle in the store
+  // (`terminalTitle ?? existing?.terminalTitle` resolves to '').
+  const paneTitle = rawPaneTitle && rawPaneTitle.length > 0 ? rawPaneTitle : undefined
   return {
     exists,
     title: paneTitle ?? tabTitle,

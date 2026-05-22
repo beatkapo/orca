@@ -1,7 +1,7 @@
 /* eslint-disable max-lines */
 import type { SshRemotePtyLease, SshTarget } from './ssh-types'
 import type { Automation, AutomationRun } from './automations-types'
-import type { WorkspaceSource } from './telemetry-events'
+import type { WorkspaceSource } from './workspace-source'
 import type { GitHubProjectSettings } from './github-project-types'
 import type {
   AgentStatusState,
@@ -14,10 +14,11 @@ import type { GitLabProjectSettings } from './gitlab-types'
 import type { TaskProvider } from './task-providers'
 import type { FeatureTipId } from './feature-tips'
 import type { GitBranchChangeStatus } from './git-status-types'
+import type { KeybindingOverrides, TerminalShortcutPolicy } from './keybindings'
 
 // Re-exported for backward compat with renderer call sites that import
 // `WorkspaceCreateTelemetrySource` from '../../../shared/types'.
-export type { WorkspaceSource as WorkspaceCreateTelemetrySource } from './telemetry-events'
+export type { WorkspaceSource as WorkspaceCreateTelemetrySource } from './workspace-source'
 export type { TaskProvider } from './task-providers'
 export type {
   GitBranchChangeStatus,
@@ -644,11 +645,12 @@ export type GitHubPRRefreshAlias = {
   branch: string
   worktreeId?: string
   connectionId?: string | null
+  linkedPRNumber?: number | null
+  fallbackPRNumber?: number | null
+  fallbackPRSource?: 'explicit' | 'pr-cache' | 'hosted-review' | null
 }
 
 export type GitHubPRRefreshCandidate = GitHubPRRefreshAlias & {
-  linkedPRNumber?: number | null
-  fallbackPRNumber?: number | null
   repoKind: RepoKind
   repoId: string
   isBare?: boolean
@@ -1253,8 +1255,8 @@ export type CreateWorktreeArgs = {
   linkedIssue?: number
   linkedPR?: number
   linkedLinearIssue?: string
-  linkedGitLabMR?: number
   linkedGitLabIssue?: number
+  linkedGitLabMR?: number
   pushTarget?: GitPushTarget
   workspaceStatus?: WorkspaceStatus
   manualOrder?: number
@@ -1527,10 +1529,16 @@ export type GlobalSettings = {
   editorMinimapEnabled: boolean
   /** Whether local markdown review note controls and the review panel are shown. */
   markdownReviewToolsEnabled: boolean
-  /** Why: mirrors X11 primary-selection muscle memory without mutating the
-   *  normal system clipboard; Linux enables it by default, other platforms
-   *  leave middle-click semantics unchanged unless the user opts in. */
+  /** Why: mirrors terminal selection-paste muscle memory without mutating the
+   *  normal system clipboard; Linux and macOS enable it by default, Windows
+   *  leaves middle-click semantics unchanged unless the user opts in. */
   primarySelectionMiddleClickPaste?: boolean
+  /** One-shot migration guard for turning the Linux default on for profiles
+   *  that persisted the earlier off-by-default value. */
+  primarySelectionMiddleClickPasteDefaultedForLinux?: boolean
+  /** One-shot migration guard for widening the terminal-style default to
+   *  Linux/macOS while preserving later explicit opt-outs. */
+  primarySelectionMiddleClickPasteDefaultedForTerminalDefaults?: boolean
   terminalFontSize: number
   terminalFontFamily: string
   terminalFontWeight: number
@@ -1619,6 +1627,9 @@ export type GlobalSettings = {
   /** Controls how Ctrl+Tab chooses the next visible tab. Optional for
    *  profiles saved before this setting existed; readers default to MRU. */
   ctrlTabOrderMode?: CtrlTabOrderMode
+  /** Why: Orca-first preserves fast workspace/app control from agent TUIs.
+   *  Terminal-first is opt-in for users who want shell/TUI bindings to win. */
+  terminalShortcutPolicy?: TerminalShortcutPolicy
   /** Why: Floating Workspace is the default global surface so users can
    *  reach terminal, browser, and markdown tabs outside repo/worktree context. */
   floatingTerminalEnabled: boolean
@@ -1638,6 +1649,9 @@ export type GlobalSettings = {
   /** Where the Floating Workspace toggle is shown. Defaults to the floating
    *  button for discoverability. */
   floatingTerminalTriggerLocation: FloatingTerminalTriggerLocation
+  /** Legacy pre-file-backed keyboard shortcut overrides. New writes go to
+   *  ~/.orca/keybindings.json; main migrates this once when present. */
+  keybindings?: KeybindingOverrides
   diffDefaultView: 'inline' | 'side-by-side'
   combinedDiffFileTreeVisibleByDefault: boolean
   notifications: NotificationSettings
@@ -1986,6 +2000,7 @@ export type TaskResumeState = {
   githubMode?: 'items' | 'project'
   githubItemsPreset?: TaskViewPresetId | null
   githubItemsQuery?: string
+  githubProjectHiddenFieldIdsByView?: Record<string, string[]>
   linearPreset?: 'assigned' | 'created' | 'all' | 'completed'
   linearQuery?: string
 }

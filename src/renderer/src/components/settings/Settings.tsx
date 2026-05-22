@@ -83,6 +83,8 @@ import { ActiveSettingsSectionProvider, SettingsSection } from './SettingsSectio
 import { matchesSettingsSearch, type SettingsSearchEntry } from './settings-search'
 import { checkRuntimeHooks } from '@/runtime/runtime-hooks-client'
 import { useWindowsTerminalCapabilities } from '@/lib/windows-terminal-capabilities'
+import { getShortcutPlatform } from '@/lib/shortcut-platform'
+import { keybindingMatchesAction } from '../../../../shared/keybindings'
 import {
   deriveNeededRepoIds,
   deriveNeededSectionIds,
@@ -214,9 +216,11 @@ function isWebClientLocation(): boolean {
 
 function Settings(): React.JSX.Element {
   const settings = useAppStore((s) => s.settings)
+  const keybindings = useAppStore((s) => s.keybindings)
   const updateSettings = useAppStore((s) => s.updateSettings)
   const switchRuntimeEnvironment = useAppStore((s) => s.switchRuntimeEnvironment)
   const fetchSettings = useAppStore((s) => s.fetchSettings)
+  const fetchKeybindings = useAppStore((s) => s.fetchKeybindings)
   const closeSettingsPage = useAppStore((s) => s.closeSettingsPage)
   const repos = useAppStore((s) => s.repos)
   const updateRepo = useAppStore((s) => s.updateRepo)
@@ -300,7 +304,8 @@ function Settings(): React.JSX.Element {
 
   useEffect(() => {
     fetchSettings()
-  }, [fetchSettings])
+    fetchKeybindings()
+  }, [fetchKeybindings, fetchSettings])
 
   const runtimeTargetIdentity = getRuntimeTargetIdentity(settings)
 
@@ -360,13 +365,10 @@ function Settings(): React.JSX.Element {
 
   useEffect(() => {
     const handleFindShortcut = (event: KeyboardEvent): void => {
-      if (event.defaultPrevented || event.altKey || event.shiftKey) {
+      if (event.defaultPrevented) {
         return
       }
-      // Why: Cmd on Mac, Ctrl elsewhere — matches the rest of the app's
-      // mod-key convention (see App.tsx) and aligns with platform Find norms.
-      const mod = isMac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey
-      if (!mod || event.key.toLowerCase() !== 'f') {
+      if (!keybindingMatchesAction('settings.search', event, getShortcutPlatform(), keybindings)) {
         return
       }
       const input = searchInputRef.current
@@ -380,7 +382,7 @@ function Settings(): React.JSX.Element {
 
     document.addEventListener('keydown', handleFindShortcut)
     return () => document.removeEventListener('keydown', handleFindShortcut)
-  }, [isMac])
+  }, [keybindings])
 
   useEffect(
     () => () => {
@@ -578,8 +580,7 @@ function Settings(): React.JSX.Element {
               description: 'Control terminals and agents from your phone.',
               icon: Smartphone,
               searchEntries: MOBILE_SETTINGS_PANE_SEARCH_ENTRIES,
-              group: 'remote',
-              badge: 'Beta'
+              group: 'remote'
             },
             {
               id: 'computer-use' as const,
@@ -669,7 +670,10 @@ function Settings(): React.JSX.Element {
       navSections.filter((section) =>
         section.id === 'git' && hasUnsavedCommitPromptChanges
           ? true
-          : matchesSettingsSearch(settingsSearchQuery, section.searchEntries)
+          : matchesSettingsSearch(settingsSearchQuery, [
+              { title: section.title, description: section.description },
+              ...section.searchEntries
+            ])
       ),
     [hasUnsavedCommitPromptChanges, navSections, settingsSearchQuery]
   )
@@ -901,9 +905,20 @@ function Settings(): React.JSX.Element {
       if (container) {
         container.scrollTo({ top: 0 })
       }
+      if (settingsSearchQuery.trim() !== '') {
+        // Why: sidebar search is a discovery tool. Once a user selects a
+        // section from the filtered results, show the actual pane instead of
+        // keeping another matching pane rendered by the stale query.
+        setSettingsSearchQuery('')
+      }
       setActiveSectionId(sectionId)
     },
-    [activeSectionId, confirmDiscardCommitPromptChanges]
+    [
+      activeSectionId,
+      confirmDiscardCommitPromptChanges,
+      setSettingsSearchQuery,
+      settingsSearchQuery
+    ]
   )
 
   const openComputerUseFromBrowser = useCallback(async () => {
@@ -1313,7 +1328,7 @@ function Settings(): React.JSX.Element {
                     <SettingsSection
                       key={repo.id}
                       id={repoSectionId}
-                      title={repo.displayName}
+                      title={`Repo Settings > ${repo.displayName}`}
                       description={repo.path}
                       searchEntries={getRepositoryPaneSearchEntries(repo)}
                     >
@@ -1322,6 +1337,7 @@ function Settings(): React.JSX.Element {
                           repo={repo}
                           yamlHooks={repoHooksState?.hooks ?? null}
                           hasHooksFile={repoHooksState?.hasHooks ?? false}
+                          hooksInspectionReady={Boolean(repoHooksState)}
                           mayNeedUpdate={repoHooksState?.mayNeedUpdate ?? false}
                           updateRepo={updateRepo}
                           removeRepo={removeRepo}

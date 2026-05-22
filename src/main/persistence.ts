@@ -81,6 +81,7 @@ import { getRepoIdFromWorktreeId, getWorktreePathBasenameFromId } from '../share
 import { normalizeTerminalQuickCommands } from '../shared/terminal-quick-commands'
 import { normalizeTaskProviderSettings } from '../shared/task-providers'
 import { normalizeOpenInApplications } from '../shared/open-in-applications'
+import { normalizeTerminalShortcutPolicy } from '../shared/keybindings'
 import {
   DEFAULT_WORKSPACE_STATUS_ID,
   clampWorkspaceBoardColumnWidth,
@@ -1397,6 +1398,22 @@ export class Store {
           visibleTaskProviders: parsed.settings?.visibleTaskProviders,
           defaultTaskSource: parsed.settings?.defaultTaskSource
         })
+        const primarySelectionDefaultedForLinux =
+          parsed.settings?.primarySelectionMiddleClickPasteDefaultedForLinux === true
+        const primarySelectionDefaultedForTerminalDefaults =
+          parsed.settings?.primarySelectionMiddleClickPasteDefaultedForTerminalDefaults === true
+        const primarySelectionPlatformDefaultEnabled =
+          defaults.settings.primarySelectionMiddleClickPaste === true
+        const primarySelectionAlreadyDefaultedForPlatform =
+          primarySelectionDefaultedForTerminalDefaults ||
+          (process.platform === 'linux' && primarySelectionDefaultedForLinux)
+        const migratePrimarySelectionPlatformDefault =
+          primarySelectionPlatformDefaultEnabled && !primarySelectionAlreadyDefaultedForPlatform
+        const stampPrimarySelectionTerminalDefaults =
+          primarySelectionPlatformDefaultEnabled && !primarySelectionDefaultedForTerminalDefaults
+        if (migratePrimarySelectionPlatformDefault || stampPrimarySelectionTerminalDefaults) {
+          this.loadNeedsSave = true
+        }
         result = {
           ...defaults,
           ...parsed,
@@ -1408,6 +1425,18 @@ export class Store {
             // the old persisted flag forward once so enabled users don't lose it.
             experimentalPet:
               parsed.settings?.experimentalPet ?? readLegacySidekickFlag(parsed) ?? false,
+            // Why: early primary-selection builds saved the disabled default.
+            // Flip Linux/macOS profiles once so terminal-style defaults match
+            // platform convention; the guards preserve future opt-outs.
+            primarySelectionMiddleClickPaste: migratePrimarySelectionPlatformDefault
+              ? true
+              : (parsed.settings?.primarySelectionMiddleClickPaste ??
+                defaults.settings.primarySelectionMiddleClickPaste),
+            primarySelectionMiddleClickPasteDefaultedForLinux:
+              primarySelectionDefaultedForLinux ||
+              (process.platform === 'linux' && migratePrimarySelectionPlatformDefault),
+            primarySelectionMiddleClickPasteDefaultedForTerminalDefaults:
+              primarySelectionDefaultedForTerminalDefaults || stampPrimarySelectionTerminalDefaults,
             experimentalActivity: migratedExperimentalActivity,
             experimentalActivityDefaultedOffForAllUsers: true,
             terminalMacOptionAsAlt: migratedOptionAsAlt,
@@ -1422,6 +1451,9 @@ export class Store {
             ),
             defaultTaskSource: taskProviderSettings.defaultTaskSource,
             visibleTaskProviders: taskProviderSettings.visibleTaskProviders,
+            terminalShortcutPolicy: normalizeTerminalShortcutPolicy(
+              parsed.settings?.terminalShortcutPolicy
+            ),
             openInApplications: normalizeOpenInApplications(parsed.settings?.openInApplications),
             notifications: normalizeNotificationSettings(parsed.settings?.notifications),
             voice: {
@@ -2315,6 +2347,11 @@ export class Store {
     }
     if ('openInApplications' in updates) {
       sanitizedUpdates.openInApplications = normalizeOpenInApplications(updates.openInApplications)
+    }
+    if ('terminalShortcutPolicy' in updates) {
+      sanitizedUpdates.terminalShortcutPolicy = normalizeTerminalShortcutPolicy(
+        updates.terminalShortcutPolicy
+      )
     }
     // Why: `telemetry` is deep-merged for the same reason `notifications` is —
     // partial updates from the Privacy pane / consent flow (e.g., flipping

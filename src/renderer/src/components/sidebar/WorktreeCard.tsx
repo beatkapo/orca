@@ -44,8 +44,10 @@ import { writeWorkspaceDragData } from './workspace-status'
 import { getWorktreeCardPrDisplay } from './worktree-card-pr-display'
 import { getWorkspacePortsByWorktreeId } from '@/lib/workspace-port-groups'
 import { hasActiveWorkspaceActivity } from '@/lib/worktree-activity-state'
+import { installWindowVisibilityInterval, isWindowVisible } from '@/lib/window-visibility-interval'
 import { runSleepWorktree } from './sleep-worktree-flow'
 import { getWorkspaceQuickActionKind } from './worktree-card-quick-action'
+import { useMacOptionKeyPressed } from './mac-option-key-state'
 
 type WorktreeCardProps = {
   worktree: Worktree
@@ -158,22 +160,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
   })
   const isSshDisconnected = sshStatus != null && sshStatus !== 'connected'
   const [showDisconnectedDialog, setShowDisconnectedDialog] = useState(false)
-  const [isSleepQuickActionModifierPressed, setIsSleepQuickActionModifierPressed] = useState(false)
-
-  useEffect(() => {
-    const handleKeyChange = (event: KeyboardEvent): void => {
-      setIsSleepQuickActionModifierPressed(event.altKey)
-    }
-    const handleWindowBlur = (): void => setIsSleepQuickActionModifierPressed(false)
-    window.addEventListener('keydown', handleKeyChange, true)
-    window.addEventListener('keyup', handleKeyChange, true)
-    window.addEventListener('blur', handleWindowBlur)
-    return () => {
-      window.removeEventListener('keydown', handleKeyChange, true)
-      window.removeEventListener('keyup', handleKeyChange, true)
-      window.removeEventListener('blur', handleWindowBlur)
-    }
-  }, [])
+  const isSleepQuickActionModifierPressed = useMacOptionKeyPressed()
 
   // Why: on restart the previously-active worktree is auto-restored without a
   // click, so the dialog never opens. Auto-show it for the active card when SSH
@@ -276,16 +263,29 @@ const WorktreeCard = React.memo(function WorktreeCard({
     if (isWebClient()) {
       return
     }
-    if (repo && !isFolder && !worktree.isBare && hostedReviewCacheKey && showPR) {
+    if (!repo || isFolder || worktree.isBare || !hostedReviewCacheKey || !showPR) {
+      return
+    }
+    const refreshHostedReviewIfVisible = (): void => {
+      if (!isWindowVisible()) {
+        return
+      }
       // Why: branch lookup is lossy for fork/deleted-head PRs; reuse a known PR
       // number from metadata or the visible cache whenever we have one.
-      fetchHostedReviewForBranch(repo.path, branch, {
+      void fetchHostedReviewForBranch(repo.path, branch, {
         repoId: repo.id,
         linkedGitHubPR: worktree.linkedPR ?? null,
         fallbackGitHubPR: fallbackGitHubPRNumber,
         linkedGitLabMR: worktree.linkedGitLabMR ?? null,
         staleWhileRevalidate: true
       })
+    }
+    refreshHostedReviewIfVisible()
+    window.addEventListener('focus', refreshHostedReviewIfVisible)
+    document.addEventListener('visibilitychange', refreshHostedReviewIfVisible)
+    return () => {
+      window.removeEventListener('focus', refreshHostedReviewIfVisible)
+      document.removeEventListener('visibilitychange', refreshHostedReviewIfVisible)
     }
   }, [
     repo,
@@ -317,21 +317,35 @@ const WorktreeCard = React.memo(function WorktreeCard({
       return
     }
 
-    fetchIssue(repo.path, worktree.linkedIssue, { repoId: repo.id })
+    const issueNumber = worktree.linkedIssue
 
-    // Background poll as fallback (activity triggers handle the fast path)
-    const interval = setInterval(() => {
-      fetchIssue(repo.path, worktree.linkedIssue!, { repoId: repo.id })
-    }, 5 * 60_000) // 5 minutes
-
-    return () => clearInterval(interval)
+    // Background poll as fallback (activity triggers handle the fast path).
+    // The interval itself is stopped while hidden so issue cards do not keep
+    // long-lived workspaces waking just to skip their fetch.
+    return installWindowVisibilityInterval({
+      run: () => void fetchIssue(repo.path, issueNumber, { repoId: repo.id }),
+      intervalMs: 5 * 60_000
+    })
   }, [repo, isFolder, worktree.linkedIssue, fetchIssue, issueCacheKey, showIssue])
 
   useEffect(() => {
     if (!worktree.linkedLinearIssue || !showIssue) {
       return
     }
-    void fetchLinearIssue(worktree.linkedLinearIssue)
+    const linearIssueId = worktree.linkedLinearIssue
+    const refreshLinearIssueIfVisible = (): void => {
+      if (!isWindowVisible()) {
+        return
+      }
+      void fetchLinearIssue(linearIssueId)
+    }
+    refreshLinearIssueIfVisible()
+    window.addEventListener('focus', refreshLinearIssueIfVisible)
+    document.addEventListener('visibilitychange', refreshLinearIssueIfVisible)
+    return () => {
+      window.removeEventListener('focus', refreshLinearIssueIfVisible)
+      document.removeEventListener('visibilitychange', refreshLinearIssueIfVisible)
+    }
   }, [worktree.linkedLinearIssue, fetchLinearIssue, showIssue])
 
   // Stable click handler – ignore clicks that are really text selections.

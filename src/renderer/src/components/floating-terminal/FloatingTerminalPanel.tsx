@@ -24,6 +24,10 @@ import { getConnectionId } from '@/lib/connection-context'
 import { createUntitledMarkdownFile } from '@/lib/create-untitled-markdown'
 import { detectLanguage } from '@/lib/language-detect'
 import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
+import {
+  isFloatingWorkspacePanelShortcut,
+  isFloatingWorkspaceTerminalInputTarget
+} from '@/lib/floating-workspace-terminal-actions'
 import { extractIpcErrorMessage } from '@/lib/ipc-error'
 import {
   ORCHESTRATION_SETUP_DISMISSED_STORAGE_KEY,
@@ -59,6 +63,7 @@ import {
   getMaximizedFloatingTerminalBounds,
   type FloatingTerminalPanelBounds
 } from './floating-terminal-panel-bounds'
+import { getFloatingTerminalOpenFiles } from './floating-terminal-open-files'
 const EMPTY_TERMINAL_TABS: TerminalTab[] = []
 const EMPTY_BROWSER_TABS: BrowserTabState[] = []
 const EMPTY_GROUPS: TabGroup[] = []
@@ -84,11 +89,19 @@ export function FloatingTerminalPanel({
   open,
   onOpenChange
 }: FloatingTerminalPanelProps): React.JSX.Element | null {
-  const tabsByWorktree = useAppStore((s) => s.tabsByWorktree)
-  const browserTabsByWorktree = useAppStore((s) => s.browserTabsByWorktree)
-  const groupsByWorktree = useAppStore((s) => s.groupsByWorktree)
-  const unifiedTabsByWorktree = useAppStore((s) => s.unifiedTabsByWorktree)
-  const openFiles = useAppStore((s) => s.openFiles)
+  const tabs = useAppStore(
+    (s) => s.tabsByWorktree[FLOATING_TERMINAL_WORKTREE_ID] ?? EMPTY_TERMINAL_TABS
+  )
+  const browserTabs = useAppStore(
+    (s) => s.browserTabsByWorktree[FLOATING_TERMINAL_WORKTREE_ID] ?? EMPTY_BROWSER_TABS
+  )
+  const groups = useAppStore(
+    (s) => s.groupsByWorktree[FLOATING_TERMINAL_WORKTREE_ID] ?? EMPTY_GROUPS
+  )
+  const unifiedTabs = useAppStore(
+    (s) => s.unifiedTabsByWorktree[FLOATING_TERMINAL_WORKTREE_ID] ?? EMPTY_UNIFIED_TABS
+  )
+  const floatingFiles = useAppStore((s) => getFloatingTerminalOpenFiles(s.openFiles))
   const expandedPaneByTabId = useAppStore((s) => s.expandedPaneByTabId)
   const createTab = useAppStore((s) => s.createTab)
   const createBrowserTab = useAppStore((s) => s.createBrowserTab)
@@ -127,14 +140,6 @@ export function FloatingTerminalPanel({
     top: number
   } | null>(null)
 
-  const tabs = tabsByWorktree[FLOATING_TERMINAL_WORKTREE_ID] ?? EMPTY_TERMINAL_TABS
-  const browserTabs = browserTabsByWorktree[FLOATING_TERMINAL_WORKTREE_ID] ?? EMPTY_BROWSER_TABS
-  const groups = groupsByWorktree[FLOATING_TERMINAL_WORKTREE_ID] ?? EMPTY_GROUPS
-  const unifiedTabs = unifiedTabsByWorktree[FLOATING_TERMINAL_WORKTREE_ID] ?? EMPTY_UNIFIED_TABS
-  const floatingFiles = useMemo(
-    () => openFiles.filter((file) => file.worktreeId === FLOATING_TERMINAL_WORKTREE_ID),
-    [openFiles]
-  )
   const activeGroup = useMemo(
     () =>
       groups.find((group) => group.activeTabId != null) ??
@@ -237,7 +242,7 @@ export function FloatingTerminalPanel({
     handleSaveDialogSave,
     handleSaveDialogDiscard,
     handleSaveDialogCancel
-  } = useTerminalSaveDialog({ openFiles, closeFile, markFileDirty })
+  } = useTerminalSaveDialog({ openFiles: floatingFiles, closeFile, markFileDirty })
 
   const getNextQueuedEditorClose = useCallback((): string | null => {
     while (pendingEditorCloseQueueRef.current.length > 0) {
@@ -654,6 +659,10 @@ export function FloatingTerminalPanel({
     panelRef.current?.focus({ preventScroll: true })
   }, [])
 
+  const setFloatingTerminalInputFocused = useCallback((target: EventTarget | null): void => {
+    window.api.ui.setFloatingTerminalInputFocused(isFloatingWorkspaceTerminalInputTarget(target))
+  }, [])
+
   const handleShortcutSurfaceKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
       if (!open || event.defaultPrevented || event.repeat) {
@@ -668,9 +677,13 @@ export function FloatingTerminalPanel({
         return
       }
 
-      const isMac = navigator.userAgent.includes('Mac')
-      const mod = isMac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey
-      if (!mod || event.altKey) {
+      if (
+        !isFloatingWorkspacePanelShortcut(
+          event,
+          navigator.userAgent.includes('Mac'),
+          panelRef.current
+        )
+      ) {
         return
       }
 
@@ -709,6 +722,13 @@ export function FloatingTerminalPanel({
       open
     ]
   )
+
+  useEffect(() => {
+    if (!open) {
+      window.api.ui.setFloatingTerminalInputFocused(false)
+    }
+    return () => window.api.ui.setFloatingTerminalInputFocused(false)
+  }, [open])
 
   const toggleMaximized = useCallback(() => {
     setMaximized((current) => {
@@ -804,6 +824,8 @@ export function FloatingTerminalPanel({
           clampFloatingTerminalBounds({ ...prev, width: rect.width, height: rect.height })
         )
       }}
+      onFocusCapture={(event) => setFloatingTerminalInputFocused(event.target)}
+      onBlurCapture={(event) => setFloatingTerminalInputFocused(event.relatedTarget)}
       onKeyDownCapture={handleShortcutSurfaceKeyDown}
     >
       <div className="flex min-h-0 flex-1 flex-col">
