@@ -269,7 +269,7 @@ function Settings(): React.JSX.Element {
       if (isEditableTarget(event.target)) {
         return
       }
-      if (activeSectionId === 'shortcuts') {
+      if (activeSectionId === 'shortcuts' && settingsSearchQuery.trim() === '') {
         event.preventDefault()
         const now = Date.now()
         if (now <= shortcutsEscapeConfirmUntilRef.current) {
@@ -291,7 +291,7 @@ function Settings(): React.JSX.Element {
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [activeSectionId, closeSettingsPageWithPromptGuard])
+  }, [activeSectionId, settingsSearchQuery, closeSettingsPageWithPromptGuard])
 
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent): void => {
