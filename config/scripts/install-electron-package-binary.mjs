@@ -123,7 +123,14 @@ async function installElectronPackageBinary() {
     }
 
     rmSync(electronDistDir, { recursive: true, force: true })
-    cpSync(extractDir, electronDistDir, { recursive: true })
+    // Why: macOS Electron archives rely on framework symlinks. cpSync's default
+    // verbatimSymlinks=false rewrites targets to absolute paths inside tempDir,
+    // which is removed in the finally block, leaving dangling symlinks.
+    cpSync(extractDir, electronDistDir, {
+      recursive: true,
+      dereference: false,
+      verbatimSymlinks: true
+    })
 
     const srcTypeDefPath = resolve(electronDistDir, 'electron.d.ts')
     if (existsSync(srcTypeDefPath)) {
