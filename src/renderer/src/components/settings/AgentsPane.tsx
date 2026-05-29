@@ -11,6 +11,10 @@ import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { cn } from '@/lib/utils'
 import { AgentAwakeSetting } from './AgentAwakeSetting'
+import {
+  AGENT_GENERATED_TAB_TITLES_DESCRIPTION,
+  AGENT_GENERATED_TAB_TITLES_TITLE
+} from './agent-generated-tab-title-copy'
 import { AGENT_STATUS_HOOKS_DESCRIPTION, AGENT_STATUS_HOOKS_TITLE } from './agent-status-hooks-copy'
 import {
   SettingsBadge,
@@ -412,6 +416,8 @@ export function AgentsPane({ settings, updateSettings }: AgentsPaneProps): React
 
       <AgentStatusHooksSetting settings={settings} updateSettings={updateSettings} />
 
+      <AgentGeneratedTabTitlesSetting settings={settings} updateSettings={updateSettings} />
+
       <AgentAwakeSetting settings={settings} updateSettings={updateSettings} />
 
       {detectedAgents.length > 0 && (
@@ -518,6 +524,28 @@ export function AgentStatusHooksSetting({
           })
         }
         ariaLabel={AGENT_STATUS_HOOKS_TITLE}
+      />
+    </section>
+  )
+}
+
+export function AgentGeneratedTabTitlesSetting({
+  settings,
+  updateSettings
+}: AgentsPaneProps): React.JSX.Element {
+  const enabled = settings.tabAutoGenerateTitle === true
+  return (
+    <section className="space-y-3">
+      <SettingsSwitchRow
+        label={AGENT_GENERATED_TAB_TITLES_TITLE}
+        description={AGENT_GENERATED_TAB_TITLES_DESCRIPTION}
+        checked={enabled}
+        onChange={() =>
+          updateSettings({
+            tabAutoGenerateTitle: !enabled
+          })
+        }
+        ariaLabel={AGENT_GENERATED_TAB_TITLES_TITLE}
       />
     </section>
   )
