@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Why: editor tab rendering, drag behavior, rename handling, and its context menu share one tightly-coupled tab surface. */
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import {
   X,
@@ -160,26 +160,24 @@ export default function EditorFileTab({
     })
   }
 
-  useEffect(() => {
-    if (!isRenaming) {
-      return
-    }
-    const raf = requestAnimationFrame(() => {
-      const el = renameInputRef.current
-      if (!el) {
+  const setRenameInputElement = useCallback(
+    (input: HTMLInputElement | null) => {
+      renameInputRef.current = input
+      if (!input) {
         return
       }
-      el.focus()
+      // Why: rename should open with the basename selected before the user types.
+      input.focus()
       const name = basename(file.filePath)
       const dotIndex = name.lastIndexOf('.')
       if (dotIndex > 0) {
-        el.setSelectionRange(0, dotIndex)
+        input.setSelectionRange(0, dotIndex)
       } else {
-        el.select()
+        input.select()
       }
-    })
-    return () => cancelAnimationFrame(raf)
-  }, [isRenaming, file.filePath])
+    },
+    [file.filePath]
+  )
 
   const tabStatus =
     file.relativePath === 'All Changes'
@@ -263,7 +261,7 @@ export default function EditorFileTab({
       <span className="mr-1 flex min-w-0 items-baseline gap-1">
         {isRenaming ? (
           <Input
-            ref={renameInputRef}
+            ref={setRenameInputElement}
             data-tab-rename-input="true"
             aria-label={`Rename file ${basename(file.filePath)}`}
             defaultValue={basename(file.filePath)}
