@@ -1,11 +1,13 @@
-import type { TerminalTab, Worktree } from '../../../shared/types'
+import type { DetectedWorktreeListResult, TerminalTab, Worktree } from '../../../shared/types'
 
 export function getUnreadBadgeCount({
   worktreesByRepo,
+  detectedWorktreesByRepo = {},
   tabsByWorktree,
   unreadTerminalTabs
 }: {
   worktreesByRepo: Record<string, Worktree[]>
+  detectedWorktreesByRepo?: Record<string, DetectedWorktreeListResult>
   tabsByWorktree: Record<string, TerminalTab[]>
   unreadTerminalTabs: Record<string, true>
 }): number {
@@ -13,6 +15,16 @@ export function getUnreadBadgeCount({
 
   for (const worktrees of Object.values(worktreesByRepo)) {
     for (const worktree of worktrees) {
+      if (worktree.isUnread) {
+        unreadWorktreeIds.add(worktree.id)
+      }
+    }
+  }
+
+  // Why: automatic agent attention can land while a worktree is only present
+  // in detectedWorktreesByRepo; the Dock badge must mirror that unread marker.
+  for (const result of Object.values(detectedWorktreesByRepo)) {
+    for (const worktree of result.worktrees) {
       if (worktree.isUnread) {
         unreadWorktreeIds.add(worktree.id)
       }

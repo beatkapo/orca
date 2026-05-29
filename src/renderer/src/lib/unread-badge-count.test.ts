@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { TerminalTab, Worktree } from '../../../shared/types'
+import type { DetectedWorktreeListResult, TerminalTab, Worktree } from '../../../shared/types'
 import { getUnreadBadgeCount } from './unread-badge-count'
 
 function worktree(id: string, isUnread: boolean): Worktree {
@@ -8,6 +8,23 @@ function worktree(id: string, isUnread: boolean): Worktree {
 
 function tab(id: string): TerminalTab {
   return { id } as TerminalTab
+}
+
+function detectedWorktree(id: string, isUnread: boolean): DetectedWorktreeListResult {
+  return {
+    repoId: 'repo',
+    authoritative: true,
+    source: 'git',
+    worktrees: [
+      {
+        ...worktree(id, isUnread),
+        repoId: 'repo',
+        ownership: 'orca-managed',
+        selectedCheckout: false,
+        visible: true
+      }
+    ]
+  } as DetectedWorktreeListResult
 }
 
 describe('getUnreadBadgeCount', () => {
@@ -39,5 +56,16 @@ describe('getUnreadBadgeCount', () => {
         unreadTerminalTabs: { 'tab-1': true, 'tab-2': true }
       })
     ).toBe(2)
+  })
+
+  it('counts automatic unread markers on detected worktrees', () => {
+    expect(
+      getUnreadBadgeCount({
+        worktreesByRepo: { repo: [] },
+        detectedWorktreesByRepo: { repo: detectedWorktree('wt-detected', true) },
+        tabsByWorktree: {},
+        unreadTerminalTabs: {}
+      })
+    ).toBe(1)
   })
 })

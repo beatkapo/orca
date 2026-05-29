@@ -6,6 +6,7 @@ export function useUnreadDockBadge(): void {
   const unreadCount = useAppStore((state) =>
     getUnreadBadgeCount({
       worktreesByRepo: state.worktreesByRepo,
+      detectedWorktreesByRepo: state.detectedWorktreesByRepo,
       tabsByWorktree: state.tabsByWorktree,
       unreadTerminalTabs: state.unreadTerminalTabs
     })
