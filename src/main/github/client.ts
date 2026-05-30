@@ -36,6 +36,7 @@ import { tmpdir } from 'os'
 import { getPRConflictSummary } from './conflict-summary'
 import { getSshFilesystemProvider } from '../providers/ssh-filesystem-dispatch'
 import { joinWorktreeRelativePath } from '../runtime/runtime-relative-paths'
+import { splitRemoteBranchName } from '../../shared/git-effective-upstream'
 import {
   execFileAsync,
   ghExecFileAsync,
@@ -55,6 +56,7 @@ import {
   getRemoteUrlForRepo,
   type OwnerRepo
 } from './gh-utils'
+import { getSshGitProvider } from '../providers/ssh-git-dispatch'
 export { _resetOwnerRepoCache } from './gh-utils'
 export {
   getIssue,
@@ -1891,26 +1893,34 @@ async function getFallbackPRListForBranch(
   return list[0] ?? null
 }
 
-function parseTrackedUpstreamBranchName(upstreamRef: string, branchName: string): string | null {
-  const trimmed = upstreamRef.trim()
-  const remoteSeparator = trimmed.indexOf('/')
-  if (remoteSeparator <= 0) {
-    return null
-  }
-  const upstreamBranchName = trimmed.slice(remoteSeparator + 1).trim()
-  return upstreamBranchName && upstreamBranchName !== branchName ? upstreamBranchName : null
+type TrackedUpstreamBranch = {
+  remoteName: string
+  branchName: string
 }
 
-async function getTrackedUpstreamBranchName(
-  repoPath: string,
+function parseTrackedUpstreamBranch(
+  upstreamRef: string,
   branchName: string
-): Promise<string | null> {
+): TrackedUpstreamBranch | null {
+  const parsed = splitRemoteBranchName(upstreamRef.trim())
+  if (!parsed || parsed.branchName === branchName) {
+    return null
+  }
+  return parsed
+}
+
+async function getTrackedUpstreamBranch(
+  repoPath: string,
+  branchName: string,
+  connectionId?: string | null
+): Promise<TrackedUpstreamBranch | null> {
+  const args = ['rev-parse', '--abbrev-ref', '--symbolic-full-name', `${branchName}@{upstream}`]
   try {
-    const { stdout } = await gitExecFileAsync(
-      ['rev-parse', '--abbrev-ref', '--symbolic-full-name', `${branchName}@{upstream}`],
-      { cwd: repoPath }
-    )
-    return parseTrackedUpstreamBranchName(stdout, branchName)
+    const provider = connectionId ? getSshGitProvider(connectionId) : null
+    const result = provider
+      ? await provider.exec(args, repoPath)
+      : await gitExecFileAsync(args, { cwd: repoPath })
+    return parseTrackedUpstreamBranch(result.stdout, branchName)
   } catch {
     return null
   }
@@ -2135,6 +2145,7 @@ export async function getPRForBranchOutcome(
     const { candidates, headRepo } = await resolvePRRepositoryCandidates(repoPath, connectionId)
     let data: PullRequestLookupData | null = null
     let dataRepo: OwnerRepo | null = null
+    let dataHeadRepo: OwnerRepo | null = headRepo
 
     if (typeof linkedPRNumber === 'number') {
       const exactLookup = await lookupPRByNumber({
@@ -2155,19 +2166,25 @@ export async function getPRForBranchOutcome(
       })
       data = branchLookup.data
       dataRepo = branchLookup.dataRepo
-      if (!data && !connectionId) {
+      if (!data) {
         // Why: worktrees can have a short local branch tracking a differently
         // named remote PR head; after the local miss, try that configured head.
-        const upstreamBranchName = await getTrackedUpstreamBranchName(repoPath, branchName)
-        if (upstreamBranchName) {
+        const upstreamBranch = await getTrackedUpstreamBranch(repoPath, branchName, connectionId)
+        if (upstreamBranch) {
+          const upstreamHeadRepo =
+            (await getOwnerRepoForRemote(repoPath, upstreamBranch.remoteName, connectionId)) ??
+            headRepo
           const upstreamLookup = await lookupPRByBranchName({
             candidates,
-            headRepo,
-            branchName: upstreamBranchName,
+            headRepo: upstreamHeadRepo,
+            branchName: upstreamBranch.branchName,
             ghOptions
           })
           data = upstreamLookup.data
           dataRepo = upstreamLookup.dataRepo
+          if (data) {
+            dataHeadRepo = upstreamHeadRepo
+          }
         }
       }
     }
@@ -2212,7 +2229,7 @@ export async function getPRForBranchOutcome(
         ...(data.mergeStateStatus !== undefined ? { mergeStateStatus: data.mergeStateStatus } : {}),
         headSha: data.headRefOid,
         prRepo: dataRepo ?? undefined,
-        headRepo: headRepo ?? undefined,
+        headRepo: dataHeadRepo ?? undefined,
         conflictSummary
       }
     }
