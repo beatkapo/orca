@@ -3660,7 +3660,23 @@ describe('Store', () => {
       }
     })
 
-    await expect(createStore()).resolves.toBeDefined()
+    const store = await createStore()
+    store.flush()
+
+    const persisted = readDataFile() as PersistedState
+    const aliasEntries = persisted.legacyPaneKeyAliasEntries
+    expect(aliasEntries).toHaveLength(leafCount + 1)
+    expect(
+      aliasEntries.some((entry) => entry.ptyId === 'large-pty' && entry.legacyPaneKey === 'tab1:0')
+    ).toBe(true)
+    expect(
+      aliasEntries.some((entry) => entry.ptyId === 'large-pty' && entry.legacyPaneKey === 'tab1:1')
+    ).toBe(true)
+    expect(
+      aliasEntries.some(
+        (entry) => entry.ptyId === 'large-pty' && entry.legacyPaneKey === `tab1:${leafCount}`
+      )
+    ).toBe(true)
   })
 
   it('converts unambiguous dev migration rows into persisted aliases', async () => {
