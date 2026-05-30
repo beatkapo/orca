@@ -2483,11 +2483,19 @@ function resolvePaneKey(
   }
 }
 
+// Why: word-boundary anchored to mirror title-agent-identity.ts so a Claude
+// task description that merely mentions "openclaude" cannot rewrite the agent.
+const OPENCLAUDE_IDENTITY_TOKEN_RE = /(?<![\w./\\-])openclaude(?![\w./\\-])/i
+
 function resolveHookPayloadAgentType(
   payload: ParsedAgentStatusPayload,
   terminalTitle: string | undefined
 ): ParsedAgentStatusPayload {
-  if (payload.agentType !== 'claude' || !terminalTitle?.toLowerCase().includes('openclaude')) {
+  if (
+    payload.agentType !== 'claude' ||
+    !terminalTitle ||
+    !OPENCLAUDE_IDENTITY_TOKEN_RE.test(terminalTitle)
+  ) {
     return payload
   }
   // Why: OpenClaude emits Claude-compatible hooks, so title identity is the
