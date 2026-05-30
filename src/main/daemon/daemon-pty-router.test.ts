@@ -158,6 +158,32 @@ describe('DaemonPtyRouter', () => {
     expect(current.write).toHaveBeenCalledWith('current-alive', 'new\n')
   })
 
+  it('merges very large startup reconciliation results without dropping routes', async () => {
+    const currentAlive = Array.from({ length: 130_000 }, (_, index) => `current-alive-${index}`)
+    const legacyKilled = Array.from({ length: 130_000 }, (_, index) => `legacy-killed-${index}`)
+    const current = createAdapter('current', [], {
+      alive: currentAlive,
+      killed: []
+    })
+    const legacy = createAdapter('legacy', [], {
+      alive: ['legacy-alive'],
+      killed: legacyKilled
+    })
+    const router = new DaemonPtyRouter({ current, legacy: [legacy] })
+
+    const result = await router.reconcileOnStartup(new Set(['wt']))
+    router.write(currentAlive.at(-1)!, 'new\n')
+    router.write('legacy-alive', 'old\n')
+
+    expect(result.alive).toHaveLength(currentAlive.length + 1)
+    expect(result.alive[0]).toBe(currentAlive[0])
+    expect(result.alive.at(-1)).toBe('legacy-alive')
+    expect(result.killed).toHaveLength(legacyKilled.length)
+    expect(result.killed.at(-1)).toBe(legacyKilled.at(-1))
+    expect(current.write).toHaveBeenCalledWith(currentAlive.at(-1), 'new\n')
+    expect(legacy.write).toHaveBeenCalledWith('legacy-alive', 'old\n')
+  })
+
   it('disposes current and legacy adapters', () => {
     const current = createAdapter('current')
     const legacy = createAdapter('legacy')

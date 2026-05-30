@@ -1,6 +1,13 @@
 import type { DaemonPtyAdapter } from './daemon-pty-adapter'
 import type { IPtyProvider, PtySpawnOptions, PtySpawnResult } from '../providers/types'
 
+function appendSessionIds(target: string[], source: readonly string[]): void {
+  // Why: daemon restore can report enough sessions to exceed V8's spread-argument cap.
+  for (const id of source) {
+    target.push(id)
+  }
+}
+
 export class DaemonPtyRouter implements IPtyProvider {
   private current: DaemonPtyAdapter
   private legacy: DaemonPtyAdapter[]
@@ -175,8 +182,8 @@ export class DaemonPtyRouter implements IPtyProvider {
     const killed: string[] = []
     for (const adapter of this.allAdapters()) {
       const result = await adapter.reconcileOnStartup(validWorktreeIds)
-      alive.push(...result.alive)
-      killed.push(...result.killed)
+      appendSessionIds(alive, result.alive)
+      appendSessionIds(killed, result.killed)
       for (const id of result.alive) {
         this.sessionAdapters.set(id, adapter)
       }
