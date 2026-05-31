@@ -1,7 +1,8 @@
 import {
   DEFAULT_SSH_RELAY_GRACE_PERIOD_SECONDS,
   MAX_SSH_RELAY_GRACE_PERIOD_SECONDS,
-  MIN_SSH_RELAY_GRACE_PERIOD_SECONDS
+  MIN_SSH_RELAY_GRACE_PERIOD_SECONDS,
+  type SshTarget
 } from '../../../../shared/ssh-types'
 
 export type EditingTarget = {
@@ -28,6 +29,28 @@ export const EMPTY_FORM: EditingTarget = {
   jumpHost: '',
   relayGracePeriodSeconds: String(DEFAULT_SSH_RELAY_GRACE_PERIOD_SECONDS),
   relayKeepAliveUntilReset: false
+}
+
+export function getEditingTargetForSshTarget(target: SshTarget): EditingTarget {
+  // Why: manual targets store configHost as their host. Clear that implicit
+  // value on edit so changing Host recomputes the alias instead of keeping stale resolution.
+  const configHost = target.configHost && target.configHost !== target.host ? target.configHost : ''
+  return {
+    label: target.label,
+    configHost,
+    host: target.host,
+    port: String(target.port),
+    username: target.username,
+    identityFile: target.identityFile ?? '',
+    proxyCommand: target.proxyCommand ?? '',
+    jumpHost: target.jumpHost ?? '',
+    relayGracePeriodSeconds: String(
+      target.relayGracePeriodSeconds === 0
+        ? DEFAULT_SSH_RELAY_GRACE_PERIOD_SECONDS
+        : (target.relayGracePeriodSeconds ?? DEFAULT_SSH_RELAY_GRACE_PERIOD_SECONDS)
+    ),
+    relayKeepAliveUntilReset: target.relayGracePeriodSeconds === 0
+  }
 }
 
 export type ParsedSshHostInput = {
