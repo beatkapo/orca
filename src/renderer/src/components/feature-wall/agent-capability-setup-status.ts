@@ -28,6 +28,7 @@ export type AgentCapabilityReadiness = {
   computerUseSkillLoading: boolean
   computerUseReady: boolean
   computerUseChecking: boolean
+  computerUseUnavailable: boolean
   orchestrationSkillInstalled: boolean
   orchestrationSkillLoading: boolean
 }
@@ -56,6 +57,7 @@ export function useAgentCapabilitySetupStatus(): AgentCapabilitySetupStatus {
       computerUseSkillLoading: computerUseSkill.loading,
       computerUseReady: computerUsePermissionStatus.ready,
       computerUseChecking: computerUsePermissionStatus.checking,
+      computerUseUnavailable: computerUsePermissionStatus.unavailableReason !== null,
       orchestrationSkillInstalled: orchestrationSkill.installed,
       orchestrationSkillLoading: orchestrationSkill.loading
     }),
@@ -64,6 +66,7 @@ export function useAgentCapabilitySetupStatus(): AgentCapabilitySetupStatus {
       browserUseSkill.loading,
       computerUsePermissionStatus.checking,
       computerUsePermissionStatus.ready,
+      computerUsePermissionStatus.unavailableReason,
       computerUseSkill.installed,
       computerUseSkill.loading,
       orchestrationSkill.installed,
@@ -90,7 +93,9 @@ export function getDefaultAgentCapabilitySetupSelection(
     browserUse: !readiness.browserUseSkillInstalled,
     // Why: Computer Use has OS permission setup in addition to the skill install.
     // Keep it selected when permissions still need action, even if the skill exists.
-    computerUse: !readiness.computerUseSkillInstalled || !readiness.computerUseReady,
+    computerUse:
+      !readiness.computerUseSkillInstalled ||
+      (!readiness.computerUseReady && !readiness.computerUseUnavailable),
     orchestration: !readiness.orchestrationSkillInstalled
   }
 }
@@ -153,11 +158,18 @@ function getComputerUseInstallStatus(
     return { label: 'checking app access', tone: 'checking', installed: true }
   }
   if (permissions.unavailableReason) {
-    return { label: 'install the Orca desktop app', tone: 'pending', installed: true }
+    return {
+      label:
+        permissions.unavailableReason === 'web_client'
+          ? 'open Orca Desktop on this Mac'
+          : 'Computer Use is not available in this build',
+      tone: 'pending',
+      installed: true
+    }
   }
   if (!permissions.ready) {
     return {
-      label: 'click Install CLI & Skills to grant app access',
+      label: 'click Install CLI & Skills to open macOS access settings',
       tone: 'pending',
       installed: true
     }

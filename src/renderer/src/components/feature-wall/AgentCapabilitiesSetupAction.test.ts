@@ -8,6 +8,7 @@ const READY_INPUT = {
   computerUseSkillLoading: false,
   computerUseReady: true,
   computerUseChecking: false,
+  computerUseUnavailable: false,
   orchestrationSkillInstalled: true,
   orchestrationSkillLoading: false
 }
@@ -44,6 +45,20 @@ describe('getDefaultAgentCapabilitySetupSelection', () => {
     ).toEqual({
       browserUse: false,
       computerUse: true,
+      orchestration: false
+    })
+  })
+
+  it('leaves Computer Use unchecked when this build cannot enable it', () => {
+    expect(
+      getDefaultAgentCapabilitySetupSelection({
+        ...READY_INPUT,
+        computerUseReady: false,
+        computerUseUnavailable: true
+      })
+    ).toEqual({
+      browserUse: false,
+      computerUse: false,
       orchestration: false
     })
   })
