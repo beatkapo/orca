@@ -110,6 +110,9 @@ vi.mock('./SettingsFormControls', () => ({
   SettingsSubsectionHeader: function SettingsSubsectionHeader() {
     return null
   },
+  SettingsSwitch: function SettingsSwitch() {
+    return null
+  },
   SettingsSwitchRow: function SettingsSwitchRow() {
     return null
   }
