@@ -61,7 +61,9 @@ function SetupStepRow(props: {
         {done ? <Check className="size-3" /> : null}
       </span>
       <span className="min-w-0">
-        <span className="block text-sm font-medium leading-tight text-foreground">{step.name}</span>
+        <span className="block text-[15px] font-medium leading-tight text-foreground">
+          {step.name}
+        </span>
       </span>
     </button>
   )
@@ -244,10 +246,10 @@ export function FeatureWallSetupChecklist(
           <div className="flex h-full flex-col gap-4">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 space-y-1">
-                <div className="text-xl font-semibold leading-tight tracking-tight text-foreground">
+                <div className="text-2xl font-semibold leading-tight tracking-tight text-foreground">
                   {activeStep.name}
                 </div>
-                <p className="max-w-[58ch] text-sm leading-snug text-muted-foreground">
+                <p className="max-w-[58ch] text-base leading-normal text-muted-foreground">
                   {activeStep.description}
                 </p>
               </div>
