@@ -12,7 +12,10 @@ import {
 type TerminalOutputTarget = ForegroundTerminalOutputTarget
 
 type TerminalOutputBeforeWrite = (data: string) => void
-type TerminalBacklogRecoveryRequest = () => boolean
+type TerminalBacklogRecoveryRequestOptions = {
+  force?: boolean
+}
+type TerminalBacklogRecoveryRequest = (options?: TerminalBacklogRecoveryRequestOptions) => boolean
 
 type WriteTerminalOutputOptions = {
   foreground: boolean
@@ -484,17 +487,23 @@ export function flushTerminalOutput(
   }
 }
 
-function requestRegisteredTerminalBacklogRecovery(terminal: TerminalOutputTarget): boolean {
+function requestRegisteredTerminalBacklogRecovery(
+  terminal: TerminalOutputTarget,
+  options?: TerminalBacklogRecoveryRequestOptions
+): boolean {
   const requestRecovery = backlogRecoveryByTerminal.get(terminal)
   if (!requestRecovery) {
     return false
   }
-  return requestRecovery()
+  return requestRecovery(options)
 }
 
-export function requestTerminalBacklogRecovery(terminal: TerminalOutputTarget): void {
+export function requestTerminalBacklogRecovery(
+  terminal: TerminalOutputTarget,
+  options?: TerminalBacklogRecoveryRequestOptions
+): void {
   exposeDebugApi()
-  requestRegisteredTerminalBacklogRecovery(terminal)
+  requestRegisteredTerminalBacklogRecovery(terminal, options)
 }
 
 export function registerTerminalBacklogRecovery(

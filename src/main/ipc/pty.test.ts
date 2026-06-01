@@ -359,7 +359,11 @@ describe('registerPtyHandlers', () => {
         }),
         write: vi.fn(),
         resize: vi.fn(),
-        kill: vi.fn()
+        kill: vi.fn(),
+        _socket: {
+          pause: vi.fn(),
+          resume: vi.fn()
+        }
       },
       emitData(data: string) {
         dataHandler?.(data)
@@ -370,12 +374,31 @@ describe('registerPtyHandlers', () => {
     }
   }
 
-  function getPtyWriteListener(): (event: unknown, args: { id: string; data: string }) => void {
+  function getPtyWriteListener(): (
+    event: unknown,
+    args: { id: string; data: string; resumeSnapshotBackedOutput?: boolean }
+  ) => void {
     const writeCall = onMock.mock.calls.find((call: unknown[]) => call[0] === 'pty:write')
     if (!writeCall) {
       throw new Error('missing pty:write listener')
     }
-    return writeCall[1] as (event: unknown, args: { id: string; data: string }) => void
+    return writeCall[1] as (
+      event: unknown,
+      args: { id: string; data: string; resumeSnapshotBackedOutput?: boolean }
+    ) => void
+  }
+
+  function getSnapshotBackedOutputPausedListener(): (
+    event: unknown,
+    args: { id: string; paused: boolean }
+  ) => void {
+    const pauseCall = onMock.mock.calls.find(
+      (call: unknown[]) => call[0] === 'pty:setSnapshotBackedOutputPaused'
+    )
+    if (!pauseCall) {
+      throw new Error('missing pty:setSnapshotBackedOutputPaused listener')
+    }
+    return pauseCall[1] as (event: unknown, args: { id: string; paused: boolean }) => void
   }
 
   /** Helper: trigger pty:spawn and return the env passed to node-pty. */
@@ -3155,7 +3178,148 @@ describe('registerPtyHandlers', () => {
     }
   })
 
-  it('does not starve background PTY output during continuous input', async () => {
+  it('drops snapshot-backed hidden plain output while still sending escape chunks', async () => {
+    vi.useFakeTimers()
+    const mockProc = createMockProc()
+    spawnMock.mockReturnValue(mockProc.proc)
+
+    try {
+      registerPtyHandlers(mainWindow as never)
+      const spawnResult = (await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        cwd: '/tmp'
+      })) as { id: string }
+      const setSnapshotBackedOutputPaused = getSnapshotBackedOutputPausedListener()
+      mainWindow.webContents.send.mockClear()
+
+      mockProc.emitData('queued-before-pause')
+      setSnapshotBackedOutputPaused(null, { id: spawnResult.id, paused: true })
+      vi.advanceTimersByTime(8)
+      expect(mainWindow.webContents.send).not.toHaveBeenCalledWith('pty:data', {
+        id: spawnResult.id,
+        data: 'queued-before-pause'
+      })
+
+      mockProc.emitData('plain-while-paused')
+      vi.advanceTimersByTime(8)
+      expect(mainWindow.webContents.send).not.toHaveBeenCalledWith('pty:data', {
+        id: spawnResult.id,
+        data: 'plain-while-paused'
+      })
+
+      mockProc.emitData('\x1b]0;hidden-title\x07')
+      vi.advanceTimersByTime(8)
+      expect(mainWindow.webContents.send).toHaveBeenCalledWith('pty:data', {
+        id: spawnResult.id,
+        data: '\x1b]0;hidden-title\x07'
+      })
+
+      setSnapshotBackedOutputPaused(null, { id: spawnResult.id, paused: false })
+      mockProc.emitData('visible-again')
+      vi.advanceTimersByTime(8)
+      expect(mainWindow.webContents.send).toHaveBeenCalledWith('pty:data', {
+        id: spawnResult.id,
+        data: 'visible-again'
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('still sends snapshot-backed hidden plain output to the runtime before suppressing renderer IPC', async () => {
+    vi.useFakeTimers()
+    const mockProc = createMockProc()
+    spawnMock.mockReturnValue(mockProc.proc)
+    let outputSeq = 0
+    const runtime = {
+      setPtyController: vi.fn(),
+      preAllocateHandleForPty: vi.fn(() => 'term_hidden_snapshot'),
+      onPtySpawned: vi.fn(),
+      onPtyExit: vi.fn(),
+      onPtyData: vi.fn((_id: string, data: string) => {
+        outputSeq += data.length
+        return outputSeq
+      }),
+      getPtyOutputSequence: vi.fn(() => outputSeq)
+    }
+
+    try {
+      registerPtyHandlers(mainWindow as never, runtime as never)
+      const spawnResult = (await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        cwd: '/tmp'
+      })) as { id: string }
+      const setSnapshotBackedOutputPaused = getSnapshotBackedOutputPausedListener()
+      mainWindow.webContents.send.mockClear()
+
+      setSnapshotBackedOutputPaused(null, { id: spawnResult.id, paused: true })
+      mockProc.emitData('hidden-canonical\n')
+      vi.advanceTimersByTime(8)
+
+      expect(runtime.onPtyData).toHaveBeenCalledWith(
+        spawnResult.id,
+        'hidden-canonical\n',
+        expect.any(Number)
+      )
+      expect(mainWindow.webContents.send).not.toHaveBeenCalledWith('pty:data', {
+        id: spawnResult.id,
+        data: 'hidden-canonical\n'
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps local provider reads flowing while snapshot-backed renderer output is paused', async () => {
+    vi.useFakeTimers()
+    const mockProc = createMockProc()
+    spawnMock.mockReturnValue(mockProc.proc)
+
+    try {
+      registerPtyHandlers(mainWindow as never)
+      const spawnResult = (await handlers.get('pty:spawn')!(null, {
+        cols: 80,
+        rows: 24,
+        cwd: '/tmp'
+      })) as { id: string }
+      const setSnapshotBackedOutputPaused = getSnapshotBackedOutputPausedListener()
+      setSnapshotBackedOutputPaused(null, { id: spawnResult.id, paused: true })
+      expect(mockProc.proc._socket.pause).not.toHaveBeenCalled()
+      mainWindow.webContents.send.mockClear()
+
+      mockProc.emitData('x'.repeat(512 * 1024))
+      vi.advanceTimersByTime(8)
+
+      expect(mockProc.proc._socket.pause).not.toHaveBeenCalled()
+      expect(mainWindow.webContents.send).not.toHaveBeenCalled()
+
+      mockProc.proc._socket.resume.mockClear()
+      getPtyWriteListener()(null, { id: spawnResult.id, data: 'hidden input' })
+      expect(mockProc.proc.write).toHaveBeenCalledWith('hidden input')
+      expect(mockProc.proc._socket.resume).not.toHaveBeenCalled()
+
+      getPtyWriteListener()(null, {
+        id: spawnResult.id,
+        data: 'visible input',
+        resumeSnapshotBackedOutput: true
+      })
+      expect(mockProc.proc._socket.resume).not.toHaveBeenCalled()
+      expect(mockProc.proc.write).toHaveBeenCalledWith('visible input')
+
+      mockProc.emitData('visible-again')
+      vi.advanceTimersByTime(8)
+      expect(mainWindow.webContents.send).toHaveBeenCalledWith('pty:data', {
+        id: spawnResult.id,
+        data: 'visible-again'
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('holds background PTY output until continuous input goes quiet', async () => {
     vi.useFakeTimers()
     const activeProc = createMockProc()
     const backgroundProc = createMockProc()
@@ -3195,6 +3359,18 @@ describe('registerPtyHandlers', () => {
       })
       vi.advanceTimersByTime(10)
 
+      expect(mainWindow.webContents.send).not.toHaveBeenCalledWith('pty:data', {
+        id: backgroundSpawn.id,
+        data: 'background output'
+      })
+
+      vi.advanceTimersByTime(39)
+      expect(mainWindow.webContents.send).not.toHaveBeenCalledWith('pty:data', {
+        id: backgroundSpawn.id,
+        data: 'background output'
+      })
+
+      vi.advanceTimersByTime(1)
       expect(mainWindow.webContents.send).toHaveBeenCalledWith('pty:data', {
         id: backgroundSpawn.id,
         data: 'background output'
@@ -3406,7 +3582,7 @@ describe('registerPtyHandlers', () => {
         data: firstChunk
       })
 
-      vi.advanceTimersByTime(1)
+      vi.advanceTimersByTime(8)
 
       expect(mainWindow.webContents.send).toHaveBeenCalledTimes(3)
       expect(mainWindow.webContents.send).toHaveBeenNthCalledWith(3, 'pty:data', {
@@ -4185,6 +4361,52 @@ describe('registerPtyHandlers', () => {
         scrollbackRows: 50_000
       })
       expect(result).toEqual({ data: 'snapshot\r\n', cols: 120, rows: 40, seq: 42 })
+    })
+
+    it('falls back to the provider snapshot when the runtime has no main snapshot', async () => {
+      const provider = {
+        spawn: vi.fn(async () => ({ id: 'daemon-pty' })),
+        write: vi.fn(),
+        resize: vi.fn(),
+        shutdown: vi.fn(),
+        onData: vi.fn(() => vi.fn()),
+        onExit: vi.fn(() => vi.fn()),
+        listProcesses: vi.fn(async () => []),
+        getForegroundProcess: vi.fn(async () => null),
+        getTerminalSnapshot: vi.fn(async () => ({
+          data: 'fresh-daemon-snapshot\r\n',
+          cols: 132,
+          rows: 43
+        }))
+      }
+      const runtime = {
+        setPtyController: vi.fn(),
+        serializeMainTerminalBuffer: vi.fn().mockResolvedValue(null)
+      }
+      setLocalPtyProvider(provider as never)
+      handlers.clear()
+      registerPtyHandlers(mainWindow as never, runtime as never)
+      setPtyOwnership('daemon-pty', null)
+
+      try {
+        const result = await handlers.get('pty:getMainBufferSnapshot')!(null, {
+          id: 'daemon-pty',
+          opts: { scrollbackRows: 5000 }
+        })
+
+        expect(provider.getTerminalSnapshot).toHaveBeenCalledWith('daemon-pty')
+        expect(runtime.serializeMainTerminalBuffer).toHaveBeenCalledWith('daemon-pty', {
+          scrollbackRows: 5000
+        })
+        expect(result).toEqual({
+          data: 'fresh-daemon-snapshot\r\n',
+          cols: 132,
+          rows: 43
+        })
+      } finally {
+        deletePtyOwnership('daemon-pty')
+        clearProviderPtyState('daemon-pty')
+      }
     })
   })
 })

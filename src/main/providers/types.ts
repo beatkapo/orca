@@ -91,6 +91,12 @@ export type PtySpawnResult = {
   }
 }
 
+export type PtyProviderTerminalSnapshot = {
+  data: string
+  cols: number
+  rows: number
+}
+
 export type IPtyProvider = {
   spawn(opts: PtySpawnOptions): Promise<PtySpawnResult>
   attach(id: string): Promise<void>
@@ -103,6 +109,7 @@ export type IPtyProvider = {
   getInitialCwd(id: string): Promise<string>
   clearBuffer(id: string): Promise<void>
   acknowledgeDataEvent(id: string, charCount: number): void
+  getTerminalSnapshot?(id: string): Promise<PtyProviderTerminalSnapshot | null>
   hasChildProcesses(id: string): Promise<boolean>
   getForegroundProcess(id: string): Promise<string | null>
   serialize(ids: string[]): Promise<string>

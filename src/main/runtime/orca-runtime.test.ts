@@ -4436,6 +4436,29 @@ describe('OrcaRuntimeService', () => {
     expect(appendRecentPtyOutput(undefined, data)).toBe(data.slice(-4096))
   })
 
+  it('keeps snapshot-backed hidden plain output in the main headless snapshot', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    syncSinglePty(runtime)
+
+    runtime.onPtyData('pty-1', 'visible-before\n', 100)
+    await runtime.serializeMainTerminalBuffer('pty-1', { scrollbackRows: 10 })
+    runtime.onPtyData('pty-1', 'hidden-plain\n', 101)
+
+    const headless = (
+      runtime as unknown as {
+        headlessTerminals: Map<string, { outputSequence: number }>
+      }
+    ).headlessTerminals.get('pty-1')
+    await runtime.serializeMainTerminalBuffer('pty-1', { scrollbackRows: 10 })
+    expect(headless?.outputSequence).toBe('visible-before\nhidden-plain\n'.length)
+
+    const snapshot = await runtime.serializeMainTerminalBuffer('pty-1', { scrollbackRows: 10 })
+
+    expect(snapshot?.data).toContain('visible-before')
+    expect(snapshot?.data).toContain('hidden-plain')
+    expect(snapshot?.seq).toBe('visible-before\nhidden-plain\n'.length)
+  })
+
   it('bounds retained partial terminal output before preview reads', async () => {
     const runtime = new OrcaRuntimeService(store)
 

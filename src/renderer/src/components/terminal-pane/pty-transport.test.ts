@@ -72,6 +72,32 @@ describe('createIpcPtyTransport', () => {
     transport.disconnect()
   })
 
+  it('can defer renderer data processing before title and terminal callbacks run', async () => {
+    const { createIpcPtyTransport } = await import('./pty-transport')
+    const onDeferredData = vi.fn()
+    const onTitleChange = vi.fn()
+    const onDataCallback = vi.fn()
+    const transport = createIpcPtyTransport({
+      onTitleChange,
+      shouldDeferDataProcessing: (data) => data === 'hidden plain output',
+      onDeferredData
+    })
+
+    await transport.connect({ url: '', callbacks: { onData: onDataCallback } })
+
+    onData?.({ id: 'pty-1', data: 'hidden plain output' })
+    onData?.({ id: 'pty-1', data: '\u001b]0;visible-title\u0007visible body' })
+
+    expect(onDeferredData).toHaveBeenCalledWith('hidden plain output', undefined)
+    expect(onDataCallback).toHaveBeenCalledTimes(1)
+    expect(onDataCallback).toHaveBeenCalledWith('\u001b]0;visible-title\u0007visible body')
+
+    await flushPtySideEffects()
+
+    expect(onTitleChange).toHaveBeenCalledWith('visible-title', 'visible-title')
+    transport.disconnect()
+  })
+
   it('defers title side effects until after terminal data is delivered', async () => {
     const { createIpcPtyTransport } = await import('./pty-transport')
     const onTitleChange = vi.fn()

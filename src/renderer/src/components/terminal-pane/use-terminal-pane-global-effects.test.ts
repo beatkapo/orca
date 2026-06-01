@@ -140,6 +140,9 @@ describe('useTerminalPaneGlobalEffects', () => {
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
       api: {
+        pty: {
+          setSnapshotBackedOutputPaused: vi.fn()
+        },
         ui: {
           onFileDrop: vi.fn(() => vi.fn())
         }
@@ -279,6 +282,85 @@ describe('useTerminalPaneGlobalEffects', () => {
     expect(mocks.captureScrollState).toHaveBeenCalledTimes(2)
     expect(manager.suspendRendering).toHaveBeenCalledTimes(1)
     expect(mocks.restoreScrollStateAfterLayout).toHaveBeenLastCalledWith(terminalA, preHideState)
+  })
+
+  it('pauses local snapshot-backed PTY output while hidden and forces restore on resume', () => {
+    const order: string[] = []
+    const terminalA = { name: 'terminal-a' }
+    const manager = {
+      getPanes: vi.fn(() => [{ id: 1, terminal: terminalA }]),
+      resumeRendering: vi.fn(() => order.push('resume')),
+      suspendRendering: vi.fn(() => order.push('suspend')),
+      fitAllPanes: vi.fn(),
+      getActivePane: vi.fn(() => null),
+      setActivePane: vi.fn()
+    }
+    const paneTransports = new Map([
+      [
+        1,
+        {
+          getPtyId: () => 'pty-local'
+        }
+      ]
+    ])
+    vi.mocked(window.api.pty.setSnapshotBackedOutputPaused).mockImplementation(
+      (_ptyId: string, paused: boolean) => {
+        order.push(`pause:${paused}`)
+      }
+    )
+    mocks.requestTerminalBacklogRecovery.mockImplementation(
+      (_terminal: { name: string }, options?: { force?: boolean }) => {
+        order.push(`recover:${options?.force === true}`)
+      }
+    )
+
+    const baseArgs = {
+      tabId: 'tab-1',
+      worktreeId: 'wt-1',
+      managerRef: { current: manager as never },
+      containerRef: { current: null },
+      paneTransportsRef: { current: paneTransports as never },
+      isActiveRef: { current: false },
+      isVisibleRef: { current: false },
+      paneCount: 1,
+      isSyncFitEnabled: true,
+      toggleExpandPane: vi.fn()
+    }
+
+    beginHookRender()
+    useTerminalPaneGlobalEffects({
+      ...baseArgs,
+      isActive: true,
+      isVisible: true
+    })
+
+    order.length = 0
+    beginHookRender()
+    useTerminalPaneGlobalEffects({
+      ...baseArgs,
+      isActive: false,
+      isVisible: false
+    })
+    expect(window.api.pty.setSnapshotBackedOutputPaused).toHaveBeenLastCalledWith('pty-local', true)
+    expect(order).toContain('pause:true')
+
+    order.length = 0
+    beginHookRender()
+    useTerminalPaneGlobalEffects({
+      ...baseArgs,
+      isActive: true,
+      isVisible: true
+    })
+
+    expect(mocks.requestTerminalBacklogRecovery).toHaveBeenLastCalledWith(terminalA, {
+      force: true
+    })
+    expect(window.api.pty.setSnapshotBackedOutputPaused).toHaveBeenLastCalledWith(
+      'pty-local',
+      false
+    )
+    expect(order.indexOf('recover:true')).toBeGreaterThanOrEqual(0)
+    expect(order.indexOf('pause:false')).toBeGreaterThan(order.indexOf('recover:true'))
   })
 
   it('ignores terminal file drops for another terminal tab', () => {

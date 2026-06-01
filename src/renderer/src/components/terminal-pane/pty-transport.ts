@@ -430,7 +430,10 @@ export function createIpcPtyTransport(opts: IpcPtyTransportOptions = {}): PtyTra
     onAgentBecameIdle,
     onAgentBecameWorking,
     onAgentExited,
-    onAgentStatus
+    onAgentStatus,
+    shouldDeferDataProcessing,
+    onDeferredData,
+    resumeSnapshotBackedOutputOnInput
   } = opts
   let connected = false
   let destroyed = false
@@ -487,6 +490,10 @@ export function createIpcPtyTransport(opts: IpcPtyTransportOptions = {}): PtyTra
       }
     })
     ptyDataHandlers.set(id, (data, meta) => {
+      if (shouldDeferDataProcessing?.(data, meta)) {
+        onDeferredData?.(data, meta)
+        return
+      }
       outputProcessor.processData(
         data,
         storedCallbacks,
@@ -737,7 +744,15 @@ export function createIpcPtyTransport(opts: IpcPtyTransportOptions = {}): PtyTra
       if (!connected || !ptyId) {
         return false
       }
-      window.api.pty.write(ptyId, data)
+      const writeOptions =
+        resumeSnapshotBackedOutputOnInput?.() === true
+          ? { resumeSnapshotBackedOutput: true }
+          : undefined
+      if (writeOptions) {
+        window.api.pty.write(ptyId, data, writeOptions)
+      } else {
+        window.api.pty.write(ptyId, data)
+      }
       return true
     },
 
@@ -748,7 +763,13 @@ export function createIpcPtyTransport(opts: IpcPtyTransportOptions = {}): PtyTra
             if (!connected || !ptyId) {
               return false
             }
-            return window.api.pty.writeAccepted(ptyId, data)
+            const writeOptions =
+              resumeSnapshotBackedOutputOnInput?.() === true
+                ? { resumeSnapshotBackedOutput: true }
+                : undefined
+            return writeOptions
+              ? window.api.pty.writeAccepted(ptyId, data, writeOptions)
+              : window.api.pty.writeAccepted(ptyId, data)
           }
         }),
 

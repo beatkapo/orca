@@ -210,6 +210,26 @@ describe('DaemonPtyAdapter (IPtyProvider)', () => {
     })
   })
 
+  describe('getTerminalSnapshot', () => {
+    it('returns a live daemon terminal snapshot for provider-level restore', async () => {
+      const { id } = await adapter.spawn({
+        cols: 80,
+        rows: 24,
+        cwd: '/tmp',
+        sessionId: 'snapshot-session'
+      })
+
+      lastSubprocess._simulateData('provider snapshot data\r\n')
+      await new Promise((r) => setTimeout(r, 50))
+
+      await expect(adapter.getTerminalSnapshot(id)).resolves.toEqual({
+        data: expect.stringContaining('provider snapshot data'),
+        cols: 80,
+        rows: 24
+      })
+    })
+  })
+
   describe('onData', () => {
     it('routes data events from daemon', async () => {
       const dataPayloads: { id: string; data: string }[] = []

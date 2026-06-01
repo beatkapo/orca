@@ -144,6 +144,7 @@ const ptyPendingGenByPtyId = new Map<string, number>()
 // Populated on settlePaneSerializer (renderer has registered for this ptyId)
 // and cleared on PTY teardown.
 const rendererSerializerByPtyId = new Set<string>()
+const snapshotBackedOutputPausedPtys = new Set<string>()
 
 function parseValidPaneKey(paneKey: unknown): ReturnType<typeof parsePaneKey> {
   if (typeof paneKey !== 'string' || paneKey.length > 256) {
@@ -786,6 +787,7 @@ export function clearProviderPtyState(id: string): void {
     }
   })
   rendererSerializerByPtyId.delete(id)
+  snapshotBackedOutputPausedPtys.delete(id)
   // Why: the hook server's per-paneKey caches (lastPrompt / lastTool) would
   // otherwise accumulate entries for dead panes over the process lifetime.
   // Use the spawn-time paneKey mapping since the server has no other way to
@@ -896,6 +898,7 @@ export function registerPtyHandlers(
   ipcMain.removeHandler('pty:writeAccepted')
   ipcMain.removeAllListeners('pty:write')
   ipcMain.removeAllListeners('pty:ackColdRestore')
+  ipcMain.removeAllListeners('pty:setSnapshotBackedOutputPaused')
   ipcMain.removeAllListeners('pty:serializeBuffer:response')
 
   // Configure the local provider with app-specific hooks.
@@ -975,7 +978,7 @@ export function registerPtyHandlers(
   const trustedTerminalHandleEnv = new Set<string>()
   let flushTimer: ReturnType<typeof setTimeout> | null = null
   const PTY_BATCH_INTERVAL_MS = 8
-  const PTY_BATCH_DRAIN_CONTINUE_MS = 1
+  const PTY_BATCH_DRAIN_CONTINUE_MS = 8
   const PTY_BATCH_FLUSH_CHUNK_CHARS = 16 * 1024
   const PTY_BATCH_FLUSH_MAX_WRITES = 2
   // Why: keep the immediate path bounded to keystroke-sized TUI redraws;
@@ -1051,6 +1054,10 @@ export function registerPtyHandlers(
       next.startSeq = startSeq
     }
     return next
+  }
+
+  function isPlainRendererOutput(data: string): boolean {
+    return !data.includes('\x1b') && !data.includes('\x07')
   }
 
   function schedulePendingDataFlush(delayMs: number): void {
@@ -1139,7 +1146,7 @@ export function registerPtyHandlers(
       )
     }
     if (shouldHoldBackgroundFlushForInput(now)) {
-      // Why: hidden PTYs can keep producing output while the user types in a
+      // Why: background PTYs can keep producing output while the user types in a
       // foreground TUI. Holding background IPC briefly lets those bytes
       // coalesce instead of flooding the renderer ahead of key echo frames.
       const quietDelay = Math.max(1, BACKGROUND_OUTPUT_INPUT_QUIET_MS - (now - lastRendererInputAt))
@@ -1181,6 +1188,8 @@ export function registerPtyHandlers(
     const isLocalProvider = localProvider instanceof LocalPtyProvider
 
     localDataUnsub = localProvider.onData((payload) => {
+      const shouldDeferSnapshotBackedPlainOutput =
+        snapshotBackedOutputPausedPtys.has(payload.id) && isPlainRendererOutput(payload.data)
       const outputSeq = isLocalProvider
         ? runtime?.getPtyOutputSequence(payload.id)
         : runtime?.onPtyData(payload.id, payload.data, Date.now())
@@ -1194,6 +1203,13 @@ export function registerPtyHandlers(
           flushTimer = null
         }
         pendingData.clear()
+        return
+      }
+      if (shouldDeferSnapshotBackedPlainOutput) {
+        // Why: hidden panes restore plain output from the main snapshot. Keeping
+        // a renderer IPC backlog here only competes with foreground typing.
+        pendingData.delete(payload.id)
+        clearFlushTimerIfIdle()
         return
       }
       const existing = pendingData.get(payload.id)
@@ -1628,6 +1644,24 @@ export function registerPtyHandlers(
     return Math.max(0, Math.min(50_000, Math.floor(value)))
   }
 
+  async function serializeProviderTerminalSnapshot(
+    id: string
+  ): Promise<{ data: string; cols: number; rows: number } | null> {
+    const provider = ptyOwnership.has(id) ? tryGetProviderForPty(id) : undefined
+    if (!provider?.getTerminalSnapshot) {
+      return null
+    }
+    try {
+      const snapshot = await provider.getTerminalSnapshot(id)
+      if (!snapshot || snapshot.data.length === 0) {
+        return null
+      }
+      return snapshot
+    } catch {
+      return null
+    }
+  }
+
   ipcMain.handle(
     'pty:getMainBufferSnapshot',
     async (
@@ -1639,7 +1673,10 @@ export function registerPtyHandlers(
       }
       const scrollbackRows = normalizeSnapshotScrollbackRows(args.opts?.scrollbackRows)
       try {
-        return await runtime.serializeMainTerminalBuffer(args.id, { scrollbackRows })
+        const runtimeSnapshot = await runtime.serializeMainTerminalBuffer(args.id, {
+          scrollbackRows
+        })
+        return runtimeSnapshot ?? (await serializeProviderTerminalSnapshot(args.id))
       } catch {
         return null
       }
@@ -2209,7 +2246,11 @@ export function registerPtyHandlers(
     }
   )
 
-  const writePtyInput = (args: { id: string; data: string }): boolean => {
+  const writePtyInput = (args: {
+    id: string
+    data: string
+    resumeSnapshotBackedOutput?: boolean
+  }): boolean => {
     // Why: defense-in-depth for the mobile-presence lock. The renderer's
     // xterm.onData guard already drops desktop keystrokes when mobile is
     // driving, but a stale view between the main-side state flip and the
@@ -2227,8 +2268,17 @@ export function registerPtyHandlers(
       const now = performance.now()
       lastRendererInputAt = now
       lastRendererInputPtyId = args.id
+      // Why: a continuous typing burst should keep background PTY IPC held until
+      // input goes quiet, not only for the first max-hold window.
+      backgroundFlushHeldSince = null
       lastInputAtByPty.set(args.id, now)
       interactiveOutputCharsByPty.set(args.id, 0)
+      if (args.resumeSnapshotBackedOutput === true) {
+        // Why: foreground terminal input proves this PTY is visible now; pair
+        // the resume with the write so stale hidden-transition IPC cannot keep
+        // renderer delivery suppressed after the child receives the key.
+        snapshotBackedOutputPausedPtys.delete(args.id)
+      }
       provider.write(args.id, args.data)
       return true
     } catch {
@@ -2236,7 +2286,11 @@ export function registerPtyHandlers(
     }
   }
 
-  const writePtyInputAccepted = (args: { id: string; data: string }): boolean => {
+  const writePtyInputAccepted = (args: {
+    id: string
+    data: string
+    resumeSnapshotBackedOutput?: boolean
+  }): boolean => {
     if (runtime?.getDriver(args.id).kind === 'mobile') {
       return false
     }
@@ -2255,8 +2309,16 @@ export function registerPtyHandlers(
       const now = performance.now()
       lastRendererInputAt = now
       lastRendererInputPtyId = args.id
+      // Why: a continuous typing burst should keep background PTY IPC held until
+      // input goes quiet, not only for the first max-hold window.
+      backgroundFlushHeldSince = null
       lastInputAtByPty.set(args.id, now)
       interactiveOutputCharsByPty.set(args.id, 0)
+      if (args.resumeSnapshotBackedOutput === true) {
+        // Why: see writePtyInput; acknowledged local writes have the same
+        // visible-input guarantee but return a delivery result to the renderer.
+        snapshotBackedOutputPausedPtys.delete(args.id)
+      }
       provider.write(args.id, args.data)
       return true
     } catch {
@@ -2270,6 +2332,25 @@ export function registerPtyHandlers(
   ipcMain.handle('pty:writeAccepted', (_event, args: { id: string; data: string }): boolean => {
     return writePtyInputAccepted(args)
   })
+
+  ipcMain.on(
+    'pty:setSnapshotBackedOutputPaused',
+    (_event, args: { id: string; paused: boolean }) => {
+      if (typeof args?.id !== 'string' || args.id.length === 0) {
+        return
+      }
+      if (args.paused) {
+        snapshotBackedOutputPausedPtys.add(args.id)
+        const pending = pendingData.get(args.id)
+        if (pending && isPlainRendererOutput(pending.data)) {
+          pendingData.delete(args.id)
+          clearFlushTimerIfIdle()
+        }
+        return
+      }
+      snapshotBackedOutputPausedPtys.delete(args.id)
+    }
+  )
 
   // Why: resize is fire-and-forget — the renderer doesn't need a reply.
   // Using ipcMain.on (not .handle) halves IPC traffic by avoiding the

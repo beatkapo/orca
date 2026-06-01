@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ManagedPane } from '@/lib/pane-manager/pane-manager'
 import { isPaneReplaying, replayIntoTerminal, type ReplayingPanesRef } from './replay-guard'
 
@@ -37,6 +37,10 @@ function makeFakePane(paneId: number): { pane: ManagedPane; terminal: FakeTermin
 }
 
 describe('replay-guard', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('reports no replay for untouched pane', () => {
     const ref = makeRef()
     expect(isPaneReplaying(ref, 1)).toBe(false)
@@ -113,6 +117,20 @@ describe('replay-guard', () => {
     const { pane, terminal } = makeFakePane(1)
     replayIntoTerminal(pane, ref, 'x')
     terminal.flush()
+    expect(ref.current.has(1)).toBe(false)
+  })
+
+  it('expires a stuck replay guard so user input is not suppressed indefinitely', () => {
+    vi.useFakeTimers()
+    const ref = makeRef()
+    const { pane } = makeFakePane(1)
+
+    replayIntoTerminal(pane, ref, 'stuck replay')
+    expect(isPaneReplaying(ref, 1)).toBe(true)
+
+    vi.advanceTimersByTime(501)
+
+    expect(isPaneReplaying(ref, 1)).toBe(false)
     expect(ref.current.has(1)).toBe(false)
   })
 })

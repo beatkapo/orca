@@ -361,4 +361,7 @@ export type IpcPtyTransportOptions = {
   onAgentExited?: () => void
   /** Callback for OSC 9999 agent status payloads parsed from PTY output. */
   onAgentStatus?: (payload: ParsedAgentStatusPayload) => void
+  shouldDeferDataProcessing?: (data: string, meta?: PtyDataMeta) => boolean
+  onDeferredData?: (data: string, meta?: PtyDataMeta) => void
+  resumeSnapshotBackedOutputOnInput?: () => boolean
 }

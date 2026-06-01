@@ -17,7 +17,12 @@ import {
   type ListSessionsResult,
   type SessionInfo
 } from './types'
-import type { IPtyProvider, PtySpawnOptions, PtySpawnResult } from '../providers/types'
+import type {
+  IPtyProvider,
+  PtyProviderTerminalSnapshot,
+  PtySpawnOptions,
+  PtySpawnResult
+} from '../providers/types'
 
 export type DaemonPtyAdapterOptions = {
   socketPath: string
@@ -320,6 +325,27 @@ export class DaemonPtyAdapter implements IPtyProvider {
 
   acknowledgeDataEvent(_id: string, _charCount: number): void {
     // No flow control for daemon-backed terminals
+  }
+
+  async getTerminalSnapshot(id: string): Promise<PtyProviderTerminalSnapshot | null> {
+    if (this.protocolVersion < 4) {
+      return null
+    }
+    try {
+      await this.ensureConnected()
+      const result = await this.client.request<GetSnapshotResult>('getSnapshot', { sessionId: id })
+      const snapshot = result.snapshot
+      if (!snapshot) {
+        return null
+      }
+      return {
+        data: snapshot.rehydrateSequences + snapshot.snapshotAnsi,
+        cols: snapshot.cols,
+        rows: snapshot.rows
+      }
+    } catch {
+      return null
+    }
   }
 
   async hasChildProcesses(_id: string): Promise<boolean> {

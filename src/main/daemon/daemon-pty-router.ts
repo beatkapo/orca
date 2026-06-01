@@ -1,5 +1,10 @@
 import type { DaemonPtyAdapter } from './daemon-pty-adapter'
-import type { IPtyProvider, PtySpawnOptions, PtySpawnResult } from '../providers/types'
+import type {
+  IPtyProvider,
+  PtyProviderTerminalSnapshot,
+  PtySpawnOptions,
+  PtySpawnResult
+} from '../providers/types'
 
 export class DaemonPtyRouter implements IPtyProvider {
   private current: DaemonPtyAdapter
@@ -102,6 +107,10 @@ export class DaemonPtyRouter implements IPtyProvider {
 
   acknowledgeDataEvent(id: string, charCount: number): void {
     this.adapterFor(id).acknowledgeDataEvent(id, charCount)
+  }
+
+  async getTerminalSnapshot(id: string): Promise<PtyProviderTerminalSnapshot | null> {
+    return this.adapterFor(id).getTerminalSnapshot(id)
   }
 
   async hasChildProcesses(id: string): Promise<boolean> {

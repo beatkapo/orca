@@ -2808,7 +2808,7 @@ export class OrcaRuntimeService {
     ptyId: string,
     opts: { scrollbackRows?: number; includeEmpty?: boolean } = {}
   ): Promise<{ data: string; cols: number; rows: number; seq?: number } | null> {
-    const state = this.headlessTerminals.get(ptyId)
+    const state = this.headlessTerminals.get(ptyId) ?? null
     if (!state) {
       return null
     }

@@ -56,6 +56,11 @@ function createAdapter(
     getInitialCwd: vi.fn(async () => ''),
     clearBuffer: vi.fn(async () => {}),
     acknowledgeDataEvent: vi.fn(),
+    getTerminalSnapshot: vi.fn(async (id: string) => ({
+      data: `${label}:${id}`,
+      cols: 80,
+      rows: 24
+    })),
     hasChildProcesses: vi.fn(async () => false),
     getForegroundProcess: vi.fn(async () => null),
     serialize: vi.fn(async () => '{}'),
@@ -116,6 +121,22 @@ describe('DaemonPtyRouter', () => {
     expect(current.spawn).toHaveBeenCalledWith({ cols: 80, rows: 24 })
     expect(legacy.write).toHaveBeenCalledWith('legacy-session', 'old\n')
     expect(current.write).toHaveBeenCalledWith(fresh.id, 'new\n')
+  })
+
+  it('routes provider snapshots to the owning daemon adapter', async () => {
+    const current = createAdapter('current')
+    const legacy = createAdapter('legacy', ['legacy-session'])
+    const router = new DaemonPtyRouter({ current, legacy: [legacy] })
+
+    await router.discoverLegacySessions()
+
+    await expect(router.getTerminalSnapshot('legacy-session')).resolves.toEqual({
+      data: 'legacy:legacy-session',
+      cols: 80,
+      rows: 24
+    })
+    expect(legacy.getTerminalSnapshot).toHaveBeenCalledWith('legacy-session')
+    expect(current.getTerminalSnapshot).not.toHaveBeenCalled()
   })
 
   it('drops a legacy mapping after the routed session exits', async () => {

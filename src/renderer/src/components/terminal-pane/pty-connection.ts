@@ -333,6 +333,10 @@ function shouldWritePtyOutputForeground(isPaneVisible: boolean): boolean {
   return document.visibilityState === 'visible'
 }
 
+function isSinglePrintableTerminalInput(data: string): boolean {
+  return data.length === 1 && data.charCodeAt(0) >= 0x20 && data.charCodeAt(0) !== 0x7f
+}
+
 export function connectPanePty(
   pane: ManagedPane,
   manager: PaneManager,
@@ -1115,9 +1119,23 @@ export function connectPanePty(
   const runtimeEnvironmentId = remoteRuntimeOwnerForTransport ?? activeRuntimeEnvironmentId
   const shouldDeliverStartupViaTerminalPaste = paneStartup?.delivery === 'terminal-paste'
   let lastTerminalInputAt = Number.NEGATIVE_INFINITY
+  const resumeSnapshotBackedOutputForVisibleInput = (): void => {
+    const ptyId = transport.getPtyId()
+    if (
+      ptyId &&
+      !isRemoteRuntimePtyId(ptyId) &&
+      shouldWritePtyOutputForeground(deps.isVisibleRef.current)
+    ) {
+      // Why: if a visible pane missed its resume transition, user input must
+      // still reopen renderer delivery so TUI redraws can echo the keystroke.
+      window.api.pty.setSnapshotBackedOutputPaused(ptyId, false)
+    }
+  }
   const markTerminalInputSent = (): void => {
     lastTerminalInputAt = performance.now()
   }
+  let shouldDeferHiddenPlainPtyDataForTransport = (_data: string): boolean => false
+  let handleDeferredHiddenPlainPtyDataForTransport = (): void => {}
   const transportOptions = {
     cwd: deps.cwd,
     env: paneEnv,
@@ -1140,6 +1158,10 @@ export function connectPanePty(
     onAgentBecameIdle,
     onAgentBecameWorking,
     onAgentExited,
+    shouldDeferDataProcessing: (data: string) => shouldDeferHiddenPlainPtyDataForTransport(data),
+    onDeferredData: () => handleDeferredHiddenPlainPtyDataForTransport(),
+    resumeSnapshotBackedOutputOnInput: () =>
+      shouldWritePtyOutputForeground(deps.isVisibleRef.current),
     // Why: forward OSC 9999 payloads from the PTY stream to the agent-status slice.
     // Without this, the OSC parser in pty-transport strips sequences from xterm
     // output but the status never reaches the store or dashboard/hover UI.
@@ -1167,17 +1189,18 @@ export function connectPanePty(
   deps.paneTransportsRef.current.set(pane.id, transport)
 
   const onDataDisposable = pane.terminal.onData((data) => {
+    const currentPtyId = transport.getPtyId()
     // Why: xterm auto-replies to embedded query sequences (DA1, DECRQM,
     // OSC 10/11, focus, CPR) via onData. When we replay recorded PTY bytes
     // into xterm for scrollback/cold-restore/snapshot, those queries would
     // otherwise pipe replies into the freshly spawned shell as stray input
     // ("?1;2c", "2026;2$y", OSC color fragments, ...). The replay sites
-    // engage the guard via replayIntoTerminal; here we drop everything
-    // xterm emits while the guard is active. See replay-guard.ts.
-    if (isPaneReplaying(deps.replayingPanesRef, pane.id)) {
+    // engage the guard via replayIntoTerminal; here we drop replay-shaped
+    // control replies while still allowing real printable keys if the replay
+    // counter gets stuck. See replay-guard.ts.
+    if (isPaneReplaying(deps.replayingPanesRef, pane.id) && !isSinglePrintableTerminalInput(data)) {
       return
     }
-    const currentPtyId = transport.getPtyId()
     // Why: after a Codex account switch, the runtime auth has already moved to
     // the newly selected account. Stale panes must not keep sending input until
     // they restart, or work can execute under the wrong account while the UI
@@ -1225,6 +1248,7 @@ export function connectPanePty(
     const acknowledgedIntent = intent ?? inferIntentFromExactTerminalInput(data)
     if (acknowledgedIntent && transport.sendInputAccepted) {
       clearPendingTerminalInputIntent()
+      resumeSnapshotBackedOutputForVisibleInput()
       markTerminalInputSent()
       const writePromise = transport
         .sendInputAccepted(data)
@@ -1242,6 +1266,7 @@ export function connectPanePty(
       return
     }
     if (intent) {
+      resumeSnapshotBackedOutputForVisibleInput()
       if (transport.sendInput(data)) {
         markTerminalInputSent()
         observeAcceptedTerminalInput(data, intent)
@@ -1249,6 +1274,7 @@ export function connectPanePty(
       clearPendingTerminalInputIntent()
       return
     }
+    resumeSnapshotBackedOutputForVisibleInput()
     if (transport.sendInput(data)) {
       markTerminalInputSent()
       observeAcceptedTerminalInput(data)
@@ -1561,6 +1587,29 @@ export function connectPanePty(
         !shouldWritePtyOutputForeground(deps.isVisibleRef.current)
       )
     }
+
+    function shouldDeferHiddenPlainPtyData(data: string): boolean {
+      return (
+        !shouldWritePtyOutputForeground(deps.isVisibleRef.current) &&
+        canUseMainBufferSnapshot(transport.getPtyId()) &&
+        !isHiddenStartupRendererQueryWindowActive() &&
+        // Why: plain hidden output is restored from main-owned snapshots; chunks
+        // with escapes/BEL still need live title, status, and query processing.
+        !data.includes('\x1b') &&
+        !data.includes('\x07')
+      )
+    }
+
+    function handleDeferredHiddenPlainPtyData(): void {
+      markHiddenOutputRestoreNeeded()
+      const ptyId = transport.getPtyId()
+      if (canUseMainBufferSnapshot(ptyId)) {
+        window.api.pty.setSnapshotBackedOutputPaused(ptyId, true)
+      }
+    }
+
+    shouldDeferHiddenPlainPtyDataForTransport = shouldDeferHiddenPlainPtyData
+    handleDeferredHiddenPlainPtyDataForTransport = handleDeferredHiddenPlainPtyData
 
     function respondToSkippedMode2031Subscribe(data: string): void {
       const scan = scanMode2031Sequences(hiddenMode2031ScanTail, data)
@@ -1875,9 +1924,21 @@ export function connectPanePty(
       restoreScrollStateAfterSnapshotReplay(scrollState)
     }
 
-    function requestHiddenOutputRestoreIfNeeded(): boolean {
+    function requestHiddenOutputRestoreIfNeeded(options?: { force?: boolean }): boolean {
       resetHiddenOutputRestoreIfPtyChanged()
       const ptyId = hiddenOutputRestorePtyId ?? transport.getPtyId()
+      if (options?.force === true) {
+        if (!canUseMainBufferSnapshot(ptyId)) {
+          return false
+        }
+        if (hiddenOutputRestorePtyId !== null && hiddenOutputRestorePtyId !== ptyId) {
+          clearHiddenOutputRestoreState()
+        }
+        // Why: hidden snapshot-backed panes may suppress renderer delivery;
+        // force the snapshot restore on resume so skipped output paints.
+        hiddenOutputRestorePtyId = ptyId
+        hiddenOutputRestoreNeeded = true
+      }
       if (!hiddenOutputRestoreNeeded && hiddenOutputRestorePendingChunks.length === 0) {
         return false
       }
@@ -2662,6 +2723,10 @@ export function connectPanePty(
       unregisterBacklogRecovery = null
       unregisterDocumentVisibilityRecovery?.()
       unregisterDocumentVisibilityRecovery = null
+      const ptyId = transport.getPtyId()
+      if (ptyId && !isRemoteRuntimePtyId(ptyId)) {
+        window.api.pty.setSnapshotBackedOutputPaused(ptyId, false)
+      }
       clearPanePtyFitBinding()
       discardTerminalOutput(pane.terminal)
       if (agentTaskCompleteSettingsUnsubscribe !== null) {

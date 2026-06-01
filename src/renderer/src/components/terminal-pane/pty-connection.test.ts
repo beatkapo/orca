@@ -465,6 +465,7 @@ describe('connectPanePty', () => {
           getForegroundProcess: vi.fn().mockResolvedValue(null),
           hasChildProcesses: vi.fn().mockResolvedValue(false),
           ackColdRestore: vi.fn(),
+          setSnapshotBackedOutputPaused: vi.fn(),
           onClearBufferRequest: vi.fn(() => vi.fn()),
           onSerializeBufferRequest: vi.fn(() => vi.fn()),
           declarePendingPaneSerializer: vi.fn().mockResolvedValue(1),
@@ -1753,10 +1754,51 @@ describe('connectPanePty', () => {
     ;(onDataHandler as (data: string) => void)('\x1b[?1;2c')
     expect(transport.sendInput).not.toHaveBeenCalled()
 
+    // Plain printable input is user-shaped, not an xterm query reply; let it
+    // through even if a replay callback is delayed.
+    ;(onDataHandler as (data: string) => void)('a')
+    expect(transport.sendInput).toHaveBeenCalledWith('a')
+    transport.sendInput.mockClear()
+
     // Once replay completes (guard cleared), real keystrokes flow through.
     replayingPanesRef.current.delete(1)
     ;(onDataHandler as (data: string) => void)('a')
     expect(transport.sendInput).toHaveBeenCalledWith('a')
+  })
+
+  it('resumes snapshot-backed local output before visible terminal input', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+
+    const order: string[] = []
+    const transport = createMockTransport('pty-live')
+    transport.sendInput.mockImplementation((data: string) => {
+      order.push(`send:${data}`)
+      return true
+    })
+    vi.mocked(window.api.pty.setSnapshotBackedOutputPaused).mockImplementation(
+      (_ptyId: string, paused: boolean) => {
+        order.push(`pause:${paused}`)
+      }
+    )
+    transportFactoryQueue.push(transport)
+
+    const pane = createPane(1)
+    let onDataHandler: ((data: string) => void) | null = null
+    pane.terminal.onData = vi.fn(((handler: (data: string) => void) => {
+      onDataHandler = handler
+      return { dispose: vi.fn() }
+    }) as typeof pane.terminal.onData)
+
+    connectPanePty(pane as never, createManager(1) as never, createDeps() as never)
+
+    expect(onDataHandler).toBeDefined()
+    if (!onDataHandler) {
+      throw new Error('expected onData handler to be registered')
+    }
+    ;(onDataHandler as (data: string) => void)('a')
+
+    expect(window.api.pty.setSnapshotBackedOutputPaused).toHaveBeenCalledWith('tab-pty', false)
+    expect(order).toEqual(['pause:false', 'send:a'])
   })
 
   it('does not enumerate every worktree tab for ordinary input without Codex restart notices', async () => {

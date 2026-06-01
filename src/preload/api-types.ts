@@ -850,10 +850,15 @@ export type PreloadApi = {
       sessionExpired?: boolean
       coldRestore?: { scrollback: string; cwd: string }
     }>
-    write: (id: string, data: string) => void
-    writeAccepted: (id: string, data: string) => Promise<boolean>
+    write: (id: string, data: string, opts?: { resumeSnapshotBackedOutput?: boolean }) => void
+    writeAccepted: (
+      id: string,
+      data: string,
+      opts?: { resumeSnapshotBackedOutput?: boolean }
+    ) => Promise<boolean>
     resize: (id: string, cols: number, rows: number) => void
     reportGeometry: (id: string, cols: number, rows: number) => void
+    setSnapshotBackedOutputPaused: (id: string, paused: boolean) => void
     signal: (id: string, signal: string) => void
     kill: (id: string, opts?: { keepHistory?: boolean }) => Promise<void>
     ackColdRestore: (id: string) => void

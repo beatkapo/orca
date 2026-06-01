@@ -2033,6 +2033,7 @@ function createPtyApi(): NonNullable<Partial<PreloadApi>['pty']> {
     writeAccepted: () => Promise.resolve(false),
     resize: () => {},
     reportGeometry: () => {},
+    setSnapshotBackedOutputPaused: () => {},
     signal: () => {},
     kill: () => Promise.resolve(),
     ackColdRestore: () => {},
@@ -2633,7 +2634,12 @@ function getFallbackResult(path: string[], args: unknown[]): unknown {
   if (name.startsWith('get') && name.endsWith('Status')) {
     return Promise.resolve([])
   }
-  if (name === 'write' || name === 'resize' || name === 'reportGeometry') {
+  if (
+    name === 'write' ||
+    name === 'resize' ||
+    name === 'reportGeometry' ||
+    name === 'setSnapshotBackedOutputPaused'
+  ) {
     return undefined
   }
   if (args.length === 0 && (name === 'getZoomLevel' || name === 'declarePendingPaneSerializer')) {

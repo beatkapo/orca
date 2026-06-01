@@ -656,11 +656,23 @@ const api = {
       coldRestore?: { scrollback: string; cwd: string }
     }> => ipcRenderer.invoke('pty:spawn', opts),
 
-    write: (id: string, data: string): void => {
-      ipcRenderer.send('pty:write', { id, data })
+    write: (id: string, data: string, opts?: { resumeSnapshotBackedOutput?: boolean }): void => {
+      ipcRenderer.send('pty:write', {
+        id,
+        data,
+        resumeSnapshotBackedOutput: opts?.resumeSnapshotBackedOutput === true
+      })
     },
-    writeAccepted: (id: string, data: string): Promise<boolean> =>
-      ipcRenderer.invoke('pty:writeAccepted', { id, data }),
+    writeAccepted: (
+      id: string,
+      data: string,
+      opts?: { resumeSnapshotBackedOutput?: boolean }
+    ): Promise<boolean> =>
+      ipcRenderer.invoke('pty:writeAccepted', {
+        id,
+        data,
+        resumeSnapshotBackedOutput: opts?.resumeSnapshotBackedOutput === true
+      }),
 
     resize: (id: string, cols: number, rows: number): void => {
       ipcRenderer.send('pty:resize', { id, cols, rows })
@@ -673,6 +685,10 @@ const api = {
      * the PTY. See docs/mobile-fit-hold.md. */
     reportGeometry: (id: string, cols: number, rows: number): void => {
       ipcRenderer.send('pty:reportGeometry', { id, cols, rows })
+    },
+
+    setSnapshotBackedOutputPaused: (id: string, paused: boolean): void => {
+      ipcRenderer.send('pty:setSnapshotBackedOutputPaused', { id, paused })
     },
 
     signal: (id: string, signal: string): void => {

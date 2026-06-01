@@ -17,6 +17,7 @@ import {
 import { handleFocusTerminalPaneDetail } from './focus-terminal-pane-event'
 import { surfaceStaleAgentRow } from './stale-agent-row'
 import { useAppStore } from '@/store'
+import { isRemoteRuntimePtyId } from '@/runtime/runtime-terminal-inspection'
 import { restoreScrollStateAfterLayout } from '@/lib/pane-manager/pane-scroll'
 import { useTerminalScrollVisibilityMemory } from './use-terminal-scroll-visibility-memory'
 import { useTerminalContainerFitSync } from './use-terminal-container-fit-sync'
@@ -85,18 +86,27 @@ export function useTerminalPaneGlobalEffects({
     isActiveRef.current = isActive
     isVisibleRef.current = isVisible
     if (isVisible) {
+      const recoveringFromHidden = !wasVisibleRef.current
       // Why: WebGL resume can disturb xterm's viewport bookkeeping before the
       // post-resume fit runs. Capture numeric viewport positions first; the
       // restore path avoids content matching so duplicate agent log lines do
       // not jump to the wrong history entry.
-      const viewportPositions = captureViewportPositions(!wasVisibleRef.current)
+      const viewportPositions = captureViewportPositions(recoveringFromHidden)
       withSuppressedScrollTracking(() => {
         // Why: hidden panes can accumulate large PTY bursts while Chromium is
         // occluded. Drain a bounded slice before fitting; the scheduler keeps
         // ordering and continues the rest asynchronously so return-to-app does
         // not beachball behind an entire backlog.
         for (const pane of manager.getPanes()) {
-          requestTerminalBacklogRecovery(pane.terminal)
+          const ptyId =
+            paneTransportsRef.current.get(pane.id)?.getPtyId() ??
+            pane.container?.dataset?.ptyId ??
+            null
+          const isLocalPty = ptyId !== null && !isRemoteRuntimePtyId(ptyId)
+          requestTerminalBacklogRecovery(
+            pane.terminal,
+            recoveringFromHidden && isLocalPty ? { force: true } : undefined
+          )
           flushTerminalOutput(pane.terminal, { maxChars: VISIBLE_RESUME_FLUSH_CHARS })
         }
         // Resume WebGL immediately so the terminal shows its last-known state
@@ -117,6 +127,13 @@ export function useTerminalPaneGlobalEffects({
           if (position) {
             restoreScrollStateAfterLayout(pane.terminal, position)
           }
+          const ptyId =
+            paneTransportsRef.current.get(pane.id)?.getPtyId() ??
+            pane.container?.dataset?.ptyId ??
+            null
+          if (ptyId && !isRemoteRuntimePtyId(ptyId)) {
+            window.api.pty.setSnapshotBackedOutputPaused(ptyId, false)
+          }
         }
       })
       wasVisibleRef.current = true
@@ -126,8 +143,20 @@ export function useTerminalPaneGlobalEffects({
       // Why: hidden DOM/layout churn can mutate xterm's viewport before the
       // pane becomes visible again. Preserve the last visible position.
       captureViewportPositions(false)
-      // Suspend WebGL when going hidden. xterm.write() continues to land in
-      // the (now DOM-renderer-fallback or paused-canvas) terminal; the
+      for (const pane of manager.getPanes()) {
+        const ptyId =
+          paneTransportsRef.current.get(pane.id)?.getPtyId() ??
+          pane.container?.dataset?.ptyId ??
+          null
+        if (ptyId && !isRemoteRuntimePtyId(ptyId)) {
+          // Why: once a local terminal is hidden, its plain output can be
+          // restored from the main snapshot; suppressing renderer delivery
+          // prevents hidden flood callbacks from delaying foreground input.
+          window.api.pty.setSnapshotBackedOutputPaused(ptyId, true)
+        }
+      }
+      // Suspend WebGL when going hidden. PTY bytes are either queued in the
+      // renderer scheduler or retained in main-owned terminal state; the
       // suspend is purely a GPU resource decision.
       manager.suspendRendering()
     }
