@@ -1,3 +1,6 @@
+/* eslint-disable max-lines -- Why: this component keeps compact/full inline
+   agent rendering and lineage disclosure behavior together; splitting during
+   this bug fix would risk divergent parent-child row behavior. */
 import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
@@ -78,12 +81,24 @@ type AgentLineageModel = {
 
 function buildAgentLineageModel(agents: DashboardAgentRowData[]): AgentLineageModel {
   const agentPaneKeys = new Set(agents.map((agent) => agent.paneKey))
+  const paneKeyByTerminalHandle = new Map<string, string>()
+  for (const agent of agents) {
+    if (agent.entry.terminalHandle && !paneKeyByTerminalHandle.has(agent.entry.terminalHandle)) {
+      paneKeyByTerminalHandle.set(agent.entry.terminalHandle, agent.paneKey)
+    }
+  }
   const childrenByParentPaneKey = new Map<string, DashboardAgentRowData[]>()
   const childPaneKeys = new Set<string>()
 
   for (const agent of agents) {
-    const parentPaneKey = agent.entry.orchestration?.parentPaneKey
-    if (!parentPaneKey || !agentPaneKeys.has(parentPaneKey)) {
+    const explicitParentPaneKey = agent.entry.orchestration?.parentPaneKey
+    const parentPaneKey =
+      explicitParentPaneKey && agentPaneKeys.has(explicitParentPaneKey)
+        ? explicitParentPaneKey
+        : agent.entry.orchestration?.parentTerminalHandle
+          ? paneKeyByTerminalHandle.get(agent.entry.orchestration.parentTerminalHandle)
+          : undefined
+    if (!parentPaneKey || parentPaneKey === agent.paneKey || !agentPaneKeys.has(parentPaneKey)) {
       continue
     }
     childPaneKeys.add(agent.paneKey)
@@ -285,10 +300,16 @@ const WorktreeCardAgentsBody = React.memo(function WorktreeCardAgentsBody({
   useLayoutEffect(() => {
     if (compactRootListExpanded && agentActivityDisplayMode === 'compact') {
       dispatchSuppressScrollAdjustment()
-      // Why: keep any needed reveal scroll in the expansion commit; a delayed
-      // store reveal paints the tall card once, then scrolls it on the next turn.
-      revealCompactAgentCard(compactAgentListRootRef.current)
+      // Why: defer the reveal scroll out of the expand commit. Running it inline
+      // forces a synchronous sidebar layout that blocks the animation's opening
+      // frames (a visible jump); next-frame keeps the open smooth and the
+      // ScrollBehavior 'auto' still lands before the height transition finishes.
+      const handle = requestAnimationFrame(() => {
+        revealCompactAgentCard(compactAgentListRootRef.current)
+      })
+      return () => cancelAnimationFrame(handle)
     }
+    return undefined
   }, [agentActivityDisplayMode, compactRootListExpanded])
   const toggleLineageParent = useCallback((paneKey: string) => {
     dispatchSuppressScrollAdjustment()
@@ -450,24 +471,32 @@ const WorktreeCardAgentsBody = React.memo(function WorktreeCardAgentsBody({
         role={hasLineage ? 'tree' : 'group'}
         aria-label="Agents"
       >
-        {shouldUseSummaryRow && (
-          <CompactAgentSummaryButton
-            agents={summaryAgents}
-            subjectLabel={subjectLabel}
-            expanded={compactRootListExpanded}
-            onToggle={() => {
-              dispatchSuppressScrollAdjustment()
-              setCompactRootListExpanded((expanded) => !expanded)
-            }}
-          />
-        )}
-        {!shouldUseSummaryRow ? (
+        {shouldUseSummaryRow ? (
+          // Why: when expanded, the header and its agent rows read as a single
+          // enclosed panel rather than a standalone pill with rows floating
+          // below it — the border/fill wraps the whole group.
+          <div
+            className={cn(
+              'compact-agent-summary-panel',
+              compactRootListExpanded && 'compact-agent-summary-panel-expanded'
+            )}
+          >
+            <CompactAgentSummaryButton
+              agents={summaryAgents}
+              subjectLabel={subjectLabel}
+              expanded={compactRootListExpanded}
+              onToggle={() => {
+                dispatchSuppressScrollAdjustment()
+                setCompactRootListExpanded((expanded) => !expanded)
+              }}
+            />
+            <CompactAgentExpansion expanded={compactRootListExpanded}>
+              {rootAgents.map((rootAgent) => renderCompactAgentBranch(rootAgent))}
+            </CompactAgentExpansion>
+          </div>
+        ) : (
           rootAgents.map((rootAgent) => renderCompactAgentBranch(rootAgent))
-        ) : shouldUseSummaryRow ? (
-          <CompactAgentExpansion expanded={compactRootListExpanded} contentClassName="pl-1">
-            {rootAgents.map((rootAgent) => renderCompactAgentBranch(rootAgent))}
-          </CompactAgentExpansion>
-        ) : null}
+        )}
       </div>
     )
   }

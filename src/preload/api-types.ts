@@ -196,6 +196,7 @@ import type {
   RuntimeBrowserDriverState,
   RuntimeMobileSessionTabMove,
   RuntimeStatus,
+  RuntimeSyncWindowGraphResult,
   RuntimeSyncWindowGraph,
   RuntimeTerminalDriverState
 } from '../shared/runtime-types'
@@ -2095,7 +2096,7 @@ export type PreloadApi = {
     confirmWindowClose: () => void
   }
   runtime: {
-    syncWindowGraph: (graph: RuntimeSyncWindowGraph) => Promise<RuntimeStatus>
+    syncWindowGraph: (graph: RuntimeSyncWindowGraph) => Promise<RuntimeSyncWindowGraphResult>
     getStatus: () => Promise<RuntimeStatus>
     call: (args: { method: string; params?: unknown }) => Promise<RuntimeRpcResponse<unknown>>
     getTerminalFitOverrides: () => Promise<

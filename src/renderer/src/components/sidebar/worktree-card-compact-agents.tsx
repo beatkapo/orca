@@ -164,9 +164,14 @@ export function CompactAgentSummaryButton({
       type="button"
       draggable={false}
       className={cn(
-        'group/agent-summary flex h-6 w-full min-w-0 items-center gap-1 rounded-sm border border-sidebar-border/70',
-        'bg-sidebar-accent/35 px-1 text-left text-[11px] leading-none text-muted-foreground',
-        'hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
+        'group/agent-summary flex h-6 w-full min-w-0 items-center gap-1 rounded-sm',
+        'px-1 text-left text-[11px] leading-none text-muted-foreground',
+        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring',
+        // Why: collapsed it's a standalone pill; expanded it's the header of the
+        // enclosing panel, so it drops its own border/fill to avoid double chrome.
+        expanded
+          ? 'hover:bg-sidebar-accent/60'
+          : 'border border-sidebar-border/70 bg-sidebar-accent/35 hover:bg-sidebar-accent'
       )}
       aria-label={
         expanded ? `Collapse ${subjectLabel}` : `Expand ${summary}. ${agentIdentitySummary}`
@@ -312,16 +317,34 @@ export const CompactAgentRow = React.memo(function CompactAgentRow({
         </span>
       )}
       <span className="min-w-0 flex-1 truncate">
-        <span className="text-foreground/85">{primary}</span>
-        {secondary && <span className="text-muted-foreground/75"> - {secondary}</span>}
+        {/* Why: the selected-row fill is strong enough to wash out the dimmed
+            prompt/secondary text, so lift both toward full foreground when focused. */}
+        <span className={isFocusedPane ? 'text-foreground' : 'text-foreground/85'}>{primary}</span>
+        {secondary && (
+          <span className={isFocusedPane ? 'text-foreground/70' : 'text-muted-foreground/75'}>
+            {' '}
+            - {secondary}
+          </span>
+        )}
       </span>
       {hasChildDisclosure && !childAgentsExpanded && (
-        <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground/70">
+        <span
+          className={cn(
+            'shrink-0 text-[10px] tabular-nums',
+            isFocusedPane ? 'text-foreground/70' : 'text-muted-foreground/70'
+          )}
+        >
           +{childAgentCount}
         </span>
       )}
       {shortTime && (
-        <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground/60">
+        <span
+          className={cn(
+            'shrink-0 text-[10px] tabular-nums',
+            // Why: the muted timestamp drops out against the selected-row fill.
+            isFocusedPane ? 'text-foreground/70' : 'text-muted-foreground/60'
+          )}
+        >
           {shortTime}
         </span>
       )}

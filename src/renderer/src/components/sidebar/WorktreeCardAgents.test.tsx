@@ -14,7 +14,8 @@ type MockAgentOptions = {
   prompt?: string
   lastAssistantMessage?: string
   stateStartedAt?: number
-  orchestration?: { parentPaneKey: string }
+  terminalHandle?: string
+  orchestration?: { parentPaneKey?: string; parentTerminalHandle?: string }
   lineage?: {
     depth: number
     isFirstSibling: boolean
@@ -32,6 +33,7 @@ function mockAgent({
   prompt,
   lastAssistantMessage,
   stateStartedAt = 1000,
+  terminalHandle,
   orchestration,
   lineage
 }: MockAgentOptions = {}): unknown {
@@ -47,6 +49,7 @@ function mockAgent({
       state,
       stateStartedAt,
       stateHistory: prompt === undefined ? undefined : [],
+      terminalHandle,
       orchestration
     },
     lineage
@@ -217,6 +220,30 @@ describe('WorktreeCardAgents', () => {
     expect(markup).toContain('data-pane-key="tab-child:1"')
     expect(markup).toContain('aria-label="Hide 1 child agent"')
     expect(markup).toContain('aria-expanded="true"')
+  })
+
+  it('shows orchestration children under a retained parent matched by terminal handle', async () => {
+    mockAgentActivityDisplayMode = 'full'
+    mockAgents = [
+      mockAgent({
+        paneKey: 'tab-parent:1',
+        terminalHandle: 'term-parent'
+      }),
+      mockAgent({
+        paneKey: 'tab-child:1',
+        state: 'done',
+        stateStartedAt: 1500,
+        orchestration: { parentTerminalHandle: 'term-parent' }
+      })
+    ]
+    const { default: WorktreeCardAgents } = await import('./WorktreeCardAgents')
+
+    const markup = renderToStaticMarkup(<WorktreeCardAgents worktreeId="wt-1" />)
+
+    expect(markup).toContain('role="tree"')
+    expect(markup).toContain('data-pane-key="tab-parent:1"')
+    expect(markup).toContain('data-pane-key="tab-child:1"')
+    expect(markup).toContain('aria-label="Hide 1 child agent"')
   })
 
   it('keeps partially cyclic orchestration rows visible as flat roots', async () => {

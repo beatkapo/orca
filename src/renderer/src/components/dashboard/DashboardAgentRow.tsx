@@ -394,7 +394,9 @@ const DashboardAgentRow = React.memo(function DashboardAgentRow({
             'block min-w-0 flex-1 overflow-hidden text-[11px] leading-snug',
             'transition-[height] duration-200 ease-out [interpolate-size:allow-keywords]',
             expanded ? 'h-auto whitespace-pre-wrap break-words' : 'h-[1lh] truncate',
-            isUnvisited ? 'font-semibold text-foreground' : 'font-normal text-muted-foreground'
+            isUnvisited ? 'font-semibold text-foreground' : 'font-normal text-muted-foreground',
+            // Why: the selected-row fill washes out muted text — keep it readable.
+            isFocusedPane && !isUnvisited && 'text-foreground/90'
           )}
           title={displayLabel}
         >

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  WORKTREE_SECTION_HEADER_PADDING_LEFT,
   getProjectGroupHeaderPaddingLeft,
   getWorktreeCardContentIndent
 } from './worktree-list-indentation'
@@ -28,5 +29,9 @@ describe('worktree list indentation', () => {
 
   it('caps header indentation separately from workspace content indentation', () => {
     expect(getProjectGroupHeaderPaddingLeft(100)).toBe(70)
+  })
+
+  it('keeps flat section headers closer to the sidebar edge than project headers', () => {
+    expect(WORKTREE_SECTION_HEADER_PADDING_LEFT).toBeLessThan(getProjectGroupHeaderPaddingLeft(0))
   })
 })

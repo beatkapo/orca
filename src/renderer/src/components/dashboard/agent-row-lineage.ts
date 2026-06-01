@@ -24,12 +24,24 @@ export function applyAgentRowLineage(rows: DashboardAgentRow[]): DashboardAgentR
   }
 
   const rowsByPaneKey = new Map(rows.map((row) => [row.paneKey, row]))
+  const paneKeyByTerminalHandle = new Map<string, string>()
+  for (const row of rows) {
+    if (row.entry.terminalHandle && !paneKeyByTerminalHandle.has(row.entry.terminalHandle)) {
+      paneKeyByTerminalHandle.set(row.entry.terminalHandle, row.paneKey)
+    }
+  }
   const childrenByParentPaneKey = new Map<string, DashboardAgentRow[]>()
   const childPaneKeys = new Set<string>()
 
   for (const row of rows) {
-    const parentPaneKey = row.entry.orchestration?.parentPaneKey
-    if (!parentPaneKey || !rowsByPaneKey.has(parentPaneKey)) {
+    const explicitParentPaneKey = row.entry.orchestration?.parentPaneKey
+    const parentPaneKey =
+      explicitParentPaneKey && rowsByPaneKey.has(explicitParentPaneKey)
+        ? explicitParentPaneKey
+        : row.entry.orchestration?.parentTerminalHandle
+          ? paneKeyByTerminalHandle.get(row.entry.orchestration.parentTerminalHandle)
+          : undefined
+    if (!parentPaneKey || parentPaneKey === row.paneKey || !rowsByPaneKey.has(parentPaneKey)) {
       continue
     }
     childPaneKeys.add(row.paneKey)

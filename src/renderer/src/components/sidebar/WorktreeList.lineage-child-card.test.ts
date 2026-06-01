@@ -397,6 +397,13 @@ describe('WorktreeList lineage child card renderer', () => {
     expect(agentRowIndex).toBeLessThan(childToggleIndex)
   })
 
+  it('nests the first-level child workspace card surface under its parent', async () => {
+    setLineageFixtureState()
+    const markup = await renderWorktreeListMarkup()
+
+    expect(markup).toContain('<div style="padding-left:18px"><div id="worktree-list-option-child"')
+  })
+
   it('opens the reconnect dialog for an active disconnected lineage child during render', async () => {
     setLineageFixtureState()
     const repo = (mockStore.state.repos as Repo[])[0]!

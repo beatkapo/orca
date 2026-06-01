@@ -7,7 +7,10 @@ import {
   isShellProcess
 } from '../../shared/agent-detection'
 import type { AgentStatus } from '../../shared/agent-detection'
-import type { AgentStatusOrchestrationContext } from '../../shared/agent-status-types'
+import {
+  AGENT_STATUS_STALE_AFTER_MS,
+  type AgentStatusOrchestrationContext
+} from '../../shared/agent-status-types'
 import { gitExecFileAsync, wslAwareSpawn } from '../git/runner'
 import {
   cleanupClaimedCloneTarget,
@@ -121,6 +124,7 @@ import type {
   RuntimeTerminalListResult,
   RuntimeTerminalState,
   RuntimeStatus,
+  RuntimeSyncWindowGraphResult,
   RuntimeTerminalWait,
   RuntimeTerminalWaitBlockedReason,
   RuntimeTerminalWaitCondition,
@@ -1793,7 +1797,7 @@ export class OrcaRuntimeService {
     }
   }
 
-  syncWindowGraph(windowId: number, graph: RuntimeSyncWindowGraph): RuntimeStatus {
+  syncWindowGraph(windowId: number, graph: RuntimeSyncWindowGraph): RuntimeSyncWindowGraphResult {
     if (this.authoritativeWindowId === null) {
       this.authoritativeWindowId = windowId
     }
@@ -1896,7 +1900,11 @@ export class OrcaRuntimeService {
       cb()
     }
 
-    return this.getStatus()
+    const agentOrchestrationByPaneKey = this.buildAgentOrchestrationByPaneKey()
+    return {
+      ...this.getStatus(),
+      ...(agentOrchestrationByPaneKey ? { agentOrchestrationByPaneKey } : {})
+    }
   }
 
   async listMobileSessionTabs(worktreeSelector: string): Promise<RuntimeMobileSessionTabsResult> {
@@ -11501,13 +11509,59 @@ export class OrcaRuntimeService {
     if (!handle) {
       return undefined
     }
+    return this.getAgentStatusOrchestrationContextForHandle(handle)
+  }
+
+  getAgentStatusTerminalHandleForPaneKey(paneKey: string): string | undefined {
+    return this.getTerminalHandleForPaneKey(paneKey) ?? undefined
+  }
+
+  private buildAgentOrchestrationByPaneKey():
+    | Record<string, AgentStatusOrchestrationContext>
+    | undefined {
     const db = this.getOrchestrationDbIfAvailable()
-    const dispatch = db?.getActiveDispatchForTerminal(handle)
+    if (!db) {
+      return undefined
+    }
+    const contexts: Record<string, AgentStatusOrchestrationContext> = {}
+    for (const leaf of this.leaves.values()) {
+      if (!leaf.ptyId) {
+        continue
+      }
+      const handle = this.issueHandle(leaf)
+      const context = this.getAgentStatusOrchestrationContextForHandle(handle, db)
+      if (context) {
+        contexts[this.makeRuntimePaneKey(leaf)] = context
+      }
+    }
+    for (const pty of this.ptysById.values()) {
+      if (!pty.paneKey || contexts[pty.paneKey]) {
+        continue
+      }
+      const handle = this.issuePtyHandle(pty)
+      const context = this.getAgentStatusOrchestrationContextForHandle(handle, db)
+      if (context) {
+        contexts[pty.paneKey] = context
+      }
+    }
+    return Object.keys(contexts).length > 0 ? contexts : undefined
+  }
+
+  private getAgentStatusOrchestrationContextForHandle(
+    handle: string,
+    db = this.getOrchestrationDbIfAvailable()
+  ): AgentStatusOrchestrationContext | undefined {
+    // Why: active dispatches are authoritative for reused terminals. Completed
+    // context is only useful while the corresponding done/recent row can still
+    // be visible; after that it would stale-group unrelated future work.
+    const dispatch =
+      db?.getActiveDispatchForTerminal?.(handle) ??
+      this.getRecentCompletedDispatchForTerminal(handle, db)
     if (!dispatch) {
       return undefined
     }
-    const task = db?.getTask(dispatch.task_id)
-    const activeRun = db?.getActiveCoordinatorRun()
+    const task = db?.getTask?.(dispatch.task_id)
+    const activeRun = db?.getActiveCoordinatorRun?.()
     const parentTerminalHandle =
       task?.created_by_terminal_handle ??
       (activeRun?.coordinator_handle && activeRun.coordinator_handle !== handle
@@ -11525,6 +11579,25 @@ export class OrcaRuntimeService {
       ...(activeRun?.coordinator_handle ? { coordinatorHandle: activeRun.coordinator_handle } : {}),
       ...(activeRun?.id ? { orchestrationRunId: activeRun.id } : {})
     }
+  }
+
+  private getRecentCompletedDispatchForTerminal(
+    handle: string,
+    db = this.getOrchestrationDbIfAvailable()
+  ): ReturnType<OrchestrationDb['getLatestDispatchForTerminal']> {
+    const dispatch = db?.getLatestDispatchForTerminal?.(handle)
+    if (dispatch?.status !== 'completed' || !dispatch.completed_at) {
+      return undefined
+    }
+    const completedAtMs = Date.parse(
+      dispatch.completed_at.includes('T')
+        ? dispatch.completed_at
+        : `${dispatch.completed_at.replace(' ', 'T')}Z`
+    )
+    if (!Number.isFinite(completedAtMs)) {
+      return undefined
+    }
+    return Date.now() - completedAtMs <= AGENT_STATUS_STALE_AFTER_MS ? dispatch : undefined
   }
 
   private getTerminalHandleForPaneKey(paneKey: string): string | null {
@@ -11550,6 +11623,9 @@ export class OrcaRuntimeService {
     }
     const record = this.handles.get(handle)
     if (!record || record.runtimeId !== this.runtimeId) {
+      return null
+    }
+    if (!isTerminalLeafId(record.leafId)) {
       return null
     }
     return makePaneKey(record.tabId, record.leafId)

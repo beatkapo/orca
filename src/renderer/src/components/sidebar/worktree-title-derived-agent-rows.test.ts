@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { applyAgentRowLineage } from '@/components/dashboard/agent-row-lineage'
 import type { TerminalLayoutSnapshot, TerminalTab, TuiAgent } from '../../../../shared/types'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
 import { buildWorktreeAgentRows } from './worktree-agent-rows'
@@ -29,6 +30,14 @@ function makeSplitLayout(): TerminalLayoutSnapshot {
       second: { type: 'leaf', leafId: LEAF_ID_2 }
     },
     activeLeafId: LEAF_ID_1,
+    expandedLeafId: null
+  }
+}
+
+function makeSingleLayout(leafId: string): TerminalLayoutSnapshot {
+  return {
+    root: { type: 'leaf', leafId },
+    activeLeafId: leafId,
     expandedLeafId: null
   }
 }
@@ -74,6 +83,43 @@ describe('buildTitleDerivedAgentRows', () => {
     })
 
     expect(rows).toHaveLength(0)
+  })
+
+  it('uses runtime orchestration metadata for title-derived worker rows', () => {
+    const parentPaneKey = makePaneKey('tab-parent', LEAF_ID_1)
+    const childPaneKey = makePaneKey('tab-child', LEAF_ID_2)
+    const rows = applyAgentRowLineage(
+      buildWorktreeAgentRows({
+        tabs: [makeTab('tab-parent'), makeTab('tab-child')],
+        entries: [],
+        retained: [],
+        runtimePaneTitlesByTabId: {
+          'tab-parent': { 1: '⠋ Codex' },
+          'tab-child': { 1: '⠋ Claude Code' }
+        },
+        ptyIdsByTabId: {
+          'tab-parent': ['pty-parent'],
+          'tab-child': ['pty-child']
+        },
+        terminalLayoutsByTabId: {
+          'tab-parent': makeSingleLayout(LEAF_ID_1),
+          'tab-child': makeSingleLayout(LEAF_ID_2)
+        },
+        runtimeAgentOrchestrationByPaneKey: {
+          [childPaneKey]: {
+            taskId: 'task-1',
+            dispatchId: 'ctx-1',
+            parentPaneKey
+          }
+        },
+        now: 2000
+      })
+    )
+
+    expect(rows.map((row) => row.paneKey)).toEqual([parentPaneKey, childPaneKey])
+    expect(rows[0].lineage).toMatchObject({ depth: 0, childCount: 1 })
+    expect(rows[1].lineage).toMatchObject({ depth: 1, childCount: 0 })
+    expect(rows[1].entry.orchestration).toMatchObject({ parentPaneKey })
   })
 
   it('does not infer Claude Code from a spinner-only non-agent title', () => {

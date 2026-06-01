@@ -612,9 +612,11 @@ function openMainWindow(): BrowserWindow {
       }
       maybeAutoRenameBranchOnFirstWorkFromHook({ paneKey, tabId, worktreeId, payload, isReplay })
       const orchestration = runtime?.getAgentStatusOrchestrationContextForPaneKey(paneKey)
+      const terminalHandle = runtime?.getAgentStatusTerminalHandleForPaneKey(paneKey)
       mainWindow?.webContents.send('agentStatus:set', {
         ...payload,
         paneKey,
+        ...(terminalHandle ? { terminalHandle } : {}),
         tabId,
         worktreeId,
         connectionId,

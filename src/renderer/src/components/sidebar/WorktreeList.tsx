@@ -189,6 +189,7 @@ import {
   type WorktreeSectionActivitySummary
 } from './worktree-section-activity'
 import {
+  WORKTREE_SECTION_HEADER_PADDING_LEFT,
   SIDEBAR_TREE_INDENT,
   getProjectGroupHeaderPaddingLeft,
   getWorktreeCardContentIndent
@@ -2499,6 +2500,12 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
                   })
                 : null
               const projectGroupDepth = row.projectGroupDepth ?? 0
+              // Why: non-project section headers like "All" are labels for the
+              // flat list, so they should not reserve project hierarchy indent.
+              const headerPaddingLeft =
+                isRepoHeader || isProjectGroupHeader
+                  ? getProjectGroupHeaderPaddingLeft(projectGroupDepth)
+                  : WORKTREE_SECTION_HEADER_PADDING_LEFT
               const isCollapsed = collapsedGroups.has(row.key)
               const sectionActivity =
                 sectionActivityByGroupKey.get(row.key) ?? EMPTY_WORKTREE_SECTION_ACTIVITY
@@ -2548,9 +2555,7 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
                         'rounded-md bg-sidebar-accent ring-1 ring-sidebar-ring/40',
                       row.repo && 'overflow-hidden'
                     )}
-                    style={{
-                      paddingLeft: getProjectGroupHeaderPaddingLeft(projectGroupDepth)
-                    }}
+                    style={{ paddingLeft: headerPaddingLeft }}
                     onDragOver={
                       isPinnedHeader
                         ? handleWorkspacePinDragOver
@@ -2967,9 +2972,15 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
                 }
               }
               const lineageToggleGroupKey = child.lineageGroupKey
+              const childCardIndent = Math.max(0, child.depth) * LINEAGE_INDENT
               const childContentIndent = Math.max(0, child.depth - 1) * LINEAGE_INDENT
               return (
-                <div key={child.worktree.id}>
+                <div
+                  key={child.worktree.id}
+                  // Why: lineage child workspaces need their whole card surface
+                  // nested, not only the text/status content inside the card.
+                  style={childCardIndent > 0 ? { paddingLeft: `${childCardIndent}px` } : undefined}
+                >
                   <WorktreeContextMenu
                     worktree={child.worktree}
                     selectedWorktrees={selectedWorktrees}

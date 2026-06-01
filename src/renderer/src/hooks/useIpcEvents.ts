@@ -2317,7 +2317,8 @@ export function useIpcEvents(): void {
         },
         {
           tabId: data.tabId,
-          worktreeId: statusWorktreeId
+          worktreeId: statusWorktreeId,
+          terminalHandle: data.terminalHandle
         }
       )
       applyResolvedAgentTerminalTitleToTab(store, data.paneKey, title, terminalTitle)

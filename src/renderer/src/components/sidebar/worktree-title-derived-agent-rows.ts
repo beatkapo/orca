@@ -3,6 +3,7 @@ import { detectAgentStatusFromTitle, getAgentLabel } from '@/lib/agent-status'
 import { tabHasLivePty } from '@/lib/tab-has-live-pty'
 import {
   type AgentStatusEntry,
+  type AgentStatusOrchestrationContext,
   type AgentStatusState,
   type AgentType
 } from '../../../../shared/agent-status-types'
@@ -40,6 +41,7 @@ export function buildTitleDerivedAgentRows(args: {
   runtimePaneTitlesByTabId?: Record<string, Record<number, string>>
   ptyIdsByTabId?: Record<string, string[]>
   terminalLayoutsByTabId?: Record<string, TerminalLayoutSnapshot | undefined>
+  runtimeAgentOrchestrationByPaneKey?: Record<string, AgentStatusOrchestrationContext>
   seenPaneKeys: Set<string>
   now: number
 }): DashboardAgentRow[] {
@@ -70,7 +72,13 @@ export function buildTitleDerivedAgentRows(args: {
         if (!leafId) {
           continue
         }
-        const row = buildTitleDerivedAgentRow({ tab, leafId, title, now: args.now })
+        const row = buildTitleDerivedAgentRow({
+          tab,
+          leafId,
+          title,
+          now: args.now,
+          runtimeAgentOrchestrationByPaneKey: args.runtimeAgentOrchestrationByPaneKey
+        })
         if (!row || args.seenPaneKeys.has(row.paneKey)) {
           continue
         }
@@ -84,7 +92,13 @@ export function buildTitleDerivedAgentRows(args: {
     if (!leafId) {
       continue
     }
-    const row = buildTitleDerivedAgentRow({ tab, leafId, title: tab.title, now: args.now })
+    const row = buildTitleDerivedAgentRow({
+      tab,
+      leafId,
+      title: tab.title,
+      now: args.now,
+      runtimeAgentOrchestrationByPaneKey: args.runtimeAgentOrchestrationByPaneKey
+    })
     if (!row || args.seenPaneKeys.has(row.paneKey)) {
       continue
     }
@@ -100,6 +114,7 @@ function buildTitleDerivedAgentRow(args: {
   leafId: string
   title: string
   now: number
+  runtimeAgentOrchestrationByPaneKey?: Record<string, AgentStatusOrchestrationContext>
 }): DashboardAgentRow | null {
   const status = detectAgentStatusFromTitle(args.title)
   const label = getAgentLabel(args.title)
@@ -110,6 +125,7 @@ function buildTitleDerivedAgentRow(args: {
     return null
   }
   const paneKey = makePaneKey(args.tab.id, args.leafId)
+  const orchestration = args.runtimeAgentOrchestrationByPaneKey?.[paneKey]
   const agentType = resolveTitleDerivedAgentType(args.title, label)
   if (!agentType) {
     return null
@@ -127,7 +143,8 @@ function buildTitleDerivedAgentRow(args: {
     stateHistory: [],
     agentType,
     terminalTitle: args.title,
-    lastAssistantMessage: secondary
+    lastAssistantMessage: secondary,
+    ...(orchestration ? { orchestration } : {})
   }
   return {
     paneKey,

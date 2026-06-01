@@ -82,6 +82,9 @@ export type AgentStatusEntry = {
   agentType?: AgentType
   /** Composite key: `${tabId}:${leafId}` where leafId is a stable UUID layout leaf. */
   paneKey: string
+  /** Runtime terminal handle for matching retained parent rows when the parent
+   *  pane key cannot be re-derived after terminal teardown. */
+  terminalHandle?: string
   /** Worktree attribution stamped by main when a hook can be resolved there.
    *  Why: orchestration workers can report status before their terminal tab is
    *  present in a renderer; retaining this lets worktree-level UI still show
@@ -156,6 +159,7 @@ export type ParsedAgentStatusPayload = Omit<AgentStatusPayload, 'prompt'> & { pr
  */
 export type AgentStatusIpcPayload = ParsedAgentStatusPayload & {
   paneKey: string
+  terminalHandle?: string
   tabId?: string
   worktreeId?: string
   /** Identifies the SSH connection the event arrived on, or null for local.
