@@ -50,11 +50,17 @@ function prepareNoUpstreamBranch(repoPath: string): void {
   }
 }
 
+function normalizeStorePath(filePath: string): string {
+  return filePath.replace(/\\/g, '/')
+}
+
 async function selectRepoForActivePolling(
   page: Page,
   repoPath: string,
   worktreePath: string
 ): Promise<void> {
+  const normalizedRepoPath = normalizeStorePath(repoPath)
+  const normalizedWorktreePath = normalizeStorePath(worktreePath)
   await page.evaluate(
     async ({ targetRepoPath, targetWorktreePath }) => {
       const store = window.__store
@@ -63,7 +69,9 @@ async function selectRepoForActivePolling(
       }
 
       let state = store.getState()
-      const repo = state.repos.find((candidate) => candidate.path === targetRepoPath)
+      const repo = state.repos.find(
+        (candidate) => candidate.path.replace(/\\/g, '/') === targetRepoPath
+      )
       if (!repo) {
         throw new Error(`Expected repo to be loaded: ${targetRepoPath}`)
       }
@@ -71,11 +79,13 @@ async function selectRepoForActivePolling(
 
       state = store.getState()
       const worktrees = Object.values(state.worktreesByRepo).flat()
-      const worktree = worktrees.find((candidate) => candidate.path === targetWorktreePath)
+      const worktree = worktrees.find(
+        (candidate) => candidate.path.replace(/\\/g, '/') === targetWorktreePath
+      )
       if (!worktree) {
         throw new Error(
           `Expected active-polling worktree to exist: ${targetWorktreePath}; saw ${worktrees
-            .map((candidate) => candidate.path)
+            .map((candidate) => candidate.path.replace(/\\/g, '/'))
             .join(', ')}`
         )
       }
@@ -83,7 +93,7 @@ async function selectRepoForActivePolling(
       state.setRightSidebarOpen(true)
       state.setRightSidebarTab('source-control')
     },
-    { targetRepoPath: repoPath, targetWorktreePath: worktreePath }
+    { targetRepoPath: normalizedRepoPath, targetWorktreePath: normalizedWorktreePath }
   )
 }
 

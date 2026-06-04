@@ -50,6 +50,7 @@ type OrcaWorkerFixtures = {
 // Why: parse + warn at module scope so a bad ORCA_E2E_SLOWMO_MS value logs once
 // per worker instead of once per test (otherwise hundreds of lines per CI run).
 const ORCA_E2E_SLOWMO_MS_RAW = process.env.ORCA_E2E_SLOWMO_MS
+const E2E_RM_OPTIONS = { recursive: true, force: true, maxRetries: 5, retryDelay: 200 } as const
 const ORCA_E2E_SLOWMO_MS = ((): number => {
   if (ORCA_E2E_SLOWMO_MS_RAW === undefined) {
     return 0
@@ -63,6 +64,17 @@ const ORCA_E2E_SLOWMO_MS = ((): number => {
   }
   return Math.max(parsed, 0)
 })()
+
+function removeE2EUserDataDir(userDataDir: string): void {
+  try {
+    rmSync(userDataDir, E2E_RM_OPTIONS)
+  } catch (error) {
+    // Why: Windows can keep Electron profile handles alive briefly after exit;
+    // temp cleanup should not fail an otherwise completed app-behavior test.
+    const message = error instanceof Error ? error.message : String(error)
+    console.warn(`[orca-e2e] Failed to remove temporary userData dir ${userDataDir}: ${message}`)
+  }
+}
 
 function shouldLaunchHeadful(testInfo: TestInfo): boolean {
   // Why: ORCA_E2E_FORCE_HEADFUL lets a developer watch any spec in a real
@@ -237,7 +249,7 @@ export const test = base.extend<OrcaTestFixtures, OrcaWorkerFixtures>({
     // descendants are gone in CI; worker teardown then hangs on open handles.
     await closeElectronAppForE2E(app)
     await cleanupE2EDaemons(userDataDir)
-    rmSync(userDataDir, { recursive: true, force: true })
+    removeE2EUserDataDir(userDataDir)
   },
 
   // Default: dismiss the onboarding overlay so it doesn't intercept clicks.

@@ -2,9 +2,13 @@ import type { GitPushTarget, GitUpstreamStatus } from '../../shared/types'
 import { upstreamOnlyCommitsArePatchEquivalent } from '../../shared/git-upstream-status'
 import { isNoUpstreamError, normalizeGitErrorMessage } from '../../shared/git-remote-error'
 import { getEffectiveGitUpstreamStatus } from '../../shared/git-effective-upstream'
-import { getPublishTargetStatus } from '../../shared/git-publish-target-status'
+import {
+  getPublishTargetRemoteRef,
+  getPublishTargetStatus
+} from '../../shared/git-publish-target-status'
 import { gitExecFileAsync } from './runner'
 import { validateGitPushTarget } from './push-target-validation'
+import { remoteTrackingRefExistsWithCache } from './remote-tracking-ref-cache'
 
 async function getBehindCommitsArePatchEquivalent(
   worktreePath: string,
@@ -30,8 +34,17 @@ export async function getUpstreamStatus(
   try {
     if (pushTarget) {
       const target = await validateGitPushTarget(worktreePath, pushTarget)
+      const remoteRef = getPublishTargetRemoteRef(target)
       return await getPublishTargetStatus(
-        (args) => gitExecFileAsync(args, { cwd: worktreePath }),
+        async (args) => {
+          if (args[0] === 'rev-parse' && args.includes(remoteRef)) {
+            if (await remoteTrackingRefExistsWithCache(worktreePath, remoteRef)) {
+              return { stdout: '' }
+            }
+            throw Object.assign(new Error('git exited with 1.'), { code: 1, stderr: '' })
+          }
+          return gitExecFileAsync(args, { cwd: worktreePath })
+        },
         target,
         (upstreamName) => getBehindCommitsArePatchEquivalent(worktreePath, upstreamName)
       )

@@ -9,6 +9,8 @@ import { readFileSync, existsSync, rmSync, readdirSync } from 'fs'
 import path from 'path'
 import { TEST_REPO_PATH_FILE } from './global-setup'
 
+const RM_OPTIONS = { recursive: true, force: true, maxRetries: 5, retryDelay: 200 } as const
+
 export default function globalTeardown(): void {
   if (!existsSync(TEST_REPO_PATH_FILE)) {
     return
@@ -24,14 +26,14 @@ export default function globalTeardown(): void {
       const siblings = readdirSync(parentDir)
       for (const name of siblings) {
         if (name.startsWith('orca-e2e-worktree-') || name.startsWith('e2e-test-')) {
-          rmSync(path.join(parentDir, name), { recursive: true, force: true })
+          rmSync(path.join(parentDir, name), RM_OPTIONS)
         }
       }
     } catch {
       // Best-effort cleanup of worktrees
     }
 
-    rmSync(testRepoDir, { recursive: true, force: true })
+    rmSync(testRepoDir, RM_OPTIONS)
     console.log(`[e2e] Cleaned up test repo at ${testRepoDir}`)
   }
 

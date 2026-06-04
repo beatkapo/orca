@@ -9,6 +9,7 @@ vi.mock('./runner', () => ({
 }))
 
 import { getUpstreamStatus } from './upstream'
+import { clearRemoteTrackingRefCacheForTests } from './remote-tracking-ref-cache'
 
 const missingTrackingRefError = new Error(
   "fatal: ambiguous argument 'HEAD@{u}': unknown revision or path not in the working tree.\n" +
@@ -18,6 +19,7 @@ const missingTrackingRefError = new Error(
 
 describe('getUpstreamStatus', () => {
   beforeEach(() => {
+    clearRemoteTrackingRefCacheForTests()
     gitExecFileAsyncMock.mockReset()
   })
 
@@ -230,6 +232,33 @@ describe('getUpstreamStatus', () => {
       ahead: 0,
       behind: 0
     })
+  })
+
+  it('does not repeat a missing explicit publish target ref probe', async () => {
+    gitExecFileAsyncMock.mockImplementation(async (args: string[]) => {
+      if (args[0] === 'check-ref-format') {
+        return { stdout: '', stderr: '' }
+      }
+      if (args[0] === 'rev-parse' && args.includes('refs/remotes/origin/Initi-Project')) {
+        throw Object.assign(new Error('git exited with 1.'), { code: 1, stderr: '' })
+      }
+      throw new Error(`unexpected git args: ${args.join(' ')}`)
+    })
+
+    await getUpstreamStatus('/repo', {
+      remoteName: 'origin',
+      branchName: 'Initi-Project'
+    })
+    await getUpstreamStatus('/repo', {
+      remoteName: 'origin',
+      branchName: 'Initi-Project'
+    })
+
+    const missingRefProbeCalls = gitExecFileAsyncMock.mock.calls.filter((call) => {
+      const args = call[0] as string[]
+      return args[0] === 'rev-parse' && args.includes('refs/remotes/origin/Initi-Project')
+    })
+    expect(missingRefProbeCalls).toHaveLength(1)
   })
 
   it('does not hide git failures while checking an explicit publish target', async () => {
