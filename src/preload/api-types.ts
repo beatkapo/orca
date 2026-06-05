@@ -2433,6 +2433,9 @@ export type PreloadApi = {
   speech: {
     getCatalog: () => Promise<SpeechModelManifest[]>
     getModelStates: () => Promise<SpeechModelState[]>
+    getOpenAiApiKeyStatus: () => Promise<{ configured: boolean }>
+    saveOpenAiApiKey: (apiKey: string) => Promise<{ configured: boolean }>
+    clearOpenAiApiKey: () => Promise<{ configured: boolean }>
     downloadModel: (modelId: string) => Promise<void>
     cancelDownload: (modelId: string) => Promise<void>
     deleteModel: (modelId: string) => Promise<void>
