@@ -149,7 +149,11 @@ export class StatsCollector {
       this.onAgentStop(ptyId, now)
     }
     this.cancelPendingSave()
-    this.writeToDiskSync()
+    try {
+      this.writeToDiskSync()
+    } catch (err) {
+      console.error('[stats] Failed to write stats:', err)
+    }
   }
 
   // ── Persistence ───────────────────────────────────────────────────
