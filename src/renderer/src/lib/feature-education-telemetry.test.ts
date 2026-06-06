@@ -38,7 +38,7 @@ describe('feature education telemetry helpers', () => {
       definedStepCount: 5
     })
 
-    expectLoggedFeatureEducationTelemetry('contextual_tour_outcome', {
+    expect(trackMock).toHaveBeenCalledWith('contextual_tour_outcome', {
       tour_id: 'workspace-agent-sessions',
       source: 'setup_guide_parallel_work',
       outcome: 'completed',
@@ -47,7 +47,6 @@ describe('feature education telemetry helpers', () => {
       furthest_step_index: 5,
       defined_step_count: 5
     })
-    expect(trackMock).not.toHaveBeenCalled()
   })
 
   it('omits stable tour-depth fields before any defined step is reached', () => {
@@ -59,14 +58,13 @@ describe('feature education telemetry helpers', () => {
       totalSteps: 3
     })
 
-    expectLoggedFeatureEducationTelemetry('contextual_tour_outcome', {
+    expect(trackMock).toHaveBeenCalledWith('contextual_tour_outcome', {
       tour_id: 'workspace-agent-sessions',
       source: 'setup_guide_parallel_work',
       outcome: 'cancelled',
       steps_seen: 0,
       total_steps: 3
     })
-    expect(trackMock).not.toHaveBeenCalled()
   })
 
   it('keeps setup guide close counts schema-valid if durable progress decreases', () => {

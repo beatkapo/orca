@@ -12,6 +12,7 @@ import {
   isFeatureWallSetupStepId,
   type FeatureWallSetupStepId
 } from '../../../shared/feature-wall-setup-steps'
+import { track } from './telemetry'
 
 const SETUP_GUIDE_TELEMETRY_COMPLETED_STEPS_STORAGE_KEY =
   'orca.setupGuideTelemetryCompletedSteps.v1'
@@ -37,7 +38,7 @@ export function trackContextualTourShown(args: {
   source: string | null | undefined
   wasFeaturePreviouslyInteracted: boolean
 }): void {
-  logFeatureEducationTelemetry('contextual_tour_shown', {
+  track('contextual_tour_shown', {
     tour_id: args.tourId,
     source: normalizeFeatureEducationSource(args.source),
     was_feature_previously_interacted: args.wasFeaturePreviouslyInteracted
@@ -53,7 +54,7 @@ export function trackContextualTourOutcome(args: {
   furthestStepIndex?: number
   definedStepCount?: number
 }): void {
-  logFeatureEducationTelemetry('contextual_tour_outcome', {
+  track('contextual_tour_outcome', {
     tour_id: args.tourId,
     source: normalizeFeatureEducationSource(args.source),
     outcome: args.outcome,
