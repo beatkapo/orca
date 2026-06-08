@@ -2,7 +2,7 @@ import type { SettingsSearchEntry } from './settings-search'
 
 export const COMMIT_MESSAGE_AI_PANE_SEARCH_ENTRIES: SettingsSearchEntry[] = [
   {
-    title: 'Enable Source Control AI defaults',
+    title: 'Show Source Control AI actions',
     description:
       'Adds action recipes for Source Control commit, pull request, branch-name, and fix actions.',
     keywords: [

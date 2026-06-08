@@ -142,7 +142,7 @@ export function CommitMessageAiPane({
 
   if (
     matchesSettingsSearch(searchQuery, {
-      title: 'Enable Source Control AI defaults',
+      title: 'Show Source Control AI actions',
       description:
         'Adds action recipes for Source Control commit, pull request, branch-name, and fix actions.',
       keywords: ['ai', 'commit', 'message', 'generate', 'agent', 'enabled']
@@ -151,13 +151,13 @@ export function CommitMessageAiPane({
     sections.push(
       <SearchableSetting
         key="enabled"
-        title="Enable Source Control AI defaults"
+        title="Show Source Control AI actions"
         description="Adds action recipes for Source Control commit, pull request, branch-name, and fix actions."
         keywords={['ai', 'commit', 'message', 'generate', 'agent', 'enabled']}
         className="flex items-center justify-between gap-4 py-2"
       >
         <div className="space-y-1">
-          <Label>Enable Source Control AI defaults</Label>
+          <Label>Show Source Control AI actions</Label>
           <p className="text-xs text-muted-foreground">
             Adds AI buttons that run the selected agent with the command template for that action.
           </p>
