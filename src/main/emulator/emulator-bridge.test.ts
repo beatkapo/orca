@@ -5,12 +5,14 @@ import type { ServeSimHelperProcess } from './serve-sim-helper-processes'
 
 const {
   execServeSimCommandMock,
+  hideNativeSimulatorAppMock,
   killServeSimHelperProcessesForDeviceMock,
   listSimulatorDevicesMock,
   listServeSimHelperProcessesForDeviceMock,
   shutdownSimulatorDeviceMock
 } = vi.hoisted(() => ({
   execServeSimCommandMock: vi.fn(async () => ({})),
+  hideNativeSimulatorAppMock: vi.fn(async () => {}),
   killServeSimHelperProcessesForDeviceMock: vi.fn(async () => {}),
   listSimulatorDevicesMock: vi.fn(async (): Promise<SimulatorDevice[]> => []),
   listServeSimHelperProcessesForDeviceMock: vi.fn(async (): Promise<ServeSimHelperProcess[]> => []),
@@ -34,6 +36,10 @@ vi.mock('./simctl-simulator-devices', () => ({
 vi.mock('./serve-sim-helper-processes', () => ({
   killServeSimHelperProcessesForDevice: killServeSimHelperProcessesForDeviceMock,
   listServeSimHelperProcessesForDevice: listServeSimHelperProcessesForDeviceMock
+}))
+
+vi.mock('./simulator-app-visibility', () => ({
+  hideNativeSimulatorApp: hideNativeSimulatorAppMock
 }))
 
 import { EmulatorBridge } from './emulator-bridge'
@@ -60,6 +66,8 @@ describe('EmulatorBridge helper ownership', () => {
     listServeSimHelperProcessesForDeviceMock.mockImplementation(async () => [
       { pid: 1234, command: 'serve-sim-bin device-1' }
     ])
+    hideNativeSimulatorAppMock.mockReset()
+    hideNativeSimulatorAppMock.mockImplementation(async () => {})
     shutdownSimulatorDeviceMock.mockReset()
     shutdownSimulatorDeviceMock.mockImplementation(async () => {})
   })
@@ -261,6 +269,7 @@ describe('EmulatorBridge helper ownership', () => {
       ['--detach', '-q', 'device-1'],
       { json: true }
     )
+    expect(hideNativeSimulatorAppMock).toHaveBeenCalledTimes(1)
   })
 
   it('rejects detach results whose stream endpoint never becomes reachable', async () => {
@@ -284,6 +293,7 @@ describe('EmulatorBridge helper ownership', () => {
     )
     expect(killServeSimHelperProcessesForDeviceMock).toHaveBeenCalledTimes(2)
     expect(listServeSimHelperProcessesForDeviceMock).not.toHaveBeenCalled()
+    expect(hideNativeSimulatorAppMock).not.toHaveBeenCalled()
   })
 
   it('rejects stale reachable endpoints when no exact serve-sim helper is alive', async () => {
@@ -316,6 +326,8 @@ describe('RuntimeEmulatorCommands attach lifecycle', () => {
     listServeSimHelperProcessesForDeviceMock.mockImplementation(async () => [
       { pid: 1234, command: 'serve-sim-bin device-1' }
     ])
+    hideNativeSimulatorAppMock.mockReset()
+    hideNativeSimulatorAppMock.mockImplementation(async () => {})
     shutdownSimulatorDeviceMock.mockReset()
     shutdownSimulatorDeviceMock.mockImplementation(async () => {})
   })

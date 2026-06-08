@@ -75,7 +75,7 @@ import {
   createWebRuntimeSessionTerminal,
   isWebRuntimeSessionActive
 } from '@/runtime/web-runtime-session'
-import { ensureSimulatorTab } from '@/lib/ensure-simulator-tab'
+import { openMobileEmulatorTab } from '@/lib/open-mobile-emulator-tab'
 import {
   createFloatingWorkspaceBrowserTab,
   createFloatingWorkspaceMarkdownTab,
@@ -832,10 +832,9 @@ function Terminal(): React.JSX.Element | null {
     const targetGroupId =
       useAppStore.getState().activeGroupIdByWorktree[activeWorktreeId] ??
       useAppStore.getState().groupsByWorktree[activeWorktreeId]?.[0]?.id
-    ensureSimulatorTab(activeWorktreeId, {
+    void openMobileEmulatorTab(activeWorktreeId, {
       placement: 'rightSplit',
-      targetGroupId: targetGroupId ?? undefined,
-      surfacePane: true
+      targetGroupId: targetGroupId ?? undefined
     })
   }, [activeWorktreeId])
 

@@ -4,6 +4,10 @@ import { tmpdir } from 'os'
 import { EmulatorError } from './emulator-errors'
 import type { EmulatorSessionInfo } from './emulator-types'
 
+function streamUrlFromServeSimUrl(url: string): string {
+  return url.endsWith('/stream.mjpeg') ? url : `${url.replace(/\/$/, '')}/stream.mjpeg`
+}
+
 export function parseServeSimDetachedSession(raw: unknown, udid: string): EmulatorSessionInfo {
   if (!raw || typeof raw !== 'object') {
     throw new EmulatorError('emulator_helper_failed', 'serve-sim did not return stream endpoints.')
@@ -14,7 +18,7 @@ export function parseServeSimDetachedSession(raw: unknown, udid: string): Emulat
     typeof json.streamUrl === 'string'
       ? json.streamUrl
       : typeof json.url === 'string'
-        ? json.url
+        ? streamUrlFromServeSimUrl(json.url)
         : undefined
   const info: EmulatorSessionInfo = {
     deviceUdid: typeof json.device === 'string' ? json.device : udid,

@@ -23,6 +23,7 @@ import type { EmulatorBridgeOptions } from './emulator-bridge-types'
 import { sendEmulatorGestureSequence, type EmulatorGesturePoint } from './emulator-gesture-sender'
 import { parseServeSimDetachedSession } from './serve-sim-detached-session'
 import { EmulatorSessionRegistry } from './emulator-session-registry'
+import { hideNativeSimulatorApp } from './simulator-app-visibility'
 
 export class EmulatorBridge {
   private readonly sessionRegistry = new EmulatorSessionRegistry()
@@ -261,6 +262,8 @@ export class EmulatorBridge {
         )
       }
     }
+    // Why: serve-sim/CoreSimulator can surface Simulator.app while Orca embeds the stream.
+    await hideNativeSimulatorApp().catch(() => {})
     return info
   }
 

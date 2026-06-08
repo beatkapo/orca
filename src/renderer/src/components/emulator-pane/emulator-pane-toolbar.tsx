@@ -64,7 +64,7 @@ export function EmulatorPaneToolbar({
         disabled={loading || devices.length === 0}
       >
         <SelectTrigger className="h-7 w-[180px] text-xs">
-          <SelectValue placeholder="Choose simulator" />
+          <SelectValue placeholder="Choose emulator" />
         </SelectTrigger>
         <SelectContent position="popper" side="bottom" align="start" sideOffset={4}>
           {devices.map((d) => (
@@ -121,13 +121,13 @@ export function EmulatorPaneToolbar({
               className="size-7 text-muted-foreground hover:text-destructive"
               onClick={onShutdown}
               disabled={loading}
-              aria-label="Shut down simulator"
+              aria-label="Shut down emulator"
             >
               <Power className="size-3.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" sideOffset={4}>
-            Shut down simulator
+            Shut down emulator
           </TooltipContent>
         </Tooltip>
       ) : (

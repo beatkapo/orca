@@ -61,6 +61,30 @@ export type TabsSlice = {
       }
     >
   ) => Tab
+  createUnifiedTabInSplit: (
+    worktreeId: string,
+    contentType: TabContentType,
+    target: {
+      sourceGroupId: string
+      splitDirection: TabSplitDirection
+    },
+    init?: Partial<
+      Pick<
+        Tab,
+        | 'id'
+        | 'entityId'
+        | 'label'
+        | 'generatedLabel'
+        | 'customLabel'
+        | 'color'
+        | 'isPreview'
+        | 'isPinned'
+      > & {
+        activate: boolean
+        recordInteraction: boolean
+      }
+    >
+  ) => Tab | null
   getTab: (tabId: string) => Tab | null
   getActiveTab: (worktreeId: string) => Tab | null
   findTabForEntityInGroup: (
@@ -532,6 +556,102 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
     })
     if (init?.recordInteraction !== false) {
       get().recordFeatureInteraction?.('terminal-tabs')
+    }
+    return created
+  },
+
+  createUnifiedTabInSplit: (worktreeId, contentType, target, init) => {
+    const id = init?.id ?? createBrowserUuid()
+    const newGroupId = createBrowserUuid()
+    let created: Tab | null = null
+    let moved = false
+    set((state) => {
+      const sourceGroup = findGroupForTab(state.groupsByWorktree, worktreeId, target.sourceGroupId)
+      if (!sourceGroup) {
+        return {}
+      }
+      const existingTabs = state.unifiedTabsByWorktree[worktreeId] ?? []
+      const currentGroups = state.groupsByWorktree[worktreeId] ?? []
+      const shouldActivate = init?.activate ?? true
+      const currentLayout =
+        state.layoutByWorktree[worktreeId] ??
+        ({ type: 'leaf', groupId: target.sourceGroupId } as const)
+      const createdTab: Tab = {
+        id,
+        entityId: init?.entityId ?? id,
+        groupId: newGroupId,
+        worktreeId,
+        contentType,
+        label:
+          init?.label ?? (contentType === 'terminal' ? `Terminal ${existingTabs.length + 1}` : id),
+        ...(init?.generatedLabel !== undefined ? { generatedLabel: init.generatedLabel } : {}),
+        customLabel: init?.customLabel ?? null,
+        color: init?.color ?? null,
+        sortOrder: 0,
+        createdAt: Date.now(),
+        isPreview: init?.isPreview,
+        isPinned: init?.isPinned
+      }
+      const newGroup: TabGroup = {
+        id: newGroupId,
+        worktreeId,
+        activeTabId: id,
+        tabOrder: [id],
+        recentTabIds: shouldActivate ? [id] : []
+      }
+      created = createdTab
+      const replacement = buildSplitNode(
+        target.sourceGroupId,
+        newGroupId,
+        target.splitDirection === 'left' || target.splitDirection === 'right'
+          ? 'horizontal'
+          : 'vertical',
+        target.splitDirection === 'left' || target.splitDirection === 'up' ? 'first' : 'second'
+      )
+      const nextUnifiedTabsByWorktree = {
+        ...state.unifiedTabsByWorktree,
+        [worktreeId]: [...existingTabs, createdTab]
+      }
+      const nextGroupsByWorktree = {
+        ...state.groupsByWorktree,
+        [worktreeId]: [...currentGroups, newGroup]
+      }
+      const nextLayoutByWorktree = {
+        ...state.layoutByWorktree,
+        [worktreeId]: replaceLeaf(currentLayout, target.sourceGroupId, replacement)
+      }
+      const nextActiveGroupIdByWorktree = shouldActivate
+        ? {
+            ...state.activeGroupIdByWorktree,
+            [worktreeId]: newGroupId
+          }
+        : state.activeGroupIdByWorktree
+      moved = true
+      return {
+        unifiedTabsByWorktree: nextUnifiedTabsByWorktree,
+        groupsByWorktree: nextGroupsByWorktree,
+        layoutByWorktree: nextLayoutByWorktree,
+        activeGroupIdByWorktree: nextActiveGroupIdByWorktree,
+        ...(shouldActivate && state.activeWorktreeId === worktreeId
+          ? buildActiveSurfacePatch(
+              {
+                ...state,
+                unifiedTabsByWorktree: nextUnifiedTabsByWorktree,
+                groupsByWorktree: nextGroupsByWorktree,
+                layoutByWorktree: nextLayoutByWorktree,
+                activeGroupIdByWorktree: nextActiveGroupIdByWorktree
+              },
+              worktreeId,
+              newGroupId
+            )
+          : {})
+      }
+    })
+    if (created && init?.recordInteraction !== false) {
+      get().recordFeatureInteraction?.('terminal-tabs')
+    }
+    if (moved && init?.recordInteraction !== false) {
+      get().recordFeatureInteraction?.('tab-splits')
     }
     return created
   },

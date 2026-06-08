@@ -426,6 +426,16 @@ export type EmulatorApi = {
       info: { deviceUdid: string; streamUrl: string; wsUrl: string; axUrl?: string }
     }) => void
   ) => () => void
+  startFrameStream: (args: { streamUrl: string; streamKey?: string }) => Promise<{
+    streamId: string
+  }>
+  stopFrameStream: (args: { streamId: string }) => Promise<void>
+  onFrameStreamFrame: (
+    callback: (data: { streamId: string; bytes: ArrayBuffer }) => void
+  ) => () => void
+  onFrameStreamError: (
+    callback: (data: { streamId: string; message: string }) => void
+  ) => () => void
 }
 
 export type DetectedBrowserProfileInfo = {

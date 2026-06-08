@@ -339,12 +339,17 @@ export function EmulatorDeviceFrame({
   )
 
   const handleStreamSize = useCallback((size: NonNullable<StreamSize>) => {
+    setStreamError(false)
     setStreamSize((current) =>
       current?.width === size.width && current.height === size.height ? current : size
     )
   }, [])
 
-  const showStream = isLive && previewUrl && !streamError
+  const handleStreamError = useCallback(() => {
+    setStreamError(true)
+  }, [])
+
+  const showStream = isLive && Boolean(previewUrl)
   const screenAspectRatio = streamSize ? streamSize.width / streamSize.height : 9 / 19
   const screenAspectRatioStyle = streamSize
     ? `${streamSize.width} / ${streamSize.height}`
@@ -398,13 +403,13 @@ export function EmulatorDeviceFrame({
             onPointerUp={handlePointerUp}
             onWheel={handleWheel}
             role={isLive ? 'button' : undefined}
-            aria-label={isLive ? 'Simulator screen' : undefined}
+            aria-label={isLive ? 'Emulator screen' : undefined}
           >
-            {/* Why: the stream is the actual simulator screen; fake in-screen
+            {/* Why: the stream is the actual emulator screen; fake in-screen
                 chrome doubles up with iOS's real status bar and makes bezels lie. */}
             <EmulatorScreenStreamContent
               loading={loading}
-              onStreamError={() => setStreamError(true)}
+              onStreamError={handleStreamError}
               onStreamSize={handleStreamSize}
               previewUrl={previewUrl}
               showStream={Boolean(showStream)}

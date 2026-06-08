@@ -25,10 +25,10 @@ export function deviceLabel(
   device: SimulatorDeviceRow | EmulatorStreamInfo | string | undefined
 ): string {
   if (!device) {
-    return 'Simulator'
+    return 'Mobile Emulator'
   }
   if (typeof device === 'string') {
-    return device.length > 20 && device.includes('-') ? 'Simulator' : device
+    return device.length > 20 && device.includes('-') ? 'Mobile Emulator' : device
   }
   if ('displayName' in device && device.displayName) {
     return device.displayName
@@ -39,7 +39,7 @@ export function deviceLabel(
   if ('device' in device && device.device && !device.device.includes('-')) {
     return device.device
   }
-  return 'Simulator'
+  return 'Mobile Emulator'
 }
 
 /** Resolve the MJPEG endpoint serve-sim exposes for the live phone preview. */

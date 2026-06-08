@@ -24,7 +24,7 @@ import {
   isWebRuntimeSessionActive
 } from '../../runtime/web-runtime-session'
 import { openTabBarEntry, type TabCreateEntryArgs } from '../tab-bar/tab-create-entry-action'
-import { ensureSimulatorTab } from '@/lib/ensure-simulator-tab'
+import { openMobileEmulatorTab } from '@/lib/open-mobile-emulator-tab'
 
 export function recordTerminalTabGroupSplit(createdTerminal: TerminalTab | null | undefined): void {
   if (!createdTerminal) {
@@ -576,10 +576,9 @@ export function useTabGroupWorkspaceModel({
         ? () => {
             // Why: mobile simulators are most useful beside the current tab group.
             // Re-open focuses the existing worktree simulator instead of spawning duplicates.
-            ensureSimulatorTab(worktreeId, {
+            void openMobileEmulatorTab(worktreeId, {
               placement: 'rightSplit',
-              targetGroupId: groupId,
-              surfacePane: true
+              targetGroupId: groupId
             })
           }
         : undefined,

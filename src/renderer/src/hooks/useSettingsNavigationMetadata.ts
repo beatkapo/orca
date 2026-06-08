@@ -243,7 +243,7 @@ export function buildSettingsNavigationMetadata({
           {
             id: 'mobile-emulator',
             title: 'Mobile Emulator',
-            description: 'Configure iOS Simulator support for Orca and coding agents.',
+            description: 'Configure mobile emulator support for Orca and coding agents.',
             icon: TabletSmartphone,
             searchEntries: MOBILE_EMULATOR_SEARCH_ENTRIES,
             group: 'workflows'

@@ -99,9 +99,9 @@ function renderFrame(props?: {
 }
 
 function getScreen(): HTMLDivElement {
-  const screen = container.querySelector<HTMLDivElement>('[aria-label="Simulator screen"]')
+  const screen = container.querySelector<HTMLDivElement>('[aria-label="Emulator screen"]')
   if (!screen) {
-    throw new Error('Simulator screen not rendered')
+    throw new Error('Emulator screen not rendered')
   }
   screen.getBoundingClientRect = () =>
     ({

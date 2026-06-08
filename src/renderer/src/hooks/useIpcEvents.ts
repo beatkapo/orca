@@ -45,6 +45,11 @@ import {
   handleSwitchTerminalTab
 } from './ipc-tab-switch'
 import { ensureSimulatorTab } from '@/lib/ensure-simulator-tab'
+import { openMobileEmulatorTab } from '@/lib/open-mobile-emulator-tab'
+import {
+  isManualSimulatorLaunchPending,
+  rememberPrelaunchedSimulatorSession
+} from '@/lib/simulator-launch-coordination'
 import {
   normalizeAgentStatusPayload,
   type AgentStatusIpcPayload,
@@ -1711,7 +1716,7 @@ export function useIpcEvents(): void {
       if (!worktreeId) {
         return
       }
-      ensureSimulatorTab(worktreeId, { placement: 'rightSplit', surfacePane: true })
+      void openMobileEmulatorTab(worktreeId, { placement: 'rightSplit' })
     })
     if (unsubscribeNewSimulatorTab) {
       unsubs.push(unsubscribeNewSimulatorTab)
@@ -1720,6 +1725,12 @@ export function useIpcEvents(): void {
     const unsubscribeEmulatorAutoAttach = window.api.emulator?.onAutoAttach(
       ({ worktreeId, info }) => {
         if (isRuntimeEnvironmentActive()) {
+          return
+        }
+        if (isManualSimulatorLaunchPending(worktreeId)) {
+          // Why: manual launches pre-attach first so the ready pane can be
+          // created in the right split instead of as a hidden tab in this group.
+          rememberPrelaunchedSimulatorSession(worktreeId, info)
           return
         }
         ensureSimulatorTab(worktreeId, { surfacePane: false })

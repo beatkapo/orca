@@ -1128,7 +1128,7 @@ function Settings(): React.JSX.Element {
                   <SettingsSection
                     id="mobile-emulator"
                     title="Mobile Emulator"
-                    description="Configure iOS Simulator support for Orca and coding agents."
+                    description="Configure mobile emulator support for Orca and coding agents."
                     searchEntries={getSectionSearchEntries('mobile-emulator')}
                   >
                     {isSectionMounted('mobile-emulator') ? (

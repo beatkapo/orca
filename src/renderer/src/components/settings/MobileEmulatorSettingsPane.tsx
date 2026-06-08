@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Loader2, RefreshCw } from 'lucide-react'
 import type { GlobalSettings } from '../../../../shared/types'
+import { cn } from '@/lib/utils'
 import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
+import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { SearchableSetting } from './SearchableSetting'
-import { SettingsBadge, SettingsRow, SettingsSwitchRow } from './SettingsFormControls'
+import { SettingsRow, SettingsSwitchRow } from './SettingsFormControls'
 import { MOBILE_EMULATOR_SEARCH_ENTRIES } from './mobile-emulator-search'
 
 type SimulatorDeviceRow = {
@@ -38,17 +40,22 @@ function statusText(availability: EmulatorAvailability | null, enabled: boolean)
   if (!enabled) {
     return 'Disabled'
   }
-  return availability?.message ?? 'Checking'
+  if (!availability) {
+    return 'Checking'
+  }
+  return availability.available ? 'Ready' : 'Needs setup'
 }
 
-function statusTone(
-  availability: EmulatorAvailability | null,
-  enabled: boolean
-): 'neutral' | 'accent' | 'muted' {
+function statusBadgeClassName(availability: EmulatorAvailability | null, enabled: boolean): string {
   if (!enabled) {
-    return 'muted'
+    return 'border-border/50 bg-muted/30 text-muted-foreground'
   }
-  return availability?.available ? 'accent' : 'neutral'
+  if (!availability) {
+    return 'border-border/50 bg-muted/30 text-muted-foreground'
+  }
+  return availability.available
+    ? 'border-status-success-border bg-status-success-background text-status-success'
+    : 'border-destructive/30 bg-destructive/10 text-destructive'
 }
 
 function deviceLabel(device: SimulatorDeviceRow): string {
@@ -65,10 +72,10 @@ function deviceLabel(device: SimulatorDeviceRow): string {
 
 function availabilityDetail(availability: EmulatorAvailability | null): string {
   if (!availability) {
-    return 'Checking Xcode, simctl, serve-sim, and installed simulator devices.'
+    return 'Checking Xcode, simctl, serve-sim, and available devices.'
   }
   if (availability.available) {
-    return `${availability.devices.length} simulator${
+    return `${availability.devices.length} emulator device${
       availability.devices.length === 1 ? '' : 's'
     } detected.`
   }
@@ -120,22 +127,22 @@ export function MobileEmulatorSettingsPane({
 
   const defaultDeviceDescription = useMemo(() => {
     if (devices.length === 0) {
-      return 'Orca will auto-select a simulator after devices are detected.'
+      return 'Orca will auto-select an emulator device after devices are detected.'
     }
-    return 'When no device is specified, Orca prefers a booted iPhone, then another booted simulator, then an available iPhone.'
+    return 'Default device for new emulator tabs and agent attach commands. Auto-select prefers an already running iPhone.'
   }, [devices.length])
 
   return (
     <div className="space-y-4">
       <SearchableSetting
         title="Mobile Emulator"
-        description="Configure iOS Simulator support for Orca and coding agents."
+        description="Configure mobile emulator support for Orca and coding agents."
         keywords={MOBILE_EMULATOR_SEARCH_ENTRIES.flatMap((entry) => entry.keywords ?? [])}
         className="divide-y divide-border/40"
       >
         <SettingsSwitchRow
           label="Enable Mobile Emulator"
-          description="Shows the New Mobile Emulator action and allows agents to attach to iOS Simulator."
+          description="Shows the New Mobile Emulator action and allows agents to attach to the active emulator."
           checked={enabled}
           onChange={() => updateSettings({ mobileEmulatorEnabled: !enabled })}
         />
@@ -146,10 +153,13 @@ export function MobileEmulatorSettingsPane({
           description={availabilityDetail(availability)}
           control={
             <div className="flex items-center gap-2">
-              <SettingsBadge tone={statusTone(availability, enabled)}>
+              <Badge
+                variant="outline"
+                className={cn('text-[11px]', statusBadgeClassName(availability, enabled))}
+              >
                 {refreshing ? <Loader2 className="size-3 animate-spin" /> : null}
                 {statusText(availability, enabled)}
-              </SettingsBadge>
+              </Badge>
               <Button
                 type="button"
                 variant="outline"
@@ -182,7 +192,7 @@ export function MobileEmulatorSettingsPane({
                 })
               }
             >
-              <SelectTrigger size="sm" className="w-72 max-w-full">
+              <SelectTrigger size="sm" className="w-56 max-w-full">
                 <SelectValue placeholder={AUTOMATIC_DEVICE_LABEL} />
               </SelectTrigger>
               <SelectContent position="popper" align="end">

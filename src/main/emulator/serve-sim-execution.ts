@@ -17,7 +17,16 @@ const EXEC_TIMEOUT_MS = 90_000
 const MAC_OPEN_SHIM_DIR = join(tmpdir(), 'orca-serve-sim-open-shim')
 const MAC_OPEN_SHIM_PATH = join(MAC_OPEN_SHIM_DIR, 'open')
 const MAC_OPEN_SHIM = `#!/bin/sh
-if [ "$1" = "-ga" ] && [ "$2" = "Simulator" ] && [ "$#" -eq 2 ]; then
+has_simulator_target=0
+for arg in "$@"; do
+  case "$arg" in
+    Simulator|Simulator.app|com.apple.iphonesimulator|*Simulator.app*)
+      has_simulator_target=1
+      ;;
+  esac
+done
+if [ "$has_simulator_target" = "1" ]; then
+  /usr/bin/open -gj -a Simulator 2>/dev/null || /usr/bin/open "$@"
   exit 0
 fi
 exec /usr/bin/open "$@"
@@ -52,7 +61,7 @@ function getServeSimEnv(executable: ServeSimExecutable): NodeJS.ProcessEnv {
     : { ...process.env }
   const openShimDir = ensureMacOpenShim()
   if (openShimDir) {
-    // Why: serve-sim activates Simulator.app after boot; Orca embeds the stream instead.
+    // Why: serve-sim needs Simulator.app attached for display/rotation, but Orca embeds the stream.
     env.PATH = `${openShimDir}${delimiter}${env.PATH ?? ''}`
   }
   return env

@@ -6,6 +6,7 @@ const mockStoreState = vi.hoisted(() => ({
   activateTab: vi.fn(),
   createEmptySplitGroup: vi.fn(),
   createUnifiedTab: vi.fn(),
+  createUnifiedTabInSplit: vi.fn(),
   dropUnifiedTab: vi.fn(),
   focusGroup: vi.fn(),
   groupsByWorktree: {} as Record<string, { id: string }[]>,
@@ -40,6 +41,7 @@ describe('ensureSimulatorTab', () => {
     mockStoreState.activateTab.mockReset()
     mockStoreState.createEmptySplitGroup.mockReset()
     mockStoreState.createUnifiedTab.mockReset()
+    mockStoreState.createUnifiedTabInSplit.mockReset()
     mockStoreState.dropUnifiedTab.mockReset()
     mockStoreState.focusGroup.mockReset()
     mockStoreState.setActiveTab.mockReset()
@@ -58,41 +60,65 @@ describe('ensureSimulatorTab', () => {
     expect(mockStoreState.setActiveTabType).toHaveBeenCalledWith('simulator')
   })
 
+  it('cancels pending managed shutdown when surfacing a simulator tab', async () => {
+    vi.useFakeTimers()
+    let cancelPendingSimulatorPaneShutdown: ((worktreeId: string) => void) | null = null
+    try {
+      const shutdownManagedSimulator = vi.fn()
+      const scheduler = await import('./simulator-pane-shutdown-scheduler')
+      cancelPendingSimulatorPaneShutdown = scheduler.cancelPendingSimulatorPaneShutdown
+      scheduler.scheduleSimulatorPaneManagedShutdown('wt-1', 'sim-old', {
+        delayMs: 100,
+        getTabsForWorktree: () => [{ id: 'terminal-1', contentType: 'terminal' }],
+        shutdownManagedSimulator
+      })
+
+      const { ensureSimulatorTab } = await import('./ensure-simulator-tab')
+
+      expect(ensureSimulatorTab('wt-1')).toBe('sim-1')
+
+      await vi.advanceTimersByTimeAsync(100)
+      expect(shutdownManagedSimulator).not.toHaveBeenCalled()
+    } finally {
+      cancelPendingSimulatorPaneShutdown?.('wt-1')
+      vi.useRealTimers()
+    }
+  })
+
   it('creates a simulator tab in a new right split when requested', async () => {
     mockStoreState.unifiedTabsByWorktree = { 'wt-1': [] }
-    mockStoreState.createUnifiedTab.mockReturnValue({
+    mockStoreState.createUnifiedTabInSplit.mockReturnValue({
       id: 'sim-2',
-      groupId: 'group-1',
+      groupId: 'group-2',
       contentType: 'simulator'
-    })
-    mockStoreState.dropUnifiedTab.mockImplementation(() => {
-      mockStoreState.unifiedTabsByWorktree = {
-        'wt-1': [{ id: 'sim-2', groupId: 'group-2', contentType: 'simulator' }]
-      }
-      return true
     })
     const { ensureSimulatorTab } = await import('./ensure-simulator-tab')
 
     expect(ensureSimulatorTab('wt-1', { placement: 'rightSplit' })).toBe('sim-2')
 
     expect(mockStoreState.createEmptySplitGroup).not.toHaveBeenCalled()
-    expect(mockStoreState.createUnifiedTab).toHaveBeenCalledWith('wt-1', 'simulator', {
-      label: 'Mobile Emulator',
-      targetGroupId: 'group-1',
-      activate: true
-    })
-    expect(mockStoreState.dropUnifiedTab).toHaveBeenCalledWith('sim-2', {
-      groupId: 'group-1',
-      splitDirection: 'right'
-    })
-    expect(mockStoreState.activateTab).toHaveBeenCalledWith('sim-2')
-    expect(mockStoreState.focusGroup).toHaveBeenCalledWith('wt-1', 'group-2')
-    expect(mockStoreState.setActiveTabType).toHaveBeenCalledWith('simulator')
+    expect(mockStoreState.createUnifiedTab).not.toHaveBeenCalled()
+    expect(mockStoreState.dropUnifiedTab).not.toHaveBeenCalled()
+    expect(mockStoreState.createUnifiedTabInSplit).toHaveBeenCalledWith(
+      'wt-1',
+      'simulator',
+      {
+        sourceGroupId: 'group-1',
+        splitDirection: 'right'
+      },
+      {
+        label: 'Mobile Emulator',
+        activate: true
+      }
+    )
+    expect(mockStoreState.activateTab).not.toHaveBeenCalled()
+    expect(mockStoreState.focusGroup).not.toHaveBeenCalled()
+    expect(mockStoreState.setActiveTabType).not.toHaveBeenCalled()
   })
 
-  it('falls back to the source group when right split movement is a no-op', async () => {
+  it('falls back to the source group when atomic right split creation fails', async () => {
     mockStoreState.unifiedTabsByWorktree = { 'wt-1': [] }
-    mockStoreState.dropUnifiedTab.mockReturnValue(false)
+    mockStoreState.createUnifiedTabInSplit.mockReturnValue(null)
     mockStoreState.createUnifiedTab.mockReturnValue({
       id: 'sim-3',
       groupId: 'group-1',
@@ -102,15 +128,24 @@ describe('ensureSimulatorTab', () => {
 
     expect(ensureSimulatorTab('wt-1', { placement: 'rightSplit' })).toBe('sim-3')
 
+    expect(mockStoreState.createUnifiedTabInSplit).toHaveBeenCalledWith(
+      'wt-1',
+      'simulator',
+      {
+        sourceGroupId: 'group-1',
+        splitDirection: 'right'
+      },
+      {
+        label: 'Mobile Emulator',
+        activate: true
+      }
+    )
     expect(mockStoreState.createUnifiedTab).toHaveBeenCalledWith('wt-1', 'simulator', {
       label: 'Mobile Emulator',
       targetGroupId: 'group-1',
       activate: true
     })
-    expect(mockStoreState.dropUnifiedTab).toHaveBeenCalledWith('sim-3', {
-      groupId: 'group-1',
-      splitDirection: 'right'
-    })
+    expect(mockStoreState.dropUnifiedTab).not.toHaveBeenCalled()
     expect(mockStoreState.focusGroup).toHaveBeenCalledWith('wt-1', 'group-1')
   })
 
@@ -128,6 +163,7 @@ describe('ensureSimulatorTab', () => {
     )
 
     expect(mockStoreState.dropUnifiedTab).not.toHaveBeenCalled()
+    expect(mockStoreState.createUnifiedTabInSplit).not.toHaveBeenCalled()
     expect(mockStoreState.createUnifiedTab).toHaveBeenCalledWith('wt-1', 'simulator', {
       label: 'Mobile Emulator',
       targetGroupId: 'group-1',

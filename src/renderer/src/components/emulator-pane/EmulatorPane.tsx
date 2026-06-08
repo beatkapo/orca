@@ -70,7 +70,7 @@ function EmulatorPaneContent({ tab, worktreeId, isActive = true }: EmulatorPaneP
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-3">
         {!isLive && !loading ? (
-          <p className="mb-4 text-center text-xs text-muted-foreground">No simulator connected</p>
+          <p className="mb-4 text-center text-xs text-muted-foreground">No emulator connected</p>
         ) : null}
         <EmulatorDeviceFrame
           previewUrl={previewUrl}

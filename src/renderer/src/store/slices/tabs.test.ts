@@ -970,6 +970,89 @@ describe('TabsSlice', () => {
       expect(layout.second).toEqual({ type: 'leaf', groupId: newGroupId })
     })
 
+    it('creates a unified tab directly in a sibling split without publishing a source-group midpoint', () => {
+      const terminal = store.getState().createUnifiedTab(WT, 'terminal', {
+        id: 'terminal-1',
+        label: 'Terminal 1'
+      })
+      const sourceGroupId = store.getState().groupsByWorktree[WT][0].id
+      store.setState({ activeWorktreeId: WT })
+      const publishedSimulatorGroupIds: (string | null)[] = []
+      const unsubscribe = store.subscribe((state) => {
+        publishedSimulatorGroupIds.push(
+          state.unifiedTabsByWorktree[WT]?.find((tab) => tab.contentType === 'simulator')
+            ?.groupId ?? null
+        )
+      })
+
+      const simulator = store.getState().createUnifiedTabInSplit(
+        WT,
+        'simulator',
+        {
+          sourceGroupId,
+          splitDirection: 'right'
+        },
+        {
+          id: 'simulator-1',
+          label: 'Mobile Emulator'
+        }
+      )
+      unsubscribe()
+
+      expect(simulator).not.toBeNull()
+      expect(publishedSimulatorGroupIds).not.toContain(sourceGroupId)
+      const state = store.getState()
+      const simulatorGroupId = simulator!.groupId
+      expect(state.activeWorktreeId).toBe(WT)
+      expect(state.activeTabType).toBe('simulator')
+      expect(state.activeGroupIdByWorktree[WT]).toBe(simulatorGroupId)
+      expect(
+        state.groupsByWorktree[WT].find((group) => group.id === sourceGroupId)?.tabOrder
+      ).toEqual([terminal.id])
+      expect(
+        state.groupsByWorktree[WT].find((group) => group.id === simulatorGroupId)?.tabOrder
+      ).toEqual([simulator!.id])
+      const layout = state.layoutByWorktree[WT]
+      expect(layout.type).toBe('split')
+      if (layout.type !== 'split') {
+        throw new Error('expected split layout after split tab creation')
+      }
+      expect(layout.direction).toBe('horizontal')
+      expect(layout.first).toEqual({ type: 'leaf', groupId: sourceGroupId })
+      expect(layout.second).toEqual({ type: 'leaf', groupId: simulatorGroupId })
+    })
+
+    it('creates a split tab without stealing focus when activation is disabled', () => {
+      store.getState().createUnifiedTab(WT, 'terminal', {
+        id: 'terminal-1',
+        label: 'Terminal 1'
+      })
+      const sourceGroupId = store.getState().groupsByWorktree[WT][0].id
+      store.setState({ activeWorktreeId: WT })
+
+      const simulator = store.getState().createUnifiedTabInSplit(
+        WT,
+        'simulator',
+        {
+          sourceGroupId,
+          splitDirection: 'right'
+        },
+        {
+          id: 'simulator-1',
+          label: 'Mobile Emulator',
+          activate: false
+        }
+      )
+
+      expect(simulator).not.toBeNull()
+      const state = store.getState()
+      expect(state.activeGroupIdByWorktree[WT]).toBe(sourceGroupId)
+      expect(state.activeTabType).toBe('terminal')
+      expect(
+        state.groupsByWorktree[WT].find((group) => group.id === simulator!.groupId)?.recentTabIds
+      ).toEqual([])
+    })
+
     it('treats splitting the only tab onto its own pane body as a no-op', () => {
       const onlyTab = store.getState().createUnifiedTab(WT, 'editor', {
         id: 'file-a.ts',

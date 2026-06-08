@@ -1,4 +1,5 @@
 import { useAppStore } from '@/store'
+import { cancelPendingSimulatorPaneShutdown } from './simulator-pane-shutdown-scheduler'
 import { shouldShutdownSimulatorForPaneUnmountFromTabs } from './simulator-tab-shutdown'
 
 export const isMacOsHost = typeof navigator !== 'undefined' && navigator.userAgent.includes('Mac')
@@ -29,6 +30,7 @@ export function ensureSimulatorTab(
   if (!sourceGroupId) {
     return null
   }
+  cancelPendingSimulatorPaneShutdown(worktreeId)
 
   const existing = (store.unifiedTabsByWorktree[worktreeId] ?? []).find(
     (tab) => tab.contentType === 'simulator'
@@ -43,31 +45,35 @@ export function ensureSimulatorTab(
     return existing.id
   }
 
-  // Why: create the tab before splitting so even a dev reload between store
-  // updates restores a real simulator tab rather than an empty right pane.
+  if (options?.placement === 'rightSplit' && shouldSurface) {
+    // Why: publish the simulator directly in its split group. A two-step
+    // create-then-move can persist the midpoint during dev reload/HMR.
+    const splitTab = store.createUnifiedTabInSplit(
+      worktreeId,
+      'simulator',
+      {
+        sourceGroupId,
+        splitDirection: 'right'
+      },
+      {
+        label: 'Mobile Emulator',
+        activate: true
+      }
+    )
+    if (splitTab) {
+      return splitTab.id
+    }
+  }
+
   const tab = store.createUnifiedTab(worktreeId, 'simulator', {
     label: 'Mobile Emulator',
     targetGroupId: sourceGroupId,
     activate: shouldSurface
   })
-  let groupId = sourceGroupId
-  if (options?.placement === 'rightSplit' && shouldSurface) {
-    const moved = store.dropUnifiedTab(tab.id, {
-      groupId: sourceGroupId,
-      splitDirection: 'right'
-    })
-    if (moved) {
-      groupId =
-        useAppStore
-          .getState()
-          .unifiedTabsByWorktree[worktreeId]?.find((candidate) => candidate.id === tab.id)
-          ?.groupId ?? sourceGroupId
-    }
-  }
   if (shouldSurface) {
     store.activateTab(tab.id)
     store.setActiveTabType('simulator')
-    store.focusGroup(worktreeId, groupId)
+    store.focusGroup(worktreeId, tab.groupId)
   }
   return tab.id
 }
