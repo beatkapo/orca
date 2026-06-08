@@ -30,6 +30,19 @@
   background: color-mix(in srgb, var(--background) 84%, transparent);
 }
 
+/* Why: the TOC header is a fixed 40px chrome row; compact the toolbar to match when both are visible. */
+.rich-markdown-editor-layout:has(.markdown-toc-panel) .markdown-toc-header,
+.rich-markdown-editor-layout:has(.markdown-toc-panel) .rich-markdown-editor-toolbar {
+  min-height: 40px;
+  box-sizing: border-box;
+  border-bottom: none;
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--border) 72%, transparent);
+}
+
+.rich-markdown-editor-layout:has(.markdown-toc-panel) .rich-markdown-editor-toolbar {
+  padding-block: 6px;
+}
+
 .rich-markdown-toolbar-button {
   display: inline-flex;
   align-items: center;
