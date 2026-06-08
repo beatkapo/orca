@@ -4,20 +4,13 @@ import { buildAgentDraftLaunchPlan, buildAgentStartupPlan } from '@/lib/tui-agen
 import { TUI_AGENT_CONFIG } from '../../../shared/tui-agent-config'
 import { isTuiAgentEnabled, pickTuiAgent } from '../../../shared/tui-agent-selection'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
-import {
-  getWorkspaceIntentName,
-  getWorkspaceSeedName,
-  isGitLabIssueUrl
-} from '@/lib/new-workspace'
+import { getWorkspaceIntentName, getWorkspaceSeedName, isGitLabIssueUrl } from '@/lib/new-workspace'
 import {
   getLaunchableWorkItemDraftContent,
   type LinkedWorkItemContext
 } from '@/lib/linked-work-item-context'
 import { ensureHooksConfirmed } from '@/lib/ensure-hooks-confirmed'
 import { getConnectionId } from '@/lib/connection-context'
-import { checkRuntimeHooks } from '@/runtime/runtime-hooks-client'
-import { track, tuiAgentToAgentKind } from '@/lib/telemetry'
-import { getAgentLaunchPlatformForRepo } from '@/lib/agent-launch-platform'
 import type {
   GitPushTarget,
   SetupDecision,
@@ -208,7 +201,6 @@ export async function launchWorkItemDirect(args: LaunchWorkItemDirectArgs): Prom
     )
     worktreeId = result.worktree.id
     const worktreePath = result.worktree.path
-    const agentLaunchPlatform = getAgentLaunchPlatformForRepo(repo)
 
     const createdConnectionId = getConnectionId(worktreeId)
     const launchConnectionId =
