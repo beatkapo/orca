@@ -1,6 +1,10 @@
 import { toast } from 'sonner'
 import { useAppStore } from '@/store'
-import { buildAgentDraftLaunchPlan, buildAgentStartupPlan } from '@/lib/tui-agent-startup'
+import {
+  buildAgentDraftLaunchPlan,
+  buildAgentStartupPlan,
+  planAgentCliArgsSuffix
+} from '@/lib/tui-agent-startup'
 import { TUI_AGENT_CONFIG } from '../../../shared/tui-agent-config'
 import { isTuiAgentEnabled, pickTuiAgent } from '../../../shared/tui-agent-selection'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
@@ -122,6 +126,22 @@ export async function launchWorkItemDirect(args: LaunchWorkItemDirectArgs): Prom
   const settings = store.settings
   const promptDelivery = args.promptDelivery ?? 'draft'
   const repoConnectionId = repo.connectionId?.trim() || null
+  const preflightLaunchPlatform =
+    args.launchPlatform ??
+    resolveSourceControlLaunchPlatform({
+      connectionId: repoConnectionId,
+      worktreePath: repo.path
+    })
+  const agentArgsPlan = planAgentCliArgsSuffix(
+    agentArgs,
+    preflightLaunchPlatform === 'win32' ? 'powershell' : 'posix'
+  )
+  if (!agentArgsPlan.ok) {
+    // Why: direct launches may create a worktree before the agent startup plan
+    // is built; reject malformed saved args before touching user workspaces.
+    toast.error(agentArgsPlan.error)
+    return false
+  }
   // Why: agent detection shells out and can be cold/slow. Start it now, but
   // don't let it serialize setup-policy resolution or git worktree creation.
   const detectedAgentsPromise = agentOverride
@@ -203,8 +223,9 @@ export async function launchWorkItemDirect(args: LaunchWorkItemDirectArgs): Prom
     const worktreePath = result.worktree.path
 
     const createdConnectionId = getConnectionId(worktreeId)
-    const launchConnectionId =
-      createdConnectionId === undefined ? repoConnectionId : createdConnectionId
+    // Why: newly-created SSH worktrees can be activated before the store
+    // rehydrates their repo link; preserve the source repo connection.
+    const launchConnectionId = createdConnectionId ?? repoConnectionId
     const launchPlatform =
       args.launchPlatform ??
       resolveSourceControlLaunchPlatform({

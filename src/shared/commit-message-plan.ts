@@ -77,6 +77,12 @@ function insertAdditionalAgentArgs(args: {
   if (!args.agentArgs.length) {
     return args.baseArgs
   }
+  const promptPlaceholderIndex = args.baseArgs.lastIndexOf('{prompt}')
+  if (promptPlaceholderIndex !== -1) {
+    const merged = [...args.baseArgs]
+    merged.splice(promptPlaceholderIndex, 0, ...args.agentArgs)
+    return merged
+  }
   if (
     args.promptDelivery === 'argv' &&
     args.prompt.length > 0 &&
@@ -111,7 +117,12 @@ export function planCommitMessageGeneration(
       ok: true,
       plan: {
         binary: planned.binary,
-        args: [...planned.args, ...agentArgs.args],
+        args: insertAdditionalAgentArgs({
+          baseArgs: planned.args,
+          agentArgs: agentArgs.args,
+          promptDelivery: planned.stdinPayload === null ? 'argv' : 'stdin',
+          prompt
+        }),
         stdinPayload: planned.stdinPayload,
         // Why: a custom command has no friendly name, so the binary doubles
         // as the label in error prefixes ("ollama failed: ...").

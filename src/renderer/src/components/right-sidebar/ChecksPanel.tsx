@@ -21,6 +21,7 @@ import {
 import { getGitHubPRCacheKey, getGitHubRepoCacheKey } from '@/store/slices/github-cache-key'
 import { useActiveWorktree, useRepoById } from '@/store/selectors'
 import { cn } from '@/lib/utils'
+import { openHttpLink } from '@/lib/http-link-routing'
 import { Button } from '@/components/ui/button'
 import { DetachedHeadBadge } from '@/components/DetachedHeadBadge'
 import {
@@ -292,6 +293,9 @@ export default function ChecksPanel(): React.JSX.Element {
   const activeWorktree = useActiveWorktree()
   const activeWorktreeId = useAppStore((s) => s.activeWorktreeId)
   const repo = useRepoById(activeWorktree?.repoId ?? null)
+  const activeConnectionId = activeWorktreeId
+    ? (getConnectionId(activeWorktreeId) ?? repo?.connectionId ?? null)
+    : null
   const settings = useAppStore((s) => s.settings)
   const updateSettings = useAppStore((s) => s.updateSettings)
   const updateRepo = useAppStore((s) => s.updateRepo)
@@ -334,9 +338,8 @@ export default function ChecksPanel(): React.JSX.Element {
   const resolveReviewThread = useAppStore((s) => s.resolveReviewThread)
   const detectedAgentIds = useAppStore((s) => s.detectedAgentIds)
   const remoteDetectedAgentIds = useAppStore((s) => {
-    const connectionId = activeWorktreeId ? getConnectionId(activeWorktreeId) : undefined
-    return typeof connectionId === 'string'
-      ? (s.remoteDetectedAgentIds[connectionId] ?? null)
+    return typeof activeConnectionId === 'string'
+      ? (s.remoteDetectedAgentIds[activeConnectionId] ?? null)
       : null
   })
 
@@ -415,7 +418,7 @@ export default function ChecksPanel(): React.JSX.Element {
   const activeWorktreePath = activeWorktree?.path ?? null
   const activeWorktreePushTarget = activeWorktree?.pushTarget ?? null
   const activeSourceControlLaunchPlatform = resolveSourceControlLaunchPlatform({
-    connectionId: repo?.connectionId ?? null,
+    connectionId: activeConnectionId,
     worktreePath: activeWorktreePath
   })
   const runtimeEnvironmentId = settings?.activeRuntimeEnvironmentId?.trim() || null
@@ -710,7 +713,7 @@ export default function ChecksPanel(): React.JSX.Element {
     }
     let stale = false
     const requestContextKey = panelContextKey
-    const connectionId = getConnectionId(activeWorktreeId) ?? undefined
+    const connectionId = activeConnectionId ?? undefined
     if (
       shouldCoalesceChecksPanelGitStatusSnapshotRefresh(
         gitStatusSnapshotInFlightContextRef.current,
@@ -810,6 +813,7 @@ export default function ChecksPanel(): React.JSX.Element {
     activeWorktreePushTarget,
     activeWorktreeId,
     activeWorktreePath,
+    activeConnectionId,
     branch,
     gitStatusInvalidation,
     gitStatusRefreshNonce,
@@ -1741,7 +1745,6 @@ export default function ChecksPanel(): React.JSX.Element {
   const commentsDisabledReason = canTargetPRComments
     ? undefined
     : 'Commenting requires a GitHub PR repository target.'
-  const activeConnectionId = activeWorktreeId ? getConnectionId(activeWorktreeId) : undefined
   const detectedAgentsForAI =
     typeof activeConnectionId === 'string' ? remoteDetectedAgentIds : detectedAgentIds
   const noEnabledAgentKnown =
@@ -1753,11 +1756,9 @@ export default function ChecksPanel(): React.JSX.Element {
     ) == null
   const aiActionDisabledReason = !activeWorktreeId
     ? 'Select a workspace before launching an AI action.'
-    : activeConnectionId === undefined
-      ? 'Unable to resolve the workspace connection.'
-      : noEnabledAgentKnown
-        ? 'No enabled AI agents. Configure agents in Settings.'
-        : undefined
+    : noEnabledAgentKnown
+      ? 'No enabled AI agents. Configure agents in Settings.'
+      : undefined
 
   const handleAddPRComment = useCallback(
     async (body: string) => {
@@ -2138,9 +2139,11 @@ export default function ChecksPanel(): React.JSX.Element {
   // Open hosted review in browser
   const handleOpenPR = useCallback(() => {
     if (activeReview?.url) {
-      window.api.shell.openUrl(activeReview.url)
+      // Why: route through openHttpLink so PR/MR links honor the "open links
+      // in app" setting instead of always launching the system browser.
+      openHttpLink(activeReview.url, { worktreeId: activeWorktreeId })
     }
-  }, [activeReview])
+  }, [activeReview, activeWorktreeId])
 
   const handleUnlinkPullRequest = useCallback(() => {
     if (!activeWorktreeId || activeReview?.provider !== 'github' || linkedPR === null) {
@@ -2173,7 +2176,7 @@ export default function ChecksPanel(): React.JSX.Element {
     if (!activeWorktreeId || !activeWorktree?.path) {
       return false
     }
-    const connectionId = getConnectionId(activeWorktreeId) ?? undefined
+    const connectionId = activeConnectionId ?? undefined
     try {
       await pushBranch(
         activeWorktreeId,
@@ -2187,7 +2190,7 @@ export default function ChecksPanel(): React.JSX.Element {
     } catch {
       return false
     }
-  }, [activeWorktree, activeWorktreeId, fetchUpstreamStatus, pushBranch])
+  }, [activeConnectionId, activeWorktree, activeWorktreeId, fetchUpstreamStatus, pushBranch])
 
   const handlePublishBranch = useCallback(async (): Promise<void> => {
     if (
@@ -2198,7 +2201,7 @@ export default function ChecksPanel(): React.JSX.Element {
     ) {
       return
     }
-    const connectionId = getConnectionId(activeWorktreeId) ?? undefined
+    const connectionId = activeConnectionId ?? undefined
     setIsPublishingBranch(true)
     try {
       await pushBranch(
@@ -2225,6 +2228,7 @@ export default function ChecksPanel(): React.JSX.Element {
   }, [
     activeWorktree,
     activeWorktreeId,
+    activeConnectionId,
     fetchUpstreamStatus,
     isPublishingBranch,
     isRemoteOperationActive,
@@ -2238,9 +2242,9 @@ export default function ChecksPanel(): React.JSX.Element {
     // Why: AI PR detail generation rebases before summarizing; if HEAD moved,
     // the dialog must push before creating from the refreshed branch state.
     setCreatePrPushFirst(true)
-    const connectionId = getConnectionId(activeWorktreeId) ?? undefined
+    const connectionId = activeConnectionId ?? undefined
     await fetchUpstreamStatus(activeWorktreeId, activeWorktree.path, connectionId)
-  }, [activeWorktree?.path, activeWorktreeId, fetchUpstreamStatus])
+  }, [activeConnectionId, activeWorktree?.path, activeWorktreeId, fetchUpstreamStatus])
 
   const handlePullRequestCreated = useCallback(
     async (result: {
@@ -2661,7 +2665,7 @@ export default function ChecksPanel(): React.JSX.Element {
         baseCommandInput={agentComposerState?.prompt ?? ''}
         worktreeId={activeWorktreeId}
         groupId={activeWorktreeId}
-        connectionId={activeWorktreeId ? getConnectionId(activeWorktreeId) : null}
+        connectionId={activeConnectionId}
         repoId={repo?.id ?? null}
         promptDelivery="submit-after-ready"
         launchPlatform={activeSourceControlLaunchPlatform}

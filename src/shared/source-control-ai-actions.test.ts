@@ -87,6 +87,15 @@ describe('source-control AI launch action defaults', () => {
     )
   })
 
+  it('renders command template placeholders that start with underscores', () => {
+    expect(
+      renderSourceControlActionCommandTemplate('agent {_prompt} {{_context}}', {
+        _prompt: 'PROMPT',
+        _context: 'CONTEXT'
+      })
+    ).toBe('agent PROMPT CONTEXT')
+  })
+
   it('sets agent defaults without dropping neighboring action defaults', () => {
     expect(
       setSourceControlActionAgentDefault(

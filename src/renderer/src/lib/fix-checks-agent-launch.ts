@@ -4,6 +4,7 @@ import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
 import { findGithubPrWorkspaceAttachment } from '@/lib/github-work-item-workspace-attachment'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
 import { launchWorkItemDirect } from '@/lib/launch-work-item-direct'
+import { planAgentCliArgsSuffix } from '@/lib/tui-agent-startup'
 import {
   pickSourceControlLaunchAgent,
   readSourceControlLaunchRecipeAgentId
@@ -73,9 +74,10 @@ async function resolveSavedAgentOverride(
 
 async function pickExistingWorktreeAgent(
   worktreeId: string,
-  savedAgent: TuiAgent | null | undefined
+  savedAgent: TuiAgent | null | undefined,
+  repoConnectionId: string | null | undefined
 ): Promise<TuiAgent | null> {
-  const connectionId = getConnectionId(worktreeId)
+  const connectionId = getConnectionId(worktreeId) ?? repoConnectionId ?? null
   const detectedAgents = await detectAgentsForConnection(connectionId)
   if (savedAgent) {
     if (isAgentAvailable(savedAgent, detectedAgents)) {
@@ -121,12 +123,37 @@ export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promis
   const targetWorktreeId = args.worktreeId ?? attachedWorkspace?.id ?? null
   if (targetWorktreeId) {
     const targetWorktree = store.allWorktrees().find((worktree) => worktree.id === targetWorktreeId)
-    const agent = await pickExistingWorktreeAgent(targetWorktreeId, savedAgentId)
+    if (!targetWorktree) {
+      toast.error('Unable to find the workspace attached to these checks.')
+      return false
+    }
+    const targetConnectionId = getConnectionId(targetWorktreeId) ?? repo?.connectionId ?? null
+    const agent = await pickExistingWorktreeAgent(
+      targetWorktreeId,
+      savedAgentId,
+      repo?.connectionId
+    )
     if (!agent) {
       return false
     }
+    const launchPlatform = resolveSourceControlLaunchPlatform({
+      connectionId: targetConnectionId,
+      worktreePath: targetWorktree.path
+    })
+    if (!launchPlatform) {
+      toast.error('Unable to resolve the workspace launch platform.')
+      return false
+    }
+    const agentArgsPlan = planAgentCliArgsSuffix(
+      recipe.agentArgs,
+      launchPlatform === 'win32' ? 'powershell' : 'posix'
+    )
+    if (!agentArgsPlan.ok) {
+      toast.error(agentArgsPlan.error)
+      return false
+    }
     if (!activateAndRevealWorktree(targetWorktreeId)) {
-      toast.error('Unable to open the workspace attached to this pull request.')
+      toast.error('Unable to open the workspace attached to these checks.')
       return false
     }
     const result = launchAgentInNewTab({
@@ -136,10 +163,7 @@ export async function startFixChecksAgent(args: StartFixChecksAgentArgs): Promis
       prompt: commandInput,
       agentArgs: recipe.agentArgs,
       promptDelivery: 'submit-after-ready',
-      launchPlatform: resolveSourceControlLaunchPlatform({
-        connectionId: repo?.connectionId ?? null,
-        worktreePath: targetWorktree?.path
-      }),
+      launchPlatform,
       launchSource: args.launchSource
     })
     if (!result) {

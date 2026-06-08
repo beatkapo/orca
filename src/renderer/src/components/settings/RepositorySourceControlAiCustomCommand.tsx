@@ -19,6 +19,9 @@ export function RepositorySourceControlAiCustomCommand({
   source,
   onChange
 }: RepositorySourceControlAiCustomCommandProps): React.JSX.Element {
+  // Why: value only counts as a repo command when it is a non-empty trimmed string;
+  // empty/nullish values make hasRepoCommand select CUSTOM_COMMAND_MODE_INHERIT
+  // instead of CUSTOM_COMMAND_MODE_REPO, so clearing the input switches mode.
   const hasRepoCommand = typeof value === 'string' && value.trim().length > 0
   const mode = hasRepoCommand ? CUSTOM_COMMAND_MODE_REPO : CUSTOM_COMMAND_MODE_INHERIT
   return (
@@ -33,6 +36,8 @@ export function RepositorySourceControlAiCustomCommand({
         <Select
           value={mode}
           onValueChange={(nextMode) => {
+            // Why: CUSTOM_COMMAND_MODE_REPO pre-populates onChange from
+            // source.customAgentCommand when this repo has no command yet; other modes clear.
             onChange(
               nextMode === CUSTOM_COMMAND_MODE_REPO
                 ? (value ?? source.customAgentCommand)
@@ -51,7 +56,10 @@ export function RepositorySourceControlAiCustomCommand({
       </div>
       <Input
         value={value ?? ''}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => {
+          const nextValue = event.target.value
+          onChange(nextValue === '' ? undefined : nextValue)
+        }}
         placeholder={source.customAgentCommand || 'e.g. ollama run llama3.1 {prompt}'}
         spellCheck={false}
         className="h-8 font-mono text-xs"

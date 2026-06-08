@@ -6,14 +6,12 @@ import {
   DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES,
   SOURCE_CONTROL_ACTION_IDS,
   SOURCE_CONTROL_TEXT_ACTION_IDS,
-  setSourceControlActionDefault,
   type SourceControlActionId,
   type SourceControlActionRecipe
 } from './source-control-ai-actions'
 import type {
   CompleteSourceControlActionRecipe,
   RepoSourceControlAiOverrides,
-  SourceControlAiModelChoice,
   SourceControlAiOperation,
   SourceControlAiSettings,
   WritableRepoSourceControlAiOverrides
@@ -86,11 +84,12 @@ function normalizeCompleteRecipe(
     typeof recipe.commandInputTemplate === 'string'
       ? recipe.commandInputTemplate
       : DEFAULT_SOURCE_CONTROL_ACTION_COMMAND_TEMPLATES[actionId]
-  const agentArgs = typeof recipe.agentArgs === 'string' ? recipe.agentArgs.trim() : ''
+  const rawAgentArgs = recipe.agentArgs
+  const agentArgs = typeof rawAgentArgs === 'string' ? rawAgentArgs.trim() : undefined
   return {
     agentId: recipe.agentId ?? null,
     commandInputTemplate,
-    ...(agentArgs ? { agentArgs } : {})
+    ...(agentArgs !== undefined ? { agentArgs } : {})
   }
 }
 
@@ -125,9 +124,7 @@ export function normalizeWritableRepoSourceControlAiOverrides(
     }
   }
   if (readCompatible.modelOverridesByOperation) {
-    writable.modelOverridesByOperation = readCompatible.modelOverridesByOperation as Partial<
-      Record<SourceControlAiOperation, SourceControlAiModelChoice>
-    >
+    writable.modelOverridesByOperation = readCompatible.modelOverridesByOperation
   }
   const instructionsByOperation = normalizeStringRecord(readCompatible.instructionsByOperation)
   if (instructionsByOperation) {
@@ -196,7 +193,10 @@ export function saveSourceControlActionRecipe(
         ...(typeof input.customAgentCommand === 'string'
           ? { customAgentCommand: input.customAgentCommand }
           : {}),
-        actions: setSourceControlActionDefault(current.actions, input.actionId, savedRecipe)
+        actions: {
+          ...current.actions,
+          [input.actionId]: savedRecipe
+        }
       }
     }
   }

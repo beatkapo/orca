@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppState } from '@/store'
+import type * as TuiAgentSelectionModule from '../../../shared/tui-agent-selection'
+import type * as TuiAgentStartupModule from '@/lib/tui-agent-startup'
 
 const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
@@ -89,6 +91,25 @@ vi.mock('@/lib/telemetry', () => ({
   tuiAgentToAgentKind: (agent: string) => agent
 }))
 
+vi.mock('@/lib/tui-agent-startup', async () => {
+  const actual = await vi.importActual<typeof TuiAgentStartupModule>('@/lib/tui-agent-startup')
+  return {
+    ...actual,
+    buildAgentDraftLaunchPlan: vi.fn(actual.buildAgentDraftLaunchPlan),
+    buildAgentStartupPlan: vi.fn(actual.buildAgentStartupPlan)
+  }
+})
+
+vi.mock('../../../shared/tui-agent-selection', async () => {
+  const actual = await vi.importActual<typeof TuiAgentSelectionModule>(
+    '../../../shared/tui-agent-selection'
+  )
+  return {
+    ...actual,
+    pickTuiAgent: vi.fn(actual.pickTuiAgent)
+  }
+})
+
 import { launchWorkItemDirect } from './launch-work-item-direct'
 import { pasteDraftWhenAgentReady } from '@/lib/agent-paste-draft'
 import { buildAgentDraftLaunchPlan, buildAgentStartupPlan } from '@/lib/tui-agent-startup'
@@ -96,7 +117,7 @@ import { pickTuiAgent } from '../../../shared/tui-agent-selection'
 
 const mockApi = {
   worktrees: {
-    resolvePrBase: vi.fn()
+    resolvePrBase: mocks.resolvePrBase
   },
   agentTrust: {
     markTrusted: vi.fn()
@@ -110,6 +131,9 @@ describe('launchWorkItemDirect', () => {
       api: {
         worktrees: {
           resolvePrBase: mocks.resolvePrBase
+        },
+        agentTrust: {
+          markTrusted: mockApi.agentTrust.markTrusted
         }
       }
     })
@@ -143,17 +167,40 @@ describe('launchWorkItemDirect', () => {
         disabledTuiAgents: [],
         agentCmdOverrides: {}
       },
-      ensureDetectedAgents: vi.fn(async () => []),
-      ensureRemoteDetectedAgents: vi.fn(async () => []),
-      createWorktree: vi.fn(async () => ({
-        worktree: { id: 'wt-1', path: '/repo/../worktrees/fix' }
-      })),
-      updateWorktreeMeta: vi.fn(async () => undefined),
-      setSidebarOpen: vi.fn()
+      ensureDetectedAgents: mocks.ensureDetectedAgents,
+      ensureRemoteDetectedAgents: mocks.ensureRemoteDetectedAgents,
+      createWorktree: mocks.createWorktree,
+      updateWorktreeMeta: mocks.updateWorktreeMeta,
+      setSidebarOpen: mocks.setSidebarOpen
     } as typeof mocks.store
     // @ts-expect-error -- test shim
     globalThis.window = { api: mockApi }
     mockApi.agentTrust.markTrusted.mockResolvedValue(undefined)
+  })
+
+  it('rejects invalid per-launch CLI arguments before creating a workspace', async () => {
+    const { launchWorkItemDirect } = await import('./launch-work-item-direct')
+
+    await expect(
+      launchWorkItemDirect({
+        repoId: 'repo-1',
+        launchSource: 'task_page',
+        openModalFallback: vi.fn(),
+        agentArgs: '--model "unterminated',
+        item: {
+          type: 'issue',
+          number: 42,
+          title: 'Fix invalid saved launch args',
+          url: 'https://github.com/acme/repo/issues/42'
+        }
+      })
+    ).resolves.toBe(false)
+
+    expect(mocks.createWorktree).not.toHaveBeenCalled()
+    expect(mocks.ensureDetectedAgents).not.toHaveBeenCalled()
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      'CLI arguments are invalid: Unclosed quote in command template.'
+    )
   })
 
   it('passes a resolved PR branch override while using a short PR identity for workspace names', async () => {
@@ -244,9 +291,9 @@ describe('launchWorkItemDirect', () => {
     ] as AppState['repos']
     mocks.store.settings = { defaultTuiAgent: 'cursor' } as AppState['settings']
     mocks.store.ensureRemoteDetectedAgents.mockResolvedValue(['cursor'])
-    vi.mocked(pickTuiAgent).mockReturnValue('cursor')
-    vi.mocked(buildAgentDraftLaunchPlan).mockReturnValue(null)
-    vi.mocked(buildAgentStartupPlan).mockReturnValue({
+    vi.mocked(pickTuiAgent).mockReturnValueOnce('cursor')
+    vi.mocked(buildAgentDraftLaunchPlan).mockReturnValueOnce(null)
+    vi.mocked(buildAgentStartupPlan).mockReturnValueOnce({
       agent: 'cursor',
       launchCommand: 'cursor-agent',
       expectedProcess: 'cursor-agent',
@@ -293,6 +340,8 @@ describe('launchWorkItemDirect', () => {
       tabId: 'tab-1',
       content: 'https://github.com/acme/repo/issues/77',
       agent: 'cursor',
+      submit: false,
+      forcePaste: false,
       onTimeout: expect.any(Function)
     })
   })

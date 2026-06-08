@@ -252,9 +252,10 @@ export function renderSourceControlActionCommandTemplate(
   variables: Record<string, string | null | undefined>
 ): string {
   return template.replace(
-    /\{\{\s*([a-zA-Z][a-zA-Z0-9_]*)\s*\}\}|\{\s*([a-zA-Z][a-zA-Z0-9_]*)\s*\}/g,
+    /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}|\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}/g,
     (match, doubleName, singleName) => {
       const name = (doubleName ?? singleName) as string
+      // Why: placeholder names may start with letters or underscores.
       // Why: only own keys are real variables; inherited Object.prototype names
       // (e.g. `constructor`) must stay visible instead of rendering their value.
       if (!Object.prototype.hasOwnProperty.call(variables, name)) {

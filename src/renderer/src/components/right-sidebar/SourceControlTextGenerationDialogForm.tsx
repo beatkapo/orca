@@ -70,7 +70,7 @@ export function SourceControlTextGenerationDialogForm({
   onOpenChange,
   onSaveDefaults
 }: SourceControlTextGenerationDialogFormProps): React.JSX.Element {
-  const capabilities = useMemo(listCommitMessageAgentCapabilities, [])
+  const capabilities = useMemo(() => listCommitMessageAgentCapabilities(), [])
   const showCustomAgent = Boolean(
     baseParams && (isCustomAgentId(baseParams.agentId) || baseParams.customAgentCommand?.trim())
   )

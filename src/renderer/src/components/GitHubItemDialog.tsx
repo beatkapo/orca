@@ -3411,6 +3411,10 @@ function ChecksTab({
       if (started) {
         toast.success('Started an AI agent for the broken checks.')
       }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      console.error('Failed to start fix checks agent', err)
+      toast.error(`Failed to start an AI agent for the broken checks: ${message}`)
     } finally {
       setFixingChecks(false)
     }

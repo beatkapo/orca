@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import type React from 'react'
 import type { GlobalSettings, TuiAgent } from '../../../../shared/types'
 import type {
@@ -97,18 +98,24 @@ export function CommitMessageAiPane({
   const storeSearchQuery = useAppStore((s) => s.settingsSearchQuery)
   const searchQuery = settingsSearchQuery ?? storeSearchQuery
   const config = readSettings(settings)
+  const settingsWriteQueueRef = useRef<Promise<void>>(Promise.resolve())
 
   const localWriteConfig = (patch: SourceControlAiSettingsPatch): Promise<void> => {
-    const current = readSettings(settings)
-    const resolvedPatch = typeof patch === 'function' ? patch(current) : patch
-    return Promise.resolve(
-      updateSettings({
-        sourceControlAi: {
-          ...current,
-          ...resolvedPatch
-        }
+    const next = settingsWriteQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        const latestSettings = useAppStore.getState().settings ?? settings
+        const current = readSettings(latestSettings)
+        const resolvedPatch = typeof patch === 'function' ? patch(current) : patch
+        await updateSettings({
+          sourceControlAi: {
+            ...current,
+            ...resolvedPatch
+          }
+        })
       })
-    )
+    settingsWriteQueueRef.current = next
+    return next
   }
   const writeConfig = writeSourceControlAiSettings ?? localWriteConfig
 

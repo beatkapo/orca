@@ -216,7 +216,7 @@ describe('planCommitMessageGeneration', () => {
     })
   })
 
-  it('keeps per-action CLI arguments before a positional prompt', () => {
+  it('appends per-action CLI arguments for stdin agents', () => {
     const result = planCommitMessageGeneration(
       {
         agentId: 'opencode',
@@ -238,9 +238,51 @@ describe('planCommitMessageGeneration', () => {
           '--format',
           'default',
           '--model',
-          'opencode/gpt-5.5',
-          'PROMPT'
-        ]
+          'opencode/gpt-5.5'
+        ],
+        stdinPayload: 'PROMPT'
+      }
+    })
+  })
+
+  it('keeps custom per-action CLI arguments before a positional prompt', () => {
+    const result = planCommitMessageGeneration(
+      {
+        agentId: 'custom',
+        model: '',
+        customAgentCommand: 'agent --message {prompt}',
+        agentArgs: '--model gpt-5.5'
+      },
+      'PROMPT'
+    )
+
+    expect(result).toEqual({
+      ok: true,
+      plan: {
+        binary: 'agent',
+        args: ['--message', '--model', 'gpt-5.5', 'PROMPT'],
+        stdinPayload: null,
+        label: 'agent'
+      }
+    })
+  })
+
+  it('appends custom per-action CLI arguments when the prompt is sent on stdin', () => {
+    const result = planCommitMessageGeneration(
+      {
+        agentId: 'custom',
+        model: '',
+        customAgentCommand: 'agent --message',
+        agentArgs: '--model gpt-5.5'
+      },
+      'PROMPT'
+    )
+
+    expect(result).toMatchObject({
+      ok: true,
+      plan: {
+        args: ['--message', '--model', 'gpt-5.5'],
+        stdinPayload: 'PROMPT'
       }
     })
   })

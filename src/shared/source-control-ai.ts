@@ -1046,9 +1046,7 @@ function resolveActionRecipeForTextOperation(
   const repoTemplate =
     typeof repoRecipe?.commandInputTemplate === 'string'
       ? repoRecipe.commandInputTemplate.trim()
-      : repoRecipe?.commandInputTemplate === null
-        ? ''
-        : undefined
+      : undefined
   const repoAgentArgs =
     typeof repoRecipe?.agentArgs === 'string'
       ? repoRecipe.agentArgs.trim()
@@ -1114,16 +1112,21 @@ export function resolveSourceControlActionRecipe(input: {
   const repoRecipe = normalizeRepoSourceControlAiOverrides(input.repo?.sourceControlAi)
     ?.actionOverrides?.[input.actionId]
   if (!repoRecipe) {
-    return globalRecipe
+    return {
+      ...globalRecipe,
+      commandInputTemplate: resolveSourceControlActionCommandTemplate(
+        source.actions,
+        input.actionId
+      )
+    }
   }
   return {
     ...globalRecipe,
+    commandInputTemplate: resolveSourceControlActionCommandTemplate(source.actions, input.actionId),
     ...(repoRecipe.agentId !== undefined ? { agentId: repoRecipe.agentId } : {}),
     ...(typeof repoRecipe.commandInputTemplate === 'string'
       ? { commandInputTemplate: repoRecipe.commandInputTemplate.trim() }
-      : repoRecipe.commandInputTemplate === null
-        ? { commandInputTemplate: '' }
-        : {}),
+      : {}),
     ...(typeof repoRecipe.agentArgs === 'string'
       ? { agentArgs: repoRecipe.agentArgs.trim() }
       : repoRecipe.agentArgs === null

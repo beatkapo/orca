@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { CommitArea } from './SourceControl'
 import {
-  CommitArea,
   hasConfiguredCommitMessageGenerationDefaults,
   hasConfiguredSourceControlTextGenerationDefaults
-} from './SourceControl'
+} from './source-control-text-generation-defaults'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { resolvePrimaryAction, type PrimaryActionInputs } from './source-control-primary-action'
 import { resolveDropdownItems, type DropdownActionKind } from './source-control-dropdown-items'
@@ -170,7 +170,8 @@ describe('CommitArea AI generation', () => {
       aiAgentConfigured: true
     })
 
-    expect(markup.match(/aria-label="Generate commit message with AI"/g)).toHaveLength(1)
+    const matches = markup.match(/aria-label="Generate commit message with AI"/g) ?? []
+    expect(matches).toHaveLength(1)
     expect(markup).not.toContain('aria-label="Customize commit-message generation"')
     expect(markup).not.toContain('aria-label="Add commit message instructions"')
   })
@@ -247,6 +248,20 @@ describe('commit-message generation defaults', () => {
       hasConfiguredSourceControlTextGenerationDefaults({
         actionId: 'pullRequest',
         settings,
+        repo: null
+      })
+    ).toBe(false)
+
+    expect(
+      hasConfiguredSourceControlTextGenerationDefaults({
+        actionId: 'pullRequest',
+        settings: {
+          ...settings,
+          commitMessageAi: {
+            ...settings.commitMessageAi!,
+            agentId: 'codex'
+          }
+        },
         repo: null
       })
     ).toBe(false)

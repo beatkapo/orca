@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type React from 'react'
 import { Terminal } from 'lucide-react'
+import { toast } from 'sonner'
 import type { GlobalSettings, TuiAgent } from '../../../../shared/types'
 import type {
   SourceControlAiSettings,
@@ -127,16 +128,37 @@ export function SourceControlAiActionRecipeDefaults({
     [onCustomPromptDirtyChange]
   )
 
-  const onActionAgentChange = (actionId: SourceControlActionId, value: string): void => {
+  const onActionAgentChange = async (
+    actionId: SourceControlActionId,
+    value: string
+  ): Promise<void> => {
     const agentId =
       value === DEFAULT_AGENT_VALUE
         ? null
         : value === CUSTOM_AGENT_ID
           ? CUSTOM_AGENT_ID
           : (value as TuiAgent)
-    void writeConfig((current) => ({
-      actions: setSourceControlActionDefault(current.actions, actionId, { agentId })
-    }))
+    let previousActions = config.actions
+    try {
+      await writeConfig((current) => {
+        previousActions = current.actions
+        return {
+          actions: setSourceControlActionDefault(current.actions, actionId, { agentId })
+        }
+      })
+    } catch (error) {
+      console.error('Failed to save Source Control AI action agent default', error)
+      try {
+        await writeConfig({ actions: previousActions })
+      } catch (rollbackError) {
+        console.error('Failed to roll back Source Control AI action agent default', rollbackError)
+      }
+      toast.error(
+        `Failed to save Source Control AI action default: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      )
+    }
   }
 
   const onActionTemplateChange = (actionId: SourceControlActionId, value: string): void => {
@@ -300,7 +322,7 @@ export function SourceControlAiActionRecipeDefaults({
                 </div>
                 <Select
                   value={selectedAgent ?? DEFAULT_AGENT_VALUE}
-                  onValueChange={(value) => onActionAgentChange(actionId, value)}
+                  onValueChange={(value) => void onActionAgentChange(actionId, value)}
                 >
                   <SelectTrigger size="sm" className="h-8 w-full shrink-0 text-xs sm:w-[220px]">
                     <SelectValue />

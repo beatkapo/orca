@@ -2319,6 +2319,10 @@ describe('Store', () => {
     })
 
     expect(store.getRepo('r1')!.sourceControlAi).toBeUndefined()
+
+    store.flush()
+    const reloaded = await createStore()
+    expect(reloaded.getRepo('r1')!.sourceControlAi).toBeUndefined()
   })
 
   it('updateRepo normalizes source-control AI overrides before storing', async () => {

@@ -181,6 +181,76 @@ describe('source-control AI action recipes', () => {
     })
   })
 
+  it('lets repo text action null templates inherit global action templates', () => {
+    const base = settings()
+    base.sourceControlAi = {
+      ...base.sourceControlAi!,
+      actions: {
+        ...base.sourceControlAi!.actions,
+        commitMessage: {
+          commandInputTemplate: '{basePrompt}\n\nUse Conventional Commits.'
+        }
+      }
+    }
+
+    expect(
+      resolveSourceControlAiForOperation({
+        settings: base,
+        repo: {
+          sourceControlAi: {
+            actionOverrides: {
+              commitMessage: {
+                commandInputTemplate: null
+              }
+            }
+          }
+        },
+        operation: 'commitMessage',
+        discoveryHostKey: 'local'
+      })
+    ).toMatchObject({
+      ok: true,
+      value: {
+        params: {
+          commandInputTemplate: '{basePrompt}\n\nUse Conventional Commits.'
+        }
+      }
+    })
+  })
+
+  it('lets repo launch action null templates inherit resolved action templates', () => {
+    const base = settings()
+    base.sourceControlAi = {
+      ...base.sourceControlAi!,
+      actions: {
+        ...base.sourceControlAi!.actions,
+        fixChecks: {
+          agentId: 'claude',
+          commandInputTemplate: '{basePrompt}\n\nGlobal checks template.'
+        }
+      }
+    }
+
+    expect(
+      resolveSourceControlActionRecipe({
+        settings: base,
+        repo: {
+          sourceControlAi: {
+            actionOverrides: {
+              fixChecks: {
+                commandInputTemplate: null
+              }
+            }
+          }
+        },
+        actionId: 'fixChecks'
+      })
+    ).toEqual({
+      agentId: 'claude',
+      commandInputTemplate: '{basePrompt}\n\nGlobal checks template.'
+    })
+  })
+
   it('preserves existing action templates when legacy settings are only the rollback projection', () => {
     const source = {
       ...settings().sourceControlAi!,
