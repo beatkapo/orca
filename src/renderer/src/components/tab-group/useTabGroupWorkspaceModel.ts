@@ -26,6 +26,7 @@ import {
 import { closeTerminalTab } from '../terminal/terminal-tab-actions'
 import { openTabBarEntry, type TabCreateEntryArgs } from '../tab-bar/tab-create-entry-action'
 import { openMobileEmulatorTab } from '@/lib/open-mobile-emulator-tab'
+import { ensureSimulatorTab, getSimulatorTabForWorktree } from '@/lib/ensure-simulator-tab'
 
 export function recordTerminalTabGroupSplit(createdTerminal: TerminalTab | null | undefined): void {
   if (!createdTerminal) {
@@ -577,8 +578,11 @@ export function useTabGroupWorkspaceModel({
       },
       newSimulatorTab: worktreeState.mobileEmulatorEnabled
         ? () => {
+            if (getSimulatorTabForWorktree(worktreeId)) {
+              void ensureSimulatorTab(worktreeId, { surfacePane: true })
+              return
+            }
             // Why: mobile simulators are most useful beside the current tab group.
-            // Re-open is guarded as a no-op once a worktree emulator tab exists.
             void openMobileEmulatorTab(worktreeId, {
               placement: 'rightSplit',
               targetGroupId: groupId

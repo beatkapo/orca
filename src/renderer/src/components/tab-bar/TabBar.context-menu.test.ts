@@ -423,7 +423,7 @@ describe('TabBar context menu wiring', () => {
     expect(menuLabels[3]).toContain('New Browser Tab')
   })
 
-  it('disables New Mobile Emulator when the workspace already has one', async () => {
+  it('turns New Mobile Emulator into a go-to action when the workspace already has one', async () => {
     const onNewSimulatorTab = vi.fn()
     appStoreSnapshot.unifiedTabsByWorktree = {
       'wt-1': [
@@ -449,13 +449,19 @@ describe('TabBar context menu wiring', () => {
     })
 
     const emulatorItem = findChildrenByType(element, 'DropdownMenuItem').find((item) =>
-      extractText(item.props.children).includes('New Mobile Emulator')
+      extractText(item.props.children).includes('Go to Mobile Emulator')
     )
-    expect(emulatorItem?.props.disabled).toBe(true)
-    expect(emulatorItem?.props.onSelect).toBeUndefined()
+    expect(emulatorItem).toBeTruthy()
+    if (!emulatorItem) {
+      throw new Error('Go to Mobile Emulator menu item not rendered')
+    }
+    expect(emulatorItem.props.disabled).toBeUndefined()
+    expect(emulatorItem.props.onSelect).toBeTypeOf('function')
+    ;(emulatorItem.props.onSelect as () => void)()
+    expect(onNewSimulatorTab).toHaveBeenCalledTimes(1)
 
     const tooltip = findChildrenByType(element, 'TooltipContent').find((item) =>
-      extractText(item.props.children).includes('An emulator already exists in this workspace.')
+      extractText(item.props.children).includes('Open the existing emulator tab.')
     )
     expect(tooltip).toBeTruthy()
   })

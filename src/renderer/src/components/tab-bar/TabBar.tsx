@@ -63,7 +63,6 @@ type GitStatusEntries = ReturnType<typeof useAppStore.getState>['gitStatusByWork
 const EMPTY_GIT_STATUS_ENTRIES: GitStatusEntries = []
 const EMPTY_AGENT_CMD_OVERRIDES: Partial<Record<TuiAgent, string>> = {}
 const EMPTY_UNIFIED_TABS: readonly Tab[] = []
-const EMULATOR_EXISTS_TOOLTIP = 'An emulator already exists in this workspace.'
 
 type TabBarProps = {
   tabs: (TerminalTab & { unifiedTabId?: string })[]
@@ -498,19 +497,17 @@ function TabBarInner({
       workspaceHasSimulatorTab ? (
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="block">
-              <DropdownMenuItem
-                disabled
-                className="gap-2 rounded-[7px] px-2 py-1.5 text-[12px] leading-5 font-medium"
-              >
-                <Smartphone className="size-4 text-muted-foreground" />
-                New Mobile Emulator
-                <DropdownMenuShortcut>{newSimulatorShortcut}</DropdownMenuShortcut>
-              </DropdownMenuItem>
-            </span>
+            <DropdownMenuItem
+              onSelect={onNewSimulatorTab}
+              className="gap-2 rounded-[7px] px-2 py-1.5 text-[12px] leading-5 font-medium"
+            >
+              <Smartphone className="size-4 text-muted-foreground" />
+              Go to Mobile Emulator
+              <DropdownMenuShortcut>{newSimulatorShortcut}</DropdownMenuShortcut>
+            </DropdownMenuItem>
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={8} className="z-[80]">
-            {EMULATOR_EXISTS_TOOLTIP}
+            Open the existing emulator tab.
           </TooltipContent>
         </Tooltip>
       ) : (
