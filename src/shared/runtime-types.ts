@@ -808,6 +808,7 @@ export const COMPUTER_ERROR_CODES = {
   app_not_found: 'app_not_found',
   app_blocked: 'app_blocked',
   window_not_found: 'window_not_found',
+  window_not_focused: 'window_not_focused',
   window_stale: 'window_stale',
   provider_incompatible: 'provider_incompatible',
   unsupported_capability: 'unsupported_capability',
@@ -826,16 +827,6 @@ export type ComputerErrorCode = keyof typeof COMPUTER_ERROR_CODES
 
 export type ComputerAppQuery = string
 
-export type ComputerSessionTarget = {
-  session?: string
-  worktree?: string
-  app?: ComputerAppQuery
-}
-
-export type ComputerListAppsArgs = {
-  worktree?: string
-}
-
 export type ComputerAppInfo = {
   name: string
   bundleId: string | null
@@ -844,6 +835,7 @@ export type ComputerAppInfo = {
 
 export type ComputerWindowInfo = {
   id?: number | null
+  index?: number | null
   title: string
   x?: number | null
   y?: number | null
@@ -902,19 +894,27 @@ export type ComputerActionMetadata = {
   actionName?: string | null
   fallbackReason?: string | null
   targetWindowId?: number | null
+  targetWindowIndex?: number | null
   verification?: ComputerActionVerification
 }
 
 export type ComputerActionVerification =
   | {
       state: 'verified'
-      property: 'focusedText' | 'selection'
+      property: 'focusedText' | 'selection' | 'value'
       expected?: string | null
       actualPreview?: string | null
     }
   | {
       state: 'unverified'
-      reason: 'synthetic_input' | 'clipboard_paste' | 'provider_unavailable' | 'window_changed'
+      reason:
+        | 'synthetic_input'
+        | 'clipboard_paste'
+        | 'provider_unavailable'
+        | 'window_changed'
+        | 'value_mismatch'
+      expected?: string | null
+      actualPreview?: string | null
     }
 
 export type ComputerSnapshotResult = {

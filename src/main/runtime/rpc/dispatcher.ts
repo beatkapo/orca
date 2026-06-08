@@ -17,6 +17,7 @@ import type { TerminalStreamFrame } from '../../../shared/terminal-stream-protoc
 import type { FeatureInteractionId } from '../../../shared/feature-interactions'
 import { isBrowserPaneUiRuntimeRpcParams } from '../../../shared/runtime-rpc-feature-interaction-source'
 import {
+  computerErrorData,
   errorResponse,
   mapBrowserError,
   mapEmulatorError,
@@ -182,7 +183,7 @@ export class RpcDispatcher {
     const result = method.params.safeParse(rawParams)
     if (!result.success) {
       return {
-        error: errorResponse(request.id, meta, 'invalid_argument', formatZodError(result.error))
+        error: this.invalidArgumentResponse(request, meta, formatZodError(result.error))
       }
     }
     return { value: result.data }
@@ -200,9 +201,23 @@ export class RpcDispatcher {
       return mapEmulatorError(request.id, meta, error)
     }
     if (error instanceof ZodError) {
-      return errorResponse(request.id, meta, 'invalid_argument', formatZodError(error))
+      return this.invalidArgumentResponse(request, meta, formatZodError(error))
     }
     return mapRuntimeError(request.id, meta, error)
+  }
+
+  private invalidArgumentResponse(
+    request: RpcRequest,
+    meta: RpcEnvelopeMeta,
+    message: string
+  ): RpcResponse {
+    return errorResponse(
+      request.id,
+      meta,
+      'invalid_argument',
+      message,
+      request.method.startsWith('computer.') ? computerErrorData('invalid_argument') : undefined
+    )
   }
 
   private meta(): RpcEnvelopeMeta {

@@ -1073,6 +1073,9 @@ export function registerPtyHandlers(
   const PTY_RENDERER_IN_FLIGHT_HIGH_WATER_CHARS = 512 * 1024
   const PTY_RENDERER_TOTAL_IN_FLIGHT_HIGH_WATER_CHARS = 8 * 1024 * 1024
   const PTY_RENDERER_INTERACTIVE_RESERVE_CHARS = 256 * 1024
+  // Why: active panes need a bounded lane through old hidden bulk output so a
+  // keystroke redraw can reach the renderer before every background ACK lands.
+  const PTY_RENDERER_ACTIVE_PTY_IN_FLIGHT_RESERVE_CHARS = 512 * 1024
   // Why: keep the immediate path bounded to keystroke-sized TUI redraws;
   // large output and non-interactive output must still use the batcher.
   const INTERACTIVE_OUTPUT_WINDOW_MS = 100
@@ -1193,8 +1196,13 @@ export function registerPtyHandlers(
     const totalLimit =
       PTY_RENDERER_TOTAL_IN_FLIGHT_HIGH_WATER_CHARS +
       (options.interactive === true ? PTY_RENDERER_INTERACTIVE_RESERVE_CHARS : 0)
+    // Why: the reserve is per active PTY, not global; one active pane should
+    // stay responsive without letting every background pane burst past the cap.
+    const ptyLimit =
+      PTY_RENDERER_IN_FLIGHT_HIGH_WATER_CHARS +
+      (options.interactive === true ? PTY_RENDERER_ACTIVE_PTY_IN_FLIGHT_RESERVE_CHARS : 0)
     return (
-      (rendererInFlightCharsByPty.get(id) ?? 0) < PTY_RENDERER_IN_FLIGHT_HIGH_WATER_CHARS &&
+      (rendererInFlightCharsByPty.get(id) ?? 0) < ptyLimit &&
       rendererInFlightTotalChars < totalLimit
     )
   }
