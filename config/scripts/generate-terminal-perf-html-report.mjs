@@ -27,6 +27,19 @@ const SCENARIO_LABELS = [
   ['opencode-revisit-pressure', 'Revisit under pressure']
 ]
 
+const COMPARISON_METRICS = [
+  { key: 'medianMs', label: 'Median typing', suffix: 'ms', lowerIsBetter: true },
+  { key: 'worstMs', label: 'Worst typing', suffix: 'ms', lowerIsBetter: true },
+  { key: 'maxTimerDriftMs', label: 'Timer drift', suffix: 'ms', lowerIsBetter: true },
+  { key: 'scrollMs', label: 'Scroll', suffix: 'ms', lowerIsBetter: true },
+  { key: 'restoreMs', label: 'Restore', suffix: 'ms', lowerIsBetter: true },
+  { key: 'revisitMs', label: 'Revisit', suffix: 'ms', lowerIsBetter: true },
+  { key: 'rendererPeakQueuedChars', label: 'Renderer peak chars', lowerIsBetter: true },
+  { key: 'mainPeakInFlightChars', label: 'Main in-flight chars', lowerIsBetter: true },
+  { key: 'mainPeakPendingChars', label: 'Main pending chars', lowerIsBetter: true },
+  { key: 'rendererDroppedBacklogs', label: 'Renderer drops', lowerIsBetter: true }
+]
+
 export function parseHtmlReportArgs(argv, env = process.env) {
   const args = [...argv]
   if (args[0] === '--') {
@@ -241,6 +254,160 @@ function groupRows(rows) {
   ])
 }
 
+function sourceOrder(rows) {
+  return [...new Set(rows.map((row) => row.source))]
+}
+
+function comparisonKey(row) {
+  return [row.scenario, row.panes ?? '', row.frames ?? ''].join('|')
+}
+
+function comparisonLabel(row) {
+  const details = []
+  if (row.panes != null) {
+    details.push(`${row.panes} panes`)
+  }
+  if (row.frames != null) {
+    details.push(`${row.frames} frames`)
+  }
+  return `${row.scenario}${details.length > 0 ? ` (${details.join(', ')})` : ''}`
+}
+
+function collectPairComparisons(rows, fromSource, toSource) {
+  const bySourceAndKey = new Map()
+  for (const row of rows) {
+    bySourceAndKey.set(`${row.source}\0${comparisonKey(row)}`, row)
+  }
+  const comparisons = []
+  for (const row of rows) {
+    if (row.source !== toSource) {
+      continue
+    }
+    const before = bySourceAndKey.get(`${fromSource}\0${comparisonKey(row)}`)
+    if (!before) {
+      continue
+    }
+    for (const metric of COMPARISON_METRICS) {
+      const beforeValue = before[metric.key]
+      const afterValue = row[metric.key]
+      if (beforeValue == null || afterValue == null) {
+        continue
+      }
+      const delta = afterValue - beforeValue
+      const percent = beforeValue === 0 ? null : (delta / beforeValue) * 100
+      const improved = metric.lowerIsBetter ? delta < 0 : delta > 0
+      const regressed = metric.lowerIsBetter ? delta > 0 : delta < 0
+      comparisons.push({
+        before,
+        after: row,
+        metric,
+        beforeValue,
+        afterValue,
+        delta,
+        percent,
+        improved,
+        regressed
+      })
+    }
+  }
+  return comparisons.sort(
+    (a, b) =>
+      comparisonLabel(a.after).localeCompare(comparisonLabel(b.after)) ||
+      a.metric.label.localeCompare(b.metric.label)
+  )
+}
+
+function renderDelta(value, metric) {
+  const sign = value > 0 ? '+' : ''
+  return `${sign}${formatMetricValue(metric.key, value)}`
+}
+
+function renderPercent(value) {
+  if (value == null || !Number.isFinite(value)) {
+    return ''
+  }
+  const sign = value > 0 ? '+' : ''
+  return `${sign}${value.toFixed(1)}%`
+}
+
+function renderComparisonSummary(rows) {
+  const sources = sourceOrder(rows)
+  if (sources.length < 2) {
+    return ''
+  }
+  const first = sources[0]
+  const last = sources.at(-1)
+  const finalComparisons = collectPairComparisons(rows, first, last)
+  const changed = finalComparisons.filter((comparison) => comparison.delta !== 0)
+  const improved = changed.filter((comparison) => comparison.improved).length
+  const regressed = changed.filter((comparison) => comparison.regressed).length
+  const unchanged = finalComparisons.length - changed.length
+  const worstRegressions = finalComparisons
+    .filter((comparison) => comparison.regressed)
+    .sort((a, b) => Math.abs(b.percent ?? b.delta) - Math.abs(a.percent ?? a.delta))
+    .slice(0, 6)
+  return `<section>
+    <h2>Baseline To Final Impact</h2>
+    <p class="summary">Comparing <strong>${escapeHtml(first)}</strong> to <strong>${escapeHtml(last)}</strong> across matching scenario rows. Lower is better for all metrics in this section.</p>
+    <div class="cards">
+      <div class="card"><span>Compared metrics</span><strong>${finalComparisons.length}</strong></div>
+      <div class="card"><span>Improved</span><strong class="ok">${improved}</strong></div>
+      <div class="card"><span>Regressed</span><strong class="${regressed === 0 ? 'ok' : 'bad'}">${regressed}</strong></div>
+      <div class="card"><span>Unchanged</span><strong>${unchanged}</strong></div>
+    </div>
+    ${
+      worstRegressions.length === 0
+        ? '<p class="summary">No regressions found among matching baseline/final metrics.</p>'
+        : `<h3>Largest Regressions</h3>${renderComparisonTable(worstRegressions)}`
+    }
+    <h3>All Baseline To Final Deltas</h3>
+    ${renderComparisonTable(finalComparisons)}
+  </section>`
+}
+
+function renderIncrementalComparisons(rows) {
+  const sources = sourceOrder(rows)
+  if (sources.length < 3) {
+    return ''
+  }
+  const sections = []
+  for (let index = 1; index < sources.length; index += 1) {
+    const comparisons = collectPairComparisons(rows, sources[index - 1], sources[index])
+    const changed = comparisons.filter((comparison) => comparison.delta !== 0)
+    const improved = changed.filter((comparison) => comparison.improved).length
+    const regressed = changed.filter((comparison) => comparison.regressed).length
+    sections.push(`<details>
+      <summary>${escapeHtml(sources[index - 1])} → ${escapeHtml(sources[index])}: ${improved} improved, ${regressed} regressed</summary>
+      ${renderComparisonTable(comparisons)}
+    </details>`)
+  }
+  return `<section>
+    <h2>Incremental Stack Deltas</h2>
+    <p class="summary">Adjacent report comparisons show how each measured slice changed from the previous report.</p>
+    ${sections.join('')}
+  </section>`
+}
+
+function renderComparisonTable(comparisons) {
+  if (comparisons.length === 0) {
+    return '<p class="summary">No matching comparable metrics found.</p>'
+  }
+  const rows = comparisons
+    .map((comparison) => {
+      const direction = comparison.improved ? 'improved' : comparison.regressed ? 'regressed' : ''
+      return `<tr class="${direction}">
+        <td>${escapeHtml(comparisonLabel(comparison.after))}</td>
+        <td>${escapeHtml(comparison.metric.label)}</td>
+        <td>${escapeHtml(formatMetricValue(comparison.metric.key, comparison.beforeValue))}</td>
+        <td>${escapeHtml(formatMetricValue(comparison.metric.key, comparison.afterValue))}</td>
+        <td>${escapeHtml(renderDelta(comparison.delta, comparison.metric))}</td>
+        <td>${escapeHtml(renderPercent(comparison.percent))}</td>
+      </tr>`
+    })
+    .join('')
+  return `<table class="comparison"><thead><tr><th>Scenario</th><th>Metric</th><th>Before</th><th>After</th><th>Delta</th><th>Percent</th></tr></thead><tbody>${rows}</tbody></table>`
+}
+
 function chartSvg(title, rows, metrics) {
   const plotRows = rows.filter(
     (row) => row.panes != null && metrics.some((metric) => row[metric.key] != null)
@@ -386,6 +553,7 @@ function renderHtml({ generatedAt, inputPaths, rows }) {
     main { max-width: 1180px; margin: 0 auto; padding: 32px 20px 48px; }
     h1 { font-size: 28px; margin: 0 0 8px; }
     h2 { font-size: 20px; margin: 32px 0 12px; }
+    h3 { font-size: 15px; margin: 18px 0 8px; }
     .meta, .summary { color: var(--muted); }
     .cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin: 18px 0 24px; }
     .card, .chart { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
@@ -396,6 +564,11 @@ function renderHtml({ generatedAt, inputPaths, rows }) {
     th, td { border-bottom: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
     th { color: var(--muted); font-size: 12px; text-transform: uppercase; }
     tr.failed td:last-child { color: var(--bad); font-weight: 600; }
+    tr.improved td:nth-last-child(2), tr.improved td:last-child { color: var(--ok); font-weight: 600; }
+    tr.regressed td:nth-last-child(2), tr.regressed td:last-child { color: var(--bad); font-weight: 600; }
+    details { background: var(--card); border: 1px solid var(--line); border-radius: 8px; margin: 12px 0; padding: 10px 12px; }
+    summary { cursor: pointer; font-weight: 700; }
+    details table { margin-top: 12px; }
     .chart { margin: 14px 0; }
     .chart-title { font-weight: 700; margin-bottom: 8px; }
     svg { width: 100%; height: auto; overflow: visible; }
@@ -422,6 +595,8 @@ function renderHtml({ generatedAt, inputPaths, rows }) {
       <div class="card"><span>Max panes</span><strong>${Math.max(...rows.map((row) => row.panes ?? 0))}</strong></div>
       <div class="card"><span>Max renderer peak chars</span><strong>${formatLargeValue(Math.max(...rows.map((row) => row.rendererPeakQueuedChars ?? 0)))}</strong></div>
     </div>
+    ${renderComparisonSummary(rows)}
+    ${renderIncrementalComparisons(rows)}
     <h2>Impact Charts</h2>
     ${chartSections || '<p class="summary">No chartable pane-count rows were found.</p>'}
     <h2>Scenario Metrics</h2>

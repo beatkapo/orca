@@ -15,9 +15,13 @@ function makeTempDir() {
   return dir
 }
 
-function writeReport(annotationDescription, annotationType = 'opencode-scale-same-workspace-25') {
+function writeReport(
+  annotationDescription,
+  annotationType = 'opencode-scale-same-workspace-25',
+  reportName = 'report.json'
+) {
   const dir = makeTempDir()
-  const reportPath = join(dir, 'report.json')
+  const reportPath = join(dir, reportName)
   writeFileSync(
     reportPath,
     JSON.stringify({
@@ -130,6 +134,43 @@ describe('generate-terminal-perf-html-report', () => {
     expect(html).toContain('5 failures')
     expect(html).toContain('fail: Median typing 80.0ms &gt; 75.0ms')
     expect(html).toContain('Cross-workspace hidden panes')
+  })
+
+  it('renders baseline, final, and incremental deltas for multiple reports', () => {
+    const mainReport = writeReport(
+      'panes=25 median=50.0ms worst=120.0ms rendererDroppedBacklogs=0',
+      'opencode-scale-same-workspace-25',
+      'main.json'
+    )
+    const middleReport = writeReport(
+      'panes=25 median=30.0ms worst=140.0ms rendererDroppedBacklogs=0',
+      'opencode-scale-same-workspace-25',
+      'pty-backpressure.json'
+    )
+    const finalReport = writeReport(
+      'panes=25 median=20.0ms worst=100.0ms rendererDroppedBacklogs=0',
+      'opencode-scale-same-workspace-25',
+      'top-stack.json'
+    )
+    const outputPath = join(makeTempDir(), 'report.html')
+
+    const result = generateTerminalPerfHtmlReport({
+      inputPaths: [mainReport, middleReport, finalReport],
+      outputPath
+    })
+
+    const html = readFileSync(outputPath, 'utf8')
+    expect(result.rowCount).toBe(3)
+    expect(html).toContain('Baseline To Final Impact')
+    expect(html).toContain('main.json')
+    expect(html).toContain('top-stack.json')
+    expect(html).toContain('Incremental Stack Deltas')
+    expect(html).toContain('main.json → pty-backpressure.json')
+    expect(html).toContain('pty-backpressure.json → top-stack.json')
+    expect(html).toContain('-30.0ms')
+    expect(html).toContain('-60.0%')
+    expect(html).toContain('+20.0ms')
+    expect(html).toContain('+16.7%')
   })
 
   it('fails when reports contain no terminal perf annotations', () => {
