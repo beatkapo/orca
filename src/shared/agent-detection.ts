@@ -17,6 +17,7 @@ import {
 
 // Re-export so existing `agent-detection` importers keep working.
 export { AGENT_NAMES, titleHasAgentName } from './agent-name-token-match'
+export { isShellProcess } from './shell-process-detection'
 
 export type AgentStatus = 'working' | 'permission' | 'idle'
 
@@ -499,22 +500,4 @@ export function detectAgentStatusFromTitle(title: string): AgentStatus | null {
   }
 
   return null
-}
-
-// Why: shared between the runtime (dispatch guard, tui-idle fallback) and the
-// renderer (agent-ready-wait, new-workspace). A bare shell is the only process
-// type that garbles injected preambles, so this is the negative signal for
-// "is an agent running".
-const SHELL_NAMES = new Set(
-  '|bash|zsh|sh|fish|cmd|cmd.exe|powershell|powershell.exe|pwsh|pwsh.exe|nu'.split('|')
-)
-
-export function isShellProcess(processName: string): boolean {
-  const normalized = processName
-    .trim()
-    .replace(/^["']|["']$/g, '')
-    .toLowerCase()
-  return (
-    SHELL_NAMES.has(normalized) || SHELL_NAMES.has(normalized.split(/[\\/]/).pop() ?? normalized)
-  )
 }
