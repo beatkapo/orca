@@ -123,17 +123,79 @@ describe('RepositoryHostSetupsSection', () => {
 
     renderSection(localRepo)
 
-    const remoteHostRow = Array.from(container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('openclaw 2')
+    expect(container.textContent).toContain('openclaw 2')
+    const openButton = Array.from(container.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Open'
     )
-    expect(remoteHostRow).toBeTruthy()
+    expect(openButton).toBeTruthy()
 
     act(() => {
-      remoteHostRow?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      openButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
 
     expect(openSettingsPage).toHaveBeenCalledTimes(1)
     expect(openSettingsTarget).toHaveBeenCalledWith({ pane: 'repo', repoId: 'remote-repo' })
+  })
+
+  it('removes independent setup metadata instead of opening an empty repo target', async () => {
+    const deleteProjectHostSetup = vi.fn().mockResolvedValue({
+      project: makeProject({ id: 'github:stablyai/orca' }),
+      setup: makeSetup({
+        id: 'gpu-setup',
+        projectId: 'github:stablyai/orca',
+        repoId: '',
+        hostId: 'runtime:gpu',
+        path: ''
+      })
+    })
+    const openSettingsPage = vi.fn()
+    const openSettingsTarget = vi.fn()
+    const localRepo = makeRepo({
+      id: 'local-repo',
+      displayName: 'Orca',
+      path: '/Users/alice/orca'
+    })
+    useAppStore.setState({
+      repos: [localRepo],
+      projects: [makeProject({ id: 'github:stablyai/orca' })],
+      projectHostSetups: [
+        makeSetup({
+          id: 'local-repo',
+          projectId: 'github:stablyai/orca',
+          repoId: 'local-repo',
+          hostId: 'local',
+          path: '/Users/alice/orca'
+        }),
+        makeSetup({
+          id: 'gpu-setup',
+          projectId: 'github:stablyai/orca',
+          repoId: '',
+          hostId: 'runtime:gpu',
+          path: '',
+          setupState: 'setting-up',
+          setupMethod: 'provisioned'
+        })
+      ],
+      openSettingsPage,
+      openSettingsTarget,
+      deleteProjectHostSetup
+    })
+
+    renderSection(localRepo)
+
+    expect(container.textContent).toContain('Path pending')
+    const removeButton = Array.from(container.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Remove'
+    )
+    expect(removeButton).toBeTruthy()
+
+    await act(async () => {
+      removeButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(deleteProjectHostSetup).toHaveBeenCalledWith({ setupId: 'gpu-setup' })
+    expect(openSettingsPage).not.toHaveBeenCalled()
+    expect(openSettingsTarget).not.toHaveBeenCalled()
   })
 
   it('sets up the project on another known host from an existing folder path', async () => {

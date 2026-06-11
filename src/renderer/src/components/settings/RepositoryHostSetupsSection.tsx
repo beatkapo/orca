@@ -98,6 +98,7 @@ export function RepositoryHostSetupsSection({
   const openSettingsPage = useAppStore((state) => state.openSettingsPage)
   const openSettingsTarget = useAppStore((state) => state.openSettingsTarget)
   const setupProjectExistingFolder = useAppStore((state) => state.setupProjectExistingFolder)
+  const deleteProjectHostSetup = useAppStore((state) => state.deleteProjectHostSetup)
   const sshTargetLabels = useAppStore((state) => state.sshTargetLabels)
   const activeRuntimeEnvironmentId = useAppStore(
     (state) => state.settings?.activeRuntimeEnvironmentId
@@ -122,6 +123,7 @@ export function RepositoryHostSetupsSection({
   const [setupPath, setSetupPath] = useState('')
   const [setupKind, setSetupKind] = useState<'git' | 'folder'>('git')
   const [isSettingUp, setIsSettingUp] = useState(false)
+  const [deletingSetupId, setDeletingSetupId] = useState<string | null>(null)
   const setupTargetHostId = selectedSetupHostId ?? setupHostOptions[0]?.id ?? null
 
   if (
@@ -156,18 +158,15 @@ export function RepositoryHostSetupsSection({
       <div className="divide-y divide-border rounded-md border border-border">
         {projectHostSetups.map((setup) => {
           const isCurrentSetup = setup.repoId === repo.id
+          const canOpenSetup = setup.repoId.trim().length > 0
+          const canRemoveSetup = !canOpenSetup && deletingSetupId !== setup.id
           return (
-            <button
+            <div
               key={setup.id}
-              type="button"
               className={cn(
                 'flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors',
-                isCurrentSetup ? 'bg-muted/30' : 'hover:bg-muted/40'
+                isCurrentSetup ? 'bg-muted/30' : ''
               )}
-              onClick={() => {
-                openSettingsPage()
-                openSettingsTarget({ pane: 'repo', repoId: setup.repoId })
-              }}
             >
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-2">
@@ -179,7 +178,11 @@ export function RepositoryHostSetupsSection({
                   </SettingsBadge>
                 </div>
                 <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
-                  {setup.path}
+                  {setup.path ||
+                    translate(
+                      'auto.components.settings.RepositoryPane.setupPathPending',
+                      'Path pending'
+                    )}
                 </p>
               </div>
               {isCurrentSetup ? (
@@ -187,7 +190,34 @@ export function RepositoryHostSetupsSection({
                   {translate('auto.components.settings.RepositoryPane.currentSetup', 'Current')}
                 </SettingsBadge>
               ) : null}
-            </button>
+              {!isCurrentSetup && canOpenSetup ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    openSettingsPage()
+                    openSettingsTarget({ pane: 'repo', repoId: setup.repoId })
+                  }}
+                >
+                  {translate('auto.components.settings.RepositoryPane.openSetup', 'Open')}
+                </Button>
+              ) : null}
+              {canRemoveSetup ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    setDeletingSetupId(setup.id)
+                    await deleteProjectHostSetup({ setupId: setup.id })
+                    setDeletingSetupId(null)
+                  }}
+                >
+                  {translate('auto.components.settings.RepositoryPane.removeSetup', 'Remove')}
+                </Button>
+              ) : null}
+            </div>
           )
         })}
       </div>
