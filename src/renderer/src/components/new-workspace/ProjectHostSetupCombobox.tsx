@@ -4,24 +4,19 @@ import { Button } from '@/components/ui/button'
 import { Command, CommandEmpty, CommandItem, CommandList } from '@/components/ui/command'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
-import type {
-  NeedsSetupProjectHostOption,
-  ProjectHostSetupOption
-} from '@/lib/project-host-setup-options'
+import type { ProjectHostSetupOption } from '@/lib/project-host-setup-options'
 import { translate } from '@/i18n/i18n'
 
 type ProjectHostSetupComboboxProps = {
   options: readonly ProjectHostSetupOption[]
   value: string | null
   onValueChange: (setupId: string) => void
-  onNeedsSetupHostSelect?: (option: NeedsSetupProjectHostOption) => void
 }
 
 export default function ProjectHostSetupCombobox({
   options,
   value,
-  onValueChange,
-  onNeedsSetupHostSelect
+  onValueChange
 }: ProjectHostSetupComboboxProps): React.JSX.Element {
   const [open, setOpen] = React.useState(false)
   const readyOptions = options.filter((option) => option.kind === 'ready')
@@ -33,21 +28,13 @@ export default function ProjectHostSetupCombobox({
       if (!option) {
         return
       }
-      if (option.kind === 'needs-setup') {
-        if (!option.isAvailable) {
-          return
-        }
-        onNeedsSetupHostSelect?.(option)
-        setOpen(false)
-        return
-      }
       if (!readyOptions.some((candidate) => candidate.id === setupId)) {
         return
       }
       onValueChange(setupId)
       setOpen(false)
     },
-    [onNeedsSetupHostSelect, onValueChange, options, readyOptions]
+    [onValueChange, options, readyOptions]
   )
 
   return (
@@ -88,12 +75,11 @@ export default function ProjectHostSetupCombobox({
                 'No hosts are ready for this project.'
               )}
             </CommandEmpty>
-            {options.map((option) => (
+            {readyOptions.map((option) => (
               <CommandItem
                 key={option.id}
                 value={option.id}
                 onSelect={() => handleSelect(option.id)}
-                disabled={option.kind === 'needs-setup' && !option.isAvailable}
                 className="items-center gap-2 px-3 py-2"
               >
                 <Check
@@ -106,7 +92,7 @@ export default function ProjectHostSetupCombobox({
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm">{option.label}</div>
                   <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                    {option.kind === 'ready' ? option.path : option.detail}
+                    {option.path}
                   </div>
                 </div>
               </CommandItem>

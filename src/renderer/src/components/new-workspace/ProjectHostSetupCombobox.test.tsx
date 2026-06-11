@@ -89,11 +89,9 @@ afterEach(() => {
 })
 
 function renderCombobox({
-  onValueChange = vi.fn(),
-  onNeedsSetupHostSelect = vi.fn()
+  onValueChange = vi.fn()
 }: {
   onValueChange?: (setupId: string) => void
-  onNeedsSetupHostSelect?: (option: NeedsSetupProjectHostOption) => void
 } = {}): void {
   act(() => {
     root.render(
@@ -101,7 +99,6 @@ function renderCombobox({
         options={[readyOption, needsSetupOption]}
         value={readyOption.id}
         onValueChange={onValueChange}
-        onNeedsSetupHostSelect={onNeedsSetupHostSelect}
       />
     )
   })
@@ -110,9 +107,8 @@ function renderCombobox({
 describe('ProjectHostSetupCombobox', () => {
   it('routes ready setup rows through onValueChange', () => {
     const onValueChange = vi.fn()
-    const onNeedsSetupHostSelect = vi.fn()
 
-    renderCombobox({ onValueChange, onNeedsSetupHostSelect })
+    renderCombobox({ onValueChange })
 
     act(() => {
       container
@@ -121,28 +117,22 @@ describe('ProjectHostSetupCombobox', () => {
     })
 
     expect(onValueChange).toHaveBeenCalledWith('local-setup')
-    expect(onNeedsSetupHostSelect).not.toHaveBeenCalled()
   })
 
-  it('routes hosts that need setup through onNeedsSetupHostSelect', () => {
+  it('hides hosts that need setup from the run target list', () => {
     const onValueChange = vi.fn()
-    const onNeedsSetupHostSelect = vi.fn()
 
-    renderCombobox({ onValueChange, onNeedsSetupHostSelect })
+    renderCombobox({ onValueChange })
 
-    act(() => {
-      container
-        .querySelector<HTMLButtonElement>('[data-command-value="needs-setup:ssh:builder"]')
-        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
-
+    expect(
+      container.querySelector<HTMLButtonElement>('[data-command-value="needs-setup:ssh:builder"]')
+    ).toBeNull()
+    expect(container.textContent).not.toContain('Project not set up on this host')
     expect(onValueChange).not.toHaveBeenCalled()
-    expect(onNeedsSetupHostSelect).toHaveBeenCalledWith(needsSetupOption)
   })
 
-  it('keeps unavailable setup rows visible but not selectable', () => {
+  it('hides unavailable setup rows from the run target list', () => {
     const onValueChange = vi.fn()
-    const onNeedsSetupHostSelect = vi.fn()
 
     act(() => {
       root.render(
@@ -150,7 +140,6 @@ describe('ProjectHostSetupCombobox', () => {
           options={[readyOption, unavailableOption]}
           value={readyOption.id}
           onValueChange={onValueChange}
-          onNeedsSetupHostSelect={onNeedsSetupHostSelect}
         />
       )
     })
@@ -158,14 +147,9 @@ describe('ProjectHostSetupCombobox', () => {
     const unavailableButton = container.querySelector<HTMLButtonElement>(
       '[data-command-value="needs-setup:runtime:old"]'
     )
-    expect(unavailableButton?.textContent).toContain('Update Orca on this host')
-    expect(unavailableButton?.disabled).toBe(true)
-
-    act(() => {
-      unavailableButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-    })
+    expect(unavailableButton).toBeNull()
+    expect(container.textContent).not.toContain('Update Orca on this host')
 
     expect(onValueChange).not.toHaveBeenCalled()
-    expect(onNeedsSetupHostSelect).not.toHaveBeenCalled()
   })
 })

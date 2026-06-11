@@ -428,13 +428,24 @@ export default function NewWorkspaceComposerCard({
     openModal('add-repo')
   }, [openModal])
   const projectDescriptionId = React.useId()
+  const readyProjectHostSetupOptions = React.useMemo(
+    () => projectHostSetupOptions.filter((option) => option.kind === 'ready'),
+    [projectHostSetupOptions]
+  )
+  const availableNeedsSetupHostOptions = React.useMemo(
+    () =>
+      projectHostSetupOptions.filter(
+        (option): option is NeedsSetupProjectHostOption =>
+          option.kind === 'needs-setup' && option.isAvailable
+      ),
+    [projectHostSetupOptions]
+  )
   const pendingSetupHostOption = React.useMemo(
     () =>
-      projectHostSetupOptions.find(
-        (option): option is NeedsSetupProjectHostOption =>
-          option.kind === 'needs-setup' && option.id === pendingSetupHostOptionId
+      availableNeedsSetupHostOptions.find(
+        (option): option is NeedsSetupProjectHostOption => option.id === pendingSetupHostOptionId
       ) ?? null,
-    [pendingSetupHostOptionId, projectHostSetupOptions]
+    [availableNeedsSetupHostOptions, pendingSetupHostOptionId]
   )
   const handleProjectHostSetupChange = React.useCallback(
     (setupId: string): void => {
@@ -449,6 +460,15 @@ export default function NewWorkspaceComposerCard({
       setPendingCloneUrl(projectHostCloneUrl ?? '')
     },
     [projectHostCloneUrl]
+  )
+  const handleNeedsSetupHostSelectById = React.useCallback(
+    (optionId: string): void => {
+      const option = availableNeedsSetupHostOptions.find((candidate) => candidate.id === optionId)
+      if (option) {
+        handleNeedsSetupHostSelect(option)
+      }
+    },
+    [availableNeedsSetupHostOptions, handleNeedsSetupHostSelect]
   )
   const handleImportExistingFolder = React.useCallback(async (): Promise<void> => {
     if (!pendingSetupHostOption || !pendingSetupPath.trim()) {
@@ -586,143 +606,183 @@ export default function NewWorkspaceComposerCard({
                 )}
             </p>
           ) : null}
-          {projectHostSetupOptions.length > 1 ? (
+          {readyProjectHostSetupOptions.length > 1 ? (
             <div className="space-y-1">
               <label className="block min-w-0 truncate text-xs font-medium text-muted-foreground">
                 {translate('auto.components.NewWorkspaceComposerCard.runOn', 'Run on')}
               </label>
               <ProjectHostSetupCombobox
-                options={projectHostSetupOptions}
+                options={readyProjectHostSetupOptions}
                 value={selectedProjectHostSetupId}
                 onValueChange={handleProjectHostSetupChange}
-                onNeedsSetupHostSelect={handleNeedsSetupHostSelect}
               />
-              {pendingSetupHostOption ? (
-                <div className="space-y-2 rounded-md border border-border bg-muted/20 p-2.5">
-                  <div className="text-xs font-medium text-foreground">
-                    {translate(
-                      'auto.components.NewWorkspaceComposerCard.setupHostExistingFolderTitle',
-                      'Set up {{value0}}',
-                      { value0: pendingSetupHostOption.label }
-                    )}
-                  </div>
-                  {canClonePendingSetup ? (
-                    <div className="space-y-2 rounded-sm border border-border/70 bg-background/50 p-2">
-                      <div className="text-[11px] font-medium text-muted-foreground">
-                        {translate(
-                          'auto.components.NewWorkspaceComposerCard.cloneProjectOnHost',
-                          'Clone project'
-                        )}
-                      </div>
-                      <Input
-                        value={pendingCloneUrl}
-                        onChange={(event) => setPendingCloneUrl(event.target.value)}
-                        placeholder={translate(
-                          'auto.components.NewWorkspaceComposerCard.cloneUrlPlaceholder',
-                          'https://github.com/owner/repo.git'
-                        )}
-                        className="h-8 min-w-0 text-xs"
-                      />
-                      <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                        <Input
-                          value={pendingCloneDestination}
-                          onChange={(event) => setPendingCloneDestination(event.target.value)}
-                          placeholder={translate(
-                            'auto.components.NewWorkspaceComposerCard.cloneDestinationPlaceholder',
-                            '/parent/directory/on/host'
-                          )}
-                          className="h-8 min-w-0 text-xs"
-                        />
-                        <Button
-                          type="button"
-                          size="xs"
-                          disabled={
-                            !pendingCloneUrl.trim() ||
-                            !pendingCloneDestination.trim() ||
-                            pendingCloneImporting
-                          }
-                          onClick={() => void handleCloneProjectHost()}
-                          className="shrink-0"
-                        >
-                          {pendingCloneImporting
-                            ? translate(
-                                'auto.components.NewWorkspaceComposerCard.cloningHostSetup',
-                                'Cloning...'
-                              )
-                            : translate(
-                                'auto.components.NewWorkspaceComposerCard.cloneHostSetup',
-                                'Clone'
-                              )}
-                        </Button>
-                      </div>
-                    </div>
-                  ) : null}
+            </div>
+          ) : null}
+          {availableNeedsSetupHostOptions.length > 0 ? (
+            <div className="space-y-1">
+              {availableNeedsSetupHostOptions.length === 1 ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 justify-start px-0 text-xs text-muted-foreground hover:bg-transparent hover:text-foreground"
+                  onClick={() => handleNeedsSetupHostSelect(availableNeedsSetupHostOptions[0])}
+                >
+                  <FolderPlus className="mr-1.5 size-3.5" />
+                  {translate(
+                    'auto.components.NewWorkspaceComposerCard.setupOnHost',
+                    'Set up on {{value0}}',
+                    { value0: availableNeedsSetupHostOptions[0].label }
+                  )}
+                </Button>
+              ) : (
+                <Select
+                  value={pendingSetupHostOption?.id}
+                  onValueChange={handleNeedsSetupHostSelectById}
+                >
+                  <SelectTrigger className="h-8 min-w-0 text-xs text-muted-foreground">
+                    <SelectValue
+                      placeholder={translate(
+                        'auto.components.NewWorkspaceComposerCard.setupOnAnotherHost',
+                        'Set up on another host...'
+                      )}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableNeedsSetupHostOptions.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          ) : null}
+          {pendingSetupHostOption ? (
+            <div className="space-y-2 rounded-md border border-border bg-muted/20 p-2.5">
+              <div className="text-xs font-medium text-foreground">
+                {translate(
+                  'auto.components.NewWorkspaceComposerCard.setupHostExistingFolderTitle',
+                  'Set up {{value0}}',
+                  { value0: pendingSetupHostOption.label }
+                )}
+              </div>
+              {canClonePendingSetup ? (
+                <div className="space-y-2 rounded-sm border border-border/70 bg-background/50 p-2">
                   <div className="text-[11px] font-medium text-muted-foreground">
                     {translate(
-                      'auto.components.NewWorkspaceComposerCard.importExistingFolderOnHost',
-                      'Import existing folder'
+                      'auto.components.NewWorkspaceComposerCard.cloneProjectOnHost',
+                      'Clone project'
                     )}
                   </div>
-                  <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_7rem]">
+                  <Input
+                    value={pendingCloneUrl}
+                    onChange={(event) => setPendingCloneUrl(event.target.value)}
+                    placeholder={translate(
+                      'auto.components.NewWorkspaceComposerCard.cloneUrlPlaceholder',
+                      'https://github.com/owner/repo.git'
+                    )}
+                    className="h-8 min-w-0 text-xs"
+                  />
+                  <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
                     <Input
-                      value={pendingSetupPath}
-                      onChange={(event) => setPendingSetupPath(event.target.value)}
+                      value={pendingCloneDestination}
+                      onChange={(event) => setPendingCloneDestination(event.target.value)}
                       placeholder={translate(
-                        'auto.components.NewWorkspaceComposerCard.setupHostExistingFolderPlaceholder',
-                        '/path/to/project/on/host'
+                        'auto.components.NewWorkspaceComposerCard.cloneDestinationPlaceholder',
+                        '/parent/directory/on/host'
                       )}
                       className="h-8 min-w-0 text-xs"
                     />
-                    <Select
-                      value={pendingSetupKind}
-                      onValueChange={(value) => setPendingSetupKind(value as 'git' | 'folder')}
-                    >
-                      <SelectTrigger className="h-8 min-w-0 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="git">
-                          {translate(
-                            'auto.components.NewWorkspaceComposerCard.setupKindGit',
-                            'Git repo'
-                          )}
-                        </SelectItem>
-                        <SelectItem value="folder">
-                          {translate(
-                            'auto.components.NewWorkspaceComposerCard.setupKindFolder',
-                            'Folder'
-                          )}
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="min-w-0 text-[11px] text-muted-foreground">
-                      {translate(
-                        'auto.components.NewWorkspaceComposerCard.setupHostExistingFolderHelp',
-                        'Link a checkout that already exists there, then create this workspace on that host.'
-                      )}
-                    </p>
                     <Button
                       type="button"
                       size="xs"
-                      disabled={!pendingSetupPath.trim() || pendingSetupImporting}
-                      onClick={() => void handleImportExistingFolder()}
+                      disabled={
+                        !pendingCloneUrl.trim() ||
+                        !pendingCloneDestination.trim() ||
+                        pendingCloneImporting
+                      }
+                      onClick={() => void handleCloneProjectHost()}
                       className="shrink-0"
                     >
-                      {pendingSetupImporting
+                      {pendingCloneImporting
                         ? translate(
-                            'auto.components.NewWorkspaceComposerCard.importingHostSetup',
-                            'Importing...'
+                            'auto.components.NewWorkspaceComposerCard.cloningHostSetup',
+                            'Cloning...'
                           )
                         : translate(
-                            'auto.components.NewWorkspaceComposerCard.importHostSetup',
-                            'Import'
+                            'auto.components.NewWorkspaceComposerCard.cloneHostSetup',
+                            'Clone'
                           )}
                     </Button>
                   </div>
                 </div>
               ) : null}
+              <div className="text-[11px] font-medium text-muted-foreground">
+                {translate(
+                  'auto.components.NewWorkspaceComposerCard.importExistingFolderOnHost',
+                  'Import existing folder'
+                )}
+              </div>
+              <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_7rem]">
+                <Input
+                  value={pendingSetupPath}
+                  onChange={(event) => setPendingSetupPath(event.target.value)}
+                  placeholder={translate(
+                    'auto.components.NewWorkspaceComposerCard.setupHostExistingFolderPlaceholder',
+                    '/path/to/project/on/host'
+                  )}
+                  className="h-8 min-w-0 text-xs"
+                />
+                <Select
+                  value={pendingSetupKind}
+                  onValueChange={(value) => setPendingSetupKind(value as 'git' | 'folder')}
+                >
+                  <SelectTrigger className="h-8 min-w-0 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="git">
+                      {translate(
+                        'auto.components.NewWorkspaceComposerCard.setupKindGit',
+                        'Git repo'
+                      )}
+                    </SelectItem>
+                    <SelectItem value="folder">
+                      {translate(
+                        'auto.components.NewWorkspaceComposerCard.setupKindFolder',
+                        'Folder'
+                      )}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <p className="min-w-0 text-[11px] text-muted-foreground">
+                  {translate(
+                    'auto.components.NewWorkspaceComposerCard.setupHostExistingFolderHelp',
+                    'Link a checkout that already exists there, then create this workspace on that host.'
+                  )}
+                </p>
+                <Button
+                  type="button"
+                  size="xs"
+                  disabled={!pendingSetupPath.trim() || pendingSetupImporting}
+                  onClick={() => void handleImportExistingFolder()}
+                  className="shrink-0"
+                >
+                  {pendingSetupImporting
+                    ? translate(
+                        'auto.components.NewWorkspaceComposerCard.importingHostSetup',
+                        'Importing...'
+                      )
+                    : translate(
+                        'auto.components.NewWorkspaceComposerCard.importHostSetup',
+                        'Import'
+                      )}
+                </Button>
+              </div>
             </div>
           ) : null}
           {selectedRepoRequiresConnection && selectedRepoConnectionId ? (
