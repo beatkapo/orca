@@ -21,6 +21,8 @@ import {
   resolveCurrentWorktreeSelector
 } from '../selectors'
 import { isTuiAgent } from '../../shared/tui-agent-config'
+import { isWorkspaceKey } from '../../shared/workspace-scope'
+import { printLineageSummary } from './worktree-lineage-summary'
 
 type HookWarningResult = {
   warning?: string
@@ -46,37 +48,23 @@ function printPreservedBranchWarning(result: PreservedBranchResult, json: boolea
   }
 }
 
-function printLineageSummary(result: RuntimeWorktreeCreateResult, json: boolean): void {
-  if (json) {
-    return
-  }
-  for (const warning of result.warnings ?? []) {
-    console.error(`warning: ${warning.message}`)
-  }
-  if (result.lineage) {
-    const source =
-      result.lineage.capture.source === 'terminal-context'
-        ? 'terminal'
-        : result.lineage.capture.source === 'cwd-context'
-          ? 'cwd'
-          : result.lineage.capture.source === 'orchestration-context'
-            ? 'orchestration'
-            : result.lineage.capture.source === 'explicit-cli-flag'
-              ? 'explicit flag'
-              : 'manual action'
-    console.error(
-      `parent: ${result.lineage.parentWorktreeId} (${result.lineage.capture.confidence} from ${source})`
-    )
-  } else {
-    console.error('parent: none')
-  }
-}
-
 function assertParentFlagsCompatible(flags: Map<string, string | boolean>): void {
   if (flags.has('parent-worktree') && flags.get('no-parent') === true) {
     throw new RuntimeClientError(
       'invalid_argument',
       'Choose either --parent-worktree or --no-parent, not both.'
+    )
+  }
+  if (flags.has('parent-workspace') && flags.get('no-parent') === true) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      'Choose either --parent-workspace or --no-parent, not both.'
+    )
+  }
+  if (flags.has('parent-workspace') && flags.has('parent-worktree')) {
+    throw new RuntimeClientError(
+      'invalid_argument',
+      'Choose either --parent-workspace or --parent-worktree, not both.'
     )
   }
   const parentWorktree = flags.get('parent-worktree')
@@ -86,6 +74,25 @@ function assertParentFlagsCompatible(flags: Map<string, string | boolean>): void
   ) {
     throw new RuntimeClientError('invalid_argument', 'Missing required --parent-worktree')
   }
+  const parentWorkspace = flags.get('parent-workspace')
+  if (
+    flags.has('parent-workspace') &&
+    (typeof parentWorkspace !== 'string' || parentWorkspace === '')
+  ) {
+    throw new RuntimeClientError('invalid_argument', 'Missing required --parent-workspace')
+  }
+}
+
+function getEnvParentWorkspace(): string | undefined {
+  const workspaceId = process.env.ORCA_WORKSPACE_ID
+  if (typeof workspaceId === 'string' && isWorkspaceKey(workspaceId)) {
+    return workspaceId
+  }
+  const worktreeId = process.env.ORCA_WORKTREE_ID
+  if (typeof worktreeId === 'string' && isWorkspaceKey(worktreeId)) {
+    return worktreeId
+  }
+  return undefined
 }
 
 function getPresentStringFlag(
@@ -205,11 +212,13 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
       cwd,
       client
     )
+    const explicitParentWorkspace = getPresentStringFlag(flags, 'parent-workspace')
+    const envParentWorkspace = getEnvParentWorkspace()
     const startupAgent = getOptionalStartupAgent(flags)
     const setupDecision = getOptionalSetupDecision(flags)
     const noParent = flags.get('no-parent') === true
     let cwdParentWorktree: string | undefined
-    if ((!explicitParentWorktree && !noParent) || !flags.has('repo')) {
+    if ((!explicitParentWorktree && !explicitParentWorkspace && !noParent) || !flags.has('repo')) {
       try {
         // Why: agent shells can lose ORCA_TERMINAL_HANDLE while still running
         // inside an Orca worktree. Cwd keeps CLI-created children nestable and
@@ -230,6 +239,8 @@ export const WORKTREE_HANDLERS: Record<string, CommandHandler> = {
         flags.get('activate') === true || flags.get('run-hooks') === true || Boolean(startupAgent),
       ...(setupDecision ? { setupDecision } : {}),
       parentWorktree: explicitParentWorktree,
+      ...(explicitParentWorkspace ? { parentWorkspace: explicitParentWorkspace } : {}),
+      ...(envParentWorkspace ? { envParentWorkspace } : {}),
       ...(cwdParentWorktree ? { cwdParentWorktree } : {}),
       noParent,
       callerTerminalHandle,

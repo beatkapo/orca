@@ -62,6 +62,7 @@ function runtimeScopedStateReset(): Partial<AppState> {
     worktreesByRepo: {},
     detectedWorktreesByRepo: {},
     worktreeLineageById: {},
+    workspaceLineageByChildKey: {},
     activeWorktreeId: null,
     activeWorkspaceKey: null,
     deleteStateByWorktreeId: {},

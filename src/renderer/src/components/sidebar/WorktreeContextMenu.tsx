@@ -43,7 +43,11 @@ import { getWorkspaceStatus, getWorkspaceStatusVisualMeta } from './workspace-st
 import { WorktreeOpenInSubMenu } from './WorktreeOpenInMenu'
 import { ProjectGroupNameDialog } from './ProjectGroupNameDialog'
 import { translate } from '@/i18n/i18n'
-import { folderWorkspaceKey, parseWorkspaceKey } from '../../../../shared/workspace-scope'
+import {
+  folderWorkspaceKey,
+  parseWorkspaceKey,
+  worktreeWorkspaceKey
+} from '../../../../shared/workspace-scope'
 
 type Props = {
   worktree: Worktree
@@ -232,6 +236,7 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
   const repoMap = useRepoMap()
   const worktreeMap = useWorktreeMap()
   const worktreeLineageById = useAppStore((s) => s.worktreeLineageById)
+  const workspaceLineageByChildKey = useAppStore((s) => s.workspaceLineageByChildKey)
   const updateWorktreeLineage = useAppStore((s) => s.updateWorktreeLineage)
   const tabsByWorktree = useAppStore((s) => s.tabsByWorktree)
   const ptyIdsByTabId = useAppStore((s) => s.ptyIdsByTabId)
@@ -283,6 +288,7 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
       ? `Delete ${batchDeleteWorktrees.length} Workspace${batchDeleteWorktrees.length === 1 ? '' : 's'}`
       : 'Delete Selected'
   const lineage = worktreeLineageById[worktree.id]
+  const workspaceLineage = workspaceLineageByChildKey[worktreeWorkspaceKey(worktree.id)]
   // Why: path-derived worktree IDs can be reused. The menu must honor the same
   // instance check as grouped rows before offering navigation to a parent.
   const lineageInfo = useMemo(
@@ -290,7 +296,10 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
     [worktree, worktreeLineageById, worktreeMap]
   )
   const validParentWorktreeId = lineageInfo.state === 'valid' ? lineageInfo.parent.id : null
-  const hasAnyContextLineage = activeContextWorktrees.some((item) => worktreeLineageById[item.id])
+  const hasAnyContextLineage = activeContextWorktrees.some(
+    (item) =>
+      worktreeLineageById[item.id] || workspaceLineageByChildKey[worktreeWorkspaceKey(item.id)]
+  )
 
   const setMenuOpenState = useCallback(
     (open: boolean) => {
@@ -604,7 +613,7 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
                 </>
               ) : null}
               <DropdownMenuSeparator />
-              {(validParentWorktreeId || lineage) && (
+              {(validParentWorktreeId || lineage || workspaceLineage) && (
                 <>
                   {validParentWorktreeId && (
                     <DropdownMenuItem onSelect={handleOpenParent} disabled={isDeleting}>
@@ -615,7 +624,7 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
                       )}
                     </DropdownMenuItem>
                   )}
-                  {lineage && (
+                  {(lineage || workspaceLineage) && (
                     <DropdownMenuItem onSelect={handleRemoveParentLink} disabled={isDeleting}>
                       <Unlink className="size-3.5" />
                       {translate(

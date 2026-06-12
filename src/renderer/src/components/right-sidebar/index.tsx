@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- Why: the right sidebar owns activity-bar visibility, routing, and resize behavior as one interaction surface; splitting the tab table away would make hidden-tab fallbacks harder to audit. */
 import React, { useEffect, useMemo, useState } from 'react'
-import { Plug, Files, GitBranch, ListChecks, PanelRight } from 'lucide-react'
+import { Plug, Files, GitBranch, ListChecks, PanelRight, Workflow } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { useRepoById } from '@/store/selectors'
 import { cn } from '@/lib/utils'
@@ -69,9 +69,9 @@ function RightSidebarInner(): React.JSX.Element {
     activeWorktreeId ? (s.getKnownWorktreeById(activeWorktreeId) ?? null) : null
   )
   const activeRepo = useRepoById(activeWorktree?.repoId ?? null)
-  const isFolder =
-    parseWorkspaceKey(activeWorktreeId ?? '')?.type === 'folder' ||
-    (activeRepo ? isFolderRepo(activeRepo) : false)
+  const activeWorkspaceScope = parseWorkspaceKey(activeWorktreeId ?? '')
+  const isFolderWorkspace = activeWorkspaceScope?.type === 'folder'
+  const isFolder = isFolderWorkspace || (activeRepo ? isFolderRepo(activeRepo) : false)
   const isSshRepo = Boolean(activeRepo?.connectionId)
 
   const activityItems = useMemo<ActivityBarItem[]>(
@@ -87,6 +87,16 @@ function RightSidebarInner(): React.JSX.Element {
         icon: AgentSessionHistoryIcon,
         title: translate('auto.components.right.sidebar.index.aiVaultSessionHistory', 'Agents'),
         shortcut: ''
+      },
+      {
+        id: 'workspaces',
+        icon: Workflow,
+        title: translate(
+          'auto.components.right.sidebar.index.folderWorkspaces',
+          'Attached worktrees'
+        ),
+        shortcut: '',
+        folderOnly: true
       },
       {
         id: 'source-control',
@@ -114,8 +124,13 @@ function RightSidebarInner(): React.JSX.Element {
   )
 
   const visibleItems = useMemo(
-    () => getVisibleRightSidebarActivityItems(activityItems, { isFolder, isSshRepo }),
-    [activityItems, isFolder, isSshRepo]
+    () =>
+      getVisibleRightSidebarActivityItems(activityItems, {
+        isFolder,
+        isFolderWorkspace,
+        isSshRepo
+      }),
+    [activityItems, isFolder, isFolderWorkspace, isSshRepo]
   )
 
   // If the active tab is hidden (e.g. switched from a git repo to a folder),

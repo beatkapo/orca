@@ -14,6 +14,7 @@ import type {
   GitPushTarget,
   RemoveWorktreeResult,
   WorktreeLineage,
+  WorkspaceLineage,
   WorktreeMeta
 } from '../../../../shared/types'
 import type { RuntimeWorktreeListResult } from '../../../../shared/runtime-types'
@@ -43,6 +44,7 @@ import { translate } from '@/i18n/i18n'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
 import {
   folderWorkspaceKey,
+  isWorkspaceKey,
   parseWorkspaceKey,
   worktreeWorkspaceKey
 } from '../../../../shared/workspace-scope'
@@ -606,21 +608,64 @@ async function listDetectedWorktreesForRepo(
   }
 }
 
-async function listWorktreeLineageForRuntime(
-  settings: AppState['settings']
-): Promise<Record<string, WorktreeLineage>> {
+async function listWorktreeLineageForRuntime(settings: AppState['settings']): Promise<{
+  worktreeLineageById: Record<string, WorktreeLineage>
+  workspaceLineageByChildKey: Record<string, WorkspaceLineage>
+}> {
   const target = getActiveRuntimeTarget(settings)
-  if (target.kind === 'local') {
-    return window.api.worktrees.listLineage()
+  type LineageListResponse = {
+    lineage?: Record<string, WorktreeLineage>
+    workspaceLineage?: Record<string, WorkspaceLineage>
   }
-  return (
-    await callRuntimeRpc<{ lineage: Record<string, WorktreeLineage> }>(
-      target,
-      'worktree.lineageList',
-      undefined,
-      { timeoutMs: 15_000 }
-    )
-  ).lineage
+  const normalizeLineageResponse = (value: Record<string, WorktreeLineage> | LineageListResponse) =>
+    Object.prototype.hasOwnProperty.call(value, 'lineage') ||
+    Object.prototype.hasOwnProperty.call(value, 'workspaceLineage')
+      ? {
+          worktreeLineageById: (value as LineageListResponse).lineage ?? {},
+          workspaceLineageByChildKey: (value as LineageListResponse).workspaceLineage ?? {}
+        }
+      : {
+          worktreeLineageById: value as Record<string, WorktreeLineage>,
+          workspaceLineageByChildKey: {}
+        }
+  if (target.kind === 'local') {
+    return normalizeLineageResponse(await window.api.worktrees.listLineage())
+  }
+  return normalizeLineageResponse(
+    await callRuntimeRpc<{
+      lineage: Record<string, WorktreeLineage>
+      workspaceLineage?: Record<string, WorkspaceLineage>
+    }>(target, 'worktree.lineageList', undefined, { timeoutMs: 15_000 })
+  )
+}
+
+function projectWorktreeLineageToWorkspaceLineage(
+  worktreeId: string,
+  lineage: WorktreeLineage | null,
+  current: Record<string, WorkspaceLineage>
+): Record<string, WorkspaceLineage> {
+  const childWorkspaceKey = worktreeWorkspaceKey(worktreeId)
+  const next = { ...current }
+  if (!lineage) {
+    delete next[childWorkspaceKey]
+    return next
+  }
+  next[childWorkspaceKey] = {
+    childWorkspaceKey,
+    childInstanceId: lineage.worktreeInstanceId,
+    parentWorkspaceKey: worktreeWorkspaceKey(lineage.parentWorktreeId),
+    parentInstanceId: lineage.parentWorktreeInstanceId,
+    origin: lineage.origin,
+    capture: lineage.capture,
+    ...(lineage.taskId ? { taskId: lineage.taskId } : {}),
+    ...(lineage.orchestrationRunId ? { orchestrationRunId: lineage.orchestrationRunId } : {}),
+    ...(lineage.coordinatorHandle ? { coordinatorHandle: lineage.coordinatorHandle } : {}),
+    ...(lineage.createdByTerminalHandle
+      ? { createdByTerminalHandle: lineage.createdByTerminalHandle }
+      : {}),
+    createdAt: lineage.createdAt
+  }
+  return next
 }
 
 async function refreshRemoteWorktreeLineageBestEffort(
@@ -631,7 +676,7 @@ async function refreshRemoteWorktreeLineageBestEffort(
     return
   }
   try {
-    set({ worktreeLineageById: await listWorktreeLineageForRuntime(settings) })
+    set(await listWorktreeLineageForRuntime(settings))
   } catch (err) {
     // Why: lineage is supplemental to the worktree list. A remote timeout here
     // must not discard a successful worktree refresh.
@@ -722,6 +767,20 @@ function buildWorktreePurgeState(s: AppState, worktreeIds: string[]): Partial<Ap
     }
     return changed ? out : obj
   }
+  const omitWorkspaceLineageByWorktree = (
+    obj: Record<string, WorkspaceLineage>
+  ): Record<string, WorkspaceLineage> => {
+    let changed = false
+    const out = { ...obj }
+    for (const id of worktreeIdSet) {
+      const childKey = isWorkspaceKey(id) ? id : worktreeWorkspaceKey(id)
+      if (childKey in out) {
+        delete out[childKey]
+        changed = true
+      }
+    }
+    return changed ? out : obj
+  }
   const pruneRightSidebarTabByWorktree = (): AppState['rightSidebarTabByWorktree'] => {
     const omitted = omitByWorktree(s.rightSidebarTabByWorktree)
     let changed = omitted !== s.rightSidebarTabByWorktree
@@ -730,6 +789,7 @@ function buildWorktreePurgeState(s: AppState, worktreeIds: string[]): Partial<Ap
       if (
         tab === 'explorer' ||
         tab === 'vault' ||
+        tab === 'workspaces' ||
         tab === 'source-control' ||
         tab === 'checks' ||
         tab === 'ports'
@@ -804,6 +864,7 @@ function buildWorktreePurgeState(s: AppState, worktreeIds: string[]): Partial<Ap
   return {
     // Worktree-scoped terminal/tab state
     worktreeLineageById: omitByWorktree(s.worktreeLineageById),
+    workspaceLineageByChildKey: omitWorkspaceLineageByWorktree(s.workspaceLineageByChildKey),
     tabsByWorktree: omitByWorktree(s.tabsByWorktree),
     terminalLayoutsByTabId: omitByTabId(s.terminalLayoutsByTabId),
     ptyIdsByTabId: omitByTabId(s.ptyIdsByTabId),
@@ -851,8 +912,15 @@ function buildWorktreePurgeState(s: AppState, worktreeIds: string[]): Partial<Ap
     everActivatedWorktreeIds: nextEverActivatedWorktreeIds,
     lastVisitedAtByWorktreeId: omitByWorktree(s.lastVisitedAtByWorktreeId),
     activeWorktreeId: removedActive ? null : s.activeWorktreeId,
-    activeWorkspaceKey:
-      s.activeWorkspaceKey && worktreeIdSet.has(s.activeWorkspaceKey) ? null : s.activeWorkspaceKey,
+    activeWorkspaceKey: (() => {
+      if (s.activeWorkspaceKey && worktreeIdSet.has(s.activeWorkspaceKey)) {
+        return null
+      }
+      const activeScope = s.activeWorkspaceKey ? parseWorkspaceKey(s.activeWorkspaceKey) : null
+      return activeScope?.type === 'worktree' && worktreeIdSet.has(activeScope.worktreeId)
+        ? null
+        : s.activeWorkspaceKey
+    })(),
     activeFileId: activeFileCleared ? null : s.activeFileId,
     activeBrowserTabId: removedActive ? null : s.activeBrowserTabId,
     activeTabId: activeTabCleared ? null : s.activeTabId,
@@ -864,6 +932,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
   worktreesByRepo: {},
   detectedWorktreesByRepo: {},
   worktreeLineageById: {},
+  workspaceLineageByChildKey: {},
   activeWorktreeId: null,
   activeWorkspaceKey: null,
   pendingWorktreeCreations: {},
@@ -1040,7 +1109,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
 
   fetchWorktreeLineage: async () => {
     try {
-      set({ worktreeLineageById: await listWorktreeLineageForRuntime(get().settings) })
+      set(await listWorktreeLineageForRuntime(get().settings))
     } catch (err) {
       console.error('Failed to fetch worktree lineage:', err)
     }
@@ -1077,6 +1146,11 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
         }
         return {
           worktreeLineageById: next,
+          workspaceLineageByChildKey: projectWorktreeLineageToWorkspaceLineage(
+            worktreeId,
+            lineage,
+            s.workspaceLineageByChildKey
+          ),
           worktreesByRepo:
             target.kind === 'local' || !updatedRemoteWorktree
               ? s.worktreesByRepo
@@ -1227,6 +1301,11 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
           // Why: Manual sort is user-authored order. Stamp new workspaces
           // deliberately at the top instead of relying on sortOrder fallback.
           const manualOrder = get().sortBy === 'manual' ? Date.now() : undefined
+          const activeScope = parseWorkspaceKey(get().activeWorkspaceKey ?? '')
+          const parentWorkspace =
+            activeScope?.type === 'folder'
+              ? folderWorkspaceKey(activeScope.folderWorkspaceId)
+              : undefined
           const createArgs = {
             repoId,
             name: candidateName,
@@ -1249,6 +1328,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
               ? { linkedLinearIssueOrganizationUrlKey }
               : {}),
             ...(manualOrder !== undefined ? { manualOrder } : {}),
+            ...(parentWorkspace ? { parentWorkspace } : {}),
             ...(workspaceStatus !== undefined ? { workspaceStatus } : {}),
             ...(linkedGitLabMR !== undefined ? { linkedGitLabMR } : {}),
             ...(linkedGitLabIssue !== undefined ? { linkedGitLabIssue } : {}),
@@ -1286,6 +1366,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
                       ? { linkedLinearIssueOrganizationUrlKey }
                       : {}),
                     ...(manualOrder !== undefined ? { manualOrder } : {}),
+                    ...(parentWorkspace ? { parentWorkspace } : {}),
                     ...(workspaceStatus !== undefined ? { workspaceStatus } : {}),
                     ...(linkedGitLabMR !== undefined ? { linkedGitLabMR } : {}),
                     ...(linkedGitLabIssue !== undefined ? { linkedGitLabIssue } : {}),
@@ -1319,6 +1400,14 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
                 ...s.worktreesByRepo,
                 [repoId]: nextWorktrees
               },
+              ...(result.workspaceLineage
+                ? {
+                    workspaceLineageByChildKey: {
+                      ...s.workspaceLineageByChildKey,
+                      [result.workspaceLineage.childWorkspaceKey]: result.workspaceLineage
+                    }
+                  }
+                : {}),
               ...(result.initialBaseStatus
                 ? {
                     baseStatusByWorktreeId: {
@@ -1500,6 +1589,8 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
         delete nextDeleteState[worktreeId]
         const nextLineage = { ...s.worktreeLineageById }
         delete nextLineage[worktreeId]
+        const nextWorkspaceLineage = { ...s.workspaceLineageByChildKey }
+        delete nextWorkspaceLineage[worktreeWorkspaceKey(worktreeId)]
         // Clean up editor files belonging to this worktree
         const newOpenFiles = s.openFiles.filter((f) => f.worktreeId !== worktreeId)
         const nextBrowserTabsByWorktree = { ...s.browserTabsByWorktree }
@@ -1618,6 +1709,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
         return {
           worktreesByRepo: next,
           worktreeLineageById: nextLineage,
+          workspaceLineageByChildKey: nextWorkspaceLineage,
           tabsByWorktree: nextTabs,
           ptyIdsByTabId: nextPtyIdsByTabId,
           runtimePaneTitlesByTabId: nextRuntimePaneTitlesByTabId,
