@@ -163,8 +163,8 @@ export function LinearAgentSkillSetupPrompt({
   const missingLabel =
     !cliAvailable && !skill.installed
       ? translate(
-          'auto.components.sidebar.LinearAgentSkillSetupPrompt.missingBoth',
-          'Orca CLI and Linear agent skill setup are missing.'
+          'auto.components.sidebar.LinearAgentSkillSetupPrompt.missingCliAndSkill',
+          'Orca CLI and Linear agent skill are missing.'
         )
       : !cliAvailable
         ? translate(

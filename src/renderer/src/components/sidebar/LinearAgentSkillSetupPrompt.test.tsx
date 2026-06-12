@@ -154,7 +154,7 @@ describe('LinearAgentSkillSetupPrompt', () => {
     const rendered = await renderPrompt({ linked: true, remote: false })
 
     expect(rendered.textContent).toContain('Set up Linear agent skill')
-    expect(rendered.textContent).toContain('Orca CLI and Linear agent skill setup are missing')
+    expect(rendered.textContent).toContain('Orca CLI and Linear agent skill are missing')
     expect(rendered.textContent).toContain('Install it for host agent handoffs')
     expect(mocks.useInstalledAgentSkill).toHaveBeenCalledWith(
       'linear-tickets',
@@ -360,9 +360,7 @@ describe('LinearAgentSkillSetupPrompt', () => {
     expect(document.body.textContent).toContain(
       'Enable agents to read and edit the attached Linear ticket.'
     )
-    expect(document.body.textContent).toContain(
-      'Orca CLI and Linear agent skill setup are missing.'
-    )
+    expect(document.body.textContent).toContain('Orca CLI and Linear agent skill are missing.')
     expect(document.body.textContent).toContain('Mock install')
     expect(mocks.panelProps.at(-1)).toEqual(
       expect.objectContaining({
