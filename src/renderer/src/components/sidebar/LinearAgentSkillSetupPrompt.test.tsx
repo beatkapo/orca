@@ -360,9 +360,14 @@ describe('LinearAgentSkillSetupPrompt', () => {
     expect(document.body.textContent).toContain(
       'Enable agents to read and edit the attached Linear ticket.'
     )
+    expect(document.body.textContent).toContain(
+      'Orca CLI and Linear agent skill setup are missing.'
+    )
     expect(document.body.textContent).toContain('Mock install')
-    expect(document.body.textContent).not.toContain(
-      'Before opening setup, Orca may show a system prompt'
+    expect(mocks.panelProps.at(-1)).toEqual(
+      expect.objectContaining({
+        preInstallNotice: 'CLI registration notice'
+      })
     )
 
     const notNowButton = Array.from(document.body.querySelectorAll('button')).find(

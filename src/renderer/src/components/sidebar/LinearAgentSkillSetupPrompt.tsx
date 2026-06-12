@@ -229,7 +229,7 @@ export function LinearAgentSkillSetupPrompt({
             'auto.components.sidebar.LinearAgentSkillSetupPrompt.modalTitle',
             'Enable Linear ticket access'
           )}
-          description=""
+          description={missingLabel}
           command={command}
           terminalTitle={translate(
             'auto.components.sidebar.LinearAgentSkillSetupPrompt.terminalTitle',
@@ -249,7 +249,7 @@ export function LinearAgentSkillSetupPrompt({
             'auto.components.sidebar.LinearAgentSkillSetupPrompt.install',
             'Install CLI & Skill'
           )}
-          preInstallNotice={surface === 'inline' ? AGENT_SKILL_CLI_PREREQUISITE_NOTICE : undefined}
+          preInstallNotice={AGENT_SKILL_CLI_PREREQUISITE_NOTICE}
           getPrerequisiteStatus={
             agentRuntime.runtime === 'wsl'
               ? () => window.api.cli.getWslInstallStatus(getWslCliDistroRequest(agentRuntime))
