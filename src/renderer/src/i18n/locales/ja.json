@@ -274,7 +274,8 @@
           "760bc6883d": "Codex",
           "a5fc0cb622": "OpenClaude",
           "bf53f09bf8": "Claude Agent Teams",
-          "0708ed89f1": "Claude"
+          "0708ed89f1": "Claude",
+          "fc80296033": "Devin"
         },
         "skill": {
           "cli": {
@@ -1551,7 +1552,9 @@
         "a2a279b32a": "保存がタイムアウトしたか失敗しました。閉じる前にエラーを修正してください。",
         "46e08bc5c8": "このファイルには保存されていない変更が含まれています。",
         "61ed600d29": "「{{value0}}」には未保存の変更があります。閉じる前に保存しますか?",
-        "cdc9ac4b2d": "エディタ"
+        "cdc9ac4b2d": "エディタ",
+        "e57db40c11": "Could not build launch command for {{value0}}.",
+        "5b2c1a9e44": "No agent CLI detected — install one or pick a default agent in Settings."
       },
       "TerminalSearch": {
         "db234b7519": "閉じる",
@@ -3935,6 +3938,30 @@
             }
           }
         },
+        "LinearAgentSkillSetupPrompt": {
+          "missingCliAndSkill": "Orca CLI と Linear agent スキルがありません。",
+          "modalTitle": "Linear チケットアクセスを有効にする",
+          "modalDescription": "terminal から Linear スキルをインストールします。",
+          "modalPrompt": "Agents が添付された Linear チケットを読み書きできるようにします。",
+          "dontShowAgain": "今後表示しない",
+          "notNow": "後で",
+          "missingBoth": "Orca CLI と Linear agent スキルがありません。",
+          "missingCli": "Orca CLI がありません。",
+          "missingSkill": "Linear agent スキルがありません。",
+          "title": "Linear agent スキルを設定",
+          "remoteCopy": "これはホスト側の設定をインストールします。リモート agent 環境では別途設定が必要な場合があります。",
+          "hostCopy": "リンクされた Linear 作業からのホスト agent 引き継ぎ用にインストールします。",
+          "dismiss": "Linear agent スキル設定を閉じる",
+          "setup": "設定",
+          "recheck": "再確認",
+          "panelTitle": "Linear agent スキル",
+          "panelDescription": "リンクされた Linear タスクの引き継ぎ用にホスト agent スキルをインストールします。",
+          "terminalTitle": "Linear agent スキルをインストール",
+          "terminalAria": "Linear agent スキルのインストール terminal",
+          "install": "CLI とスキルをインストール",
+          "wslCopy": "リンクされた Linear 作業からの WSL agent 引き継ぎ用にインストールします。",
+          "wslLabel": "WSL 既定"
+        },
         "FolderWorkspaceComposerDialog": {
           "connectFailed": "プロジェクトに接続できませんでした。",
           "noRepos": "GitHub または GitLab のタスクを関連付けるには、このフォルダー内に Git プロジェクトを追加してください。",
@@ -4164,7 +4191,19 @@
           "7d26ccabe8": "ダーク",
           "fb0e0b4453": "システム",
           "932ff1fbff": "テーマ",
-          "0f28e7b30c": "アプリ ウィンドウで Orca がどのように見えるかを選択します。"
+          "0f28e7b30c": "アプリ ウィンドウで Orca がどのように見えるかを選択します。",
+          "leftSidebarAppearance": {
+            "title": "左サイドバーの外観",
+            "description": "左サイドバーをターミナルに合わせるか、既定のままにするか、色合いを加えます。",
+            "rowDescription": "左サイドバーをターミナルに合わせるか、既定のままにするか、色合いを加えます。",
+            "default": "デフォルト",
+            "matchTerminal": "ターミナルに合わせる",
+            "tinted": "色合い",
+            "tintColor": "サイドバーの色合い",
+            "tintColorDescription": "左サイドバーの表面に混ぜる色です。",
+            "tintOpacity": "色合いの強さ",
+            "tintOpacityDescription": "サイドバーに色合いをどの程度強く混ぜるかを調整します。"
+          }
         },
         "AutoRenameBranchFromWorkSetting": {
           "1626524572": "Nautilus",
@@ -4321,6 +4360,8 @@
           "8671e406f0": "キャンセル",
           "a4aafe46e3": "ターゲットパス:",
           "e8012c03a1": "agents が Orca ワークスペース、terminal、進捗コマンドを使用できるようにします。",
+          "cliSkillTerminalTitle": "CLI スキルのセットアップ",
+          "cliSkillTerminalAria": "CLI スキルのインストール terminal",
           "6053cf736c": "CLIスキル",
           "36a6f919ba": "agents に Orca 対応のワークスペース、terminal、および進行状況のワークフローを提供します。",
           "04873eea3e": "Agent のスキル",
@@ -5008,7 +5049,8 @@
           "9bedd2a6e5": "agents がコンテキストを引き継ぎ、Orca を通じて作業を調整できるようにします。",
           "07641b9768": "オーケストレーションスキル",
           "2aacdb0517": "ハンドオフ、ワークツリーのハンドオーバー、および子 agents の作業全体にわたってコーディング agents を調整します。",
-          "191ac34567": "Agent オーケストレーション"
+          "191ac34567": "Agent オーケストレーション",
+          "thisDevice": "This device"
         },
         "OrchestrationSetupCard": {
           "e7d2a5146c": "agents がコンテキストを引き継ぎ、Orca を通じて作業を調整できるようにします。",
@@ -5421,7 +5463,8 @@
           "9abb9be3bc": "セットアップ",
           "23c6874fdf": "AI 機能",
           "2309068a6f": "破壊的な",
-          "65358016ea": "破棄"
+          "65358016ea": "破棄",
+          "thisDevice": "This device"
         },
         "SettingsFormControls": {
           "42a4d15a30": "一致するフォントがありません。",
@@ -6202,6 +6245,10 @@
               "locale": "ロケール",
               "i18n": "i18n",
               "translation": "翻訳"
+            },
+            "leftSidebarAppearance": {
+              "title": "左サイドバーの外観",
+              "description": "左サイドバーをターミナルに合わせるか、既定のままにするか、色合いを加えます。"
             }
           }
         },
@@ -7534,7 +7581,16 @@
                 "eae4a9f16b": "Add Linear access to browse and link issues.",
                 "fe9231215b": "Checking Linear access before showing setup actions.",
                 "e1f5e6424c": "{{value0}} workspace{{value1}} connected",
-                "disconnect_all": "Disconnect"
+                "disconnect_all": "すべて切断",
+                "linearSkillTitle": "Linear agent スキル",
+                "linearSkillDescription": "リンクされた Linear タスクの引き継ぎをより充実させるために agents が使うホスト agent スキルをインストールします。",
+                "linearSkillTerminalTitle": "Linear agent スキルをインストール",
+                "linearSkillTerminalAria": "Linear agent スキルのインストール terminal",
+                "linearSkillInstall": "CLI とスキルをインストール",
+                "linearSkillOptionalHint": "任意の次の手順: チケットを踏まえた agent の引き継ぎのために Linear agent スキルをインストールします。",
+                "linearSkillDismissHint": "任意の Linear agent スキル設定メモを閉じる",
+                "linearSkillWslDescription": "リンクされた Linear タスクの引き継ぎをより充実させるために agents が使う WSL agent スキルをインストールします。",
+                "linearSkillWslLabel": "WSL 既定"
               }
             }
           }
@@ -7580,6 +7636,19 @@
               }
             }
           }
+        },
+        "computerUseSummary": {
+          "permissionsRequired": "{{value0}} permission{{value1}} required before agents can operate app windows.",
+          "checkingTitle": "Checking Computer Use access.",
+          "checkingDescription": "Orca is checking macOS privacy permissions for the Computer Use helper.",
+          "unavailableTitle": "Computer Use is unavailable.",
+          "unavailableDescription": "Computer Use permissions are unavailable because {{value0}}.",
+          "readyTitle": "Computer Use is ready.",
+          "readyDescription": "Agents can inspect and operate app windows when you ask.",
+          "permissionsTitle": "Finish setup to use local apps."
+        },
+        "computerUseSkillRuntime": {
+          "thisDevice": "This device"
         }
       },
       "right": {
@@ -8494,7 +8563,10 @@
           "c5292c409d": "Agents は、要求に応じてアプリ ウィンドウを検査し、ローカル アプリを操作できます。",
           "1ecfb490ac": "コンピュータ操作",
           "01426f3a23": "Agents はサイトを移動し、ページを検査し、ブラウザーのタスクを実行できます。",
-          "ea85d9e628": "Agent ブラウザの使用"
+          "ea85d9e628": "Agent ブラウザの使用",
+          "linearTicketsTitle": "Linear agent スキル",
+          "linearTicketsDescription": "Agents はリンクされた Linear タスクを使って、チケットを踏まえたより詳しい引き継ぎができます。",
+          "linearTicketsSetupSummary": "Linear ワークスペースに推奨。Linear 接続設定には影響しません。"
         },
         "FeatureSetupInlineTerminal": {
           "789b59936e": "Enter キーを押してコマンドを実行し、要求されたら npx を確認します。これは、後で [設定] で設定することもできます。",
@@ -8636,7 +8708,7 @@
           }
         },
         "AgentFeatureSetupStep": {
-          "97dcdc010f": "機能を有効にする"
+          "97dcdc010f": "CLI とスキルをインストール"
         }
       },
       "new": {
@@ -8909,7 +8981,9 @@
             "3a59452a67": "スキル コマンドをコピーして確認のために以下に挿入しました。",
             "c605f51f2b": "機能セットアップの準備完了",
             "1aa657d8f4": "一部の機能の設定には注意が必要です",
-            "c89534cbe9": "CLIとスキルのインストール"
+            "c89534cbe9": "CLIとスキルのインストール",
+            "linearTicketsTitle": "Linear agent スキル",
+            "linearTicketsDescription": "Agents がリンクされた Linear タスクから作業する場合に推奨されます。"
           },
           "AiCommitPrSettingsCard": {
             "8d4152701a": "例えばオラマはラマ3.1 {{value0}}を実行します",
@@ -10528,6 +10602,44 @@
           "countMany": "{{value0}} attached worktrees",
           "emptyTitle": "No attached worktrees yet",
           "emptyCopy": "Worktrees created from this workspace will show up here."
+        }
+      },
+      "link": {
+        "routing": {
+          "preference": {
+            "dialog": {
+              "badge": "ターミナルリンク",
+              "preview": "プレビュー",
+              "title": "ターミナルのリンクを Orca のブラウザで開きますか？",
+              "description": "ターミナルのリンクを Orca のブラウザで開くか、システムブラウザを使い続けます。",
+              "orca": {
+                "button": "Orca で開く",
+                "note": "Orca はインポート済み Cookie を使ってログイン済みサイトを開けます。"
+              },
+              "settings": {
+                "note": "後で 設定 → ブラウザ から変更できます。"
+              },
+              "system": {
+                "button": "システムブラウザを使用"
+              },
+              "link": {
+                "label": "リンク"
+              },
+              "shortcut": {
+                "note": {
+                  "prefix": "リンクを Orca で開く場合、",
+                  "suffix": "クリックで今回だけシステムブラウザで開きます。"
+                }
+              },
+              "keep": {
+                "title": "ターミナルのリンクを Orca のブラウザで開き続けますか？",
+                "description": "またはシステムブラウザを既定で使用します。",
+                "orca": {
+                  "button": "Orca のままにする"
+                }
+              }
+            }
+          }
         }
       }
     },

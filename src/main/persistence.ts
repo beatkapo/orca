@@ -100,6 +100,11 @@ import { normalizeTerminalShortcutPolicy } from '../shared/keybindings'
 import { normalizeAppIconId } from '../shared/app-icon'
 import { normalizeTerminalCustomThemes } from '../shared/terminal-custom-themes'
 import {
+  normalizeLeftSidebarAppearanceMode,
+  normalizeLeftSidebarTintColor,
+  normalizeLeftSidebarTintOpacity
+} from '../shared/left-sidebar-appearance'
+import {
   compareFeatureInteractionUsageBuckets,
   getFeatureInteractionCategory,
   getFeatureInteractionUsageBucket,
@@ -2282,6 +2287,14 @@ export class Store {
           parsed.settings?.disabledTuiAgents
         )
         const migratedAgentYoloDefaults = migrateAgentYoloDefaults(parsed.settings)
+        const openLinksInAppWasPersisted = Object.prototype.hasOwnProperty.call(
+          parsed.settings ?? {},
+          'openLinksInApp'
+        )
+        const migratedOpenLinksInAppPreferencePrompted =
+          typeof parsed.settings?.openLinksInAppPreferencePrompted === 'boolean'
+            ? parsed.settings.openLinksInAppPreferencePrompted
+            : openLinksInAppWasPersisted
         if (
           parsed.settings?.agentYoloDefaultsMigrated !== true ||
           hasUnsupportedTuiAgentArgs('opencode', parsed.settings?.agentDefaultArgs?.opencode) ||
@@ -2296,6 +2309,12 @@ export class Store {
           migratedDisabledTuiAgents.push('claude-agent-teams')
         }
         if (!autoRenameBranchFromWorkDefaultedOn) {
+          this.loadNeedsSave = true
+        }
+        if (
+          parsed.settings?.openLinksInAppPreferencePrompted !==
+          migratedOpenLinksInAppPreferencePrompted
+        ) {
           this.loadNeedsSave = true
         }
         const normalizedOnboarding = normalizeLoadedOnboardingState(
@@ -2364,6 +2383,15 @@ export class Store {
             terminalCustomThemes: normalizeTerminalCustomThemes(
               parsed.settings?.terminalCustomThemes
             ),
+            leftSidebarAppearanceMode: normalizeLeftSidebarAppearanceMode(
+              parsed.settings?.leftSidebarAppearanceMode
+            ),
+            leftSidebarTintColor: normalizeLeftSidebarTintColor(
+              parsed.settings?.leftSidebarTintColor
+            ),
+            leftSidebarTintOpacity: normalizeLeftSidebarTintOpacity(
+              parsed.settings?.leftSidebarTintOpacity
+            ),
             appIcon: normalizeAppIconId(parsed.settings?.appIcon),
             uiLanguage: normalizeUiLanguage(parsed.settings?.uiLanguage),
             defaultTaskSource: taskProviderSettings.defaultTaskSource,
@@ -2378,6 +2406,7 @@ export class Store {
             openInApplications: normalizeOpenInApplications(parsed.settings?.openInApplications, {
               seedDefaults: true
             }),
+            openLinksInAppPreferencePrompted: migratedOpenLinksInAppPreferencePrompted,
             notifications: normalizeNotificationSettings(parsed.settings?.notifications),
             sourceControlAi: migratedSourceControlAi,
             // Why: new builds read sourceControlAi, but rollback builds still
@@ -3731,6 +3760,21 @@ export class Store {
     if ('terminalCustomThemes' in updates) {
       sanitizedUpdates.terminalCustomThemes = normalizeTerminalCustomThemes(
         updates.terminalCustomThemes
+      )
+    }
+    if ('leftSidebarAppearanceMode' in updates) {
+      sanitizedUpdates.leftSidebarAppearanceMode = normalizeLeftSidebarAppearanceMode(
+        updates.leftSidebarAppearanceMode
+      )
+    }
+    if ('leftSidebarTintColor' in updates) {
+      sanitizedUpdates.leftSidebarTintColor = normalizeLeftSidebarTintColor(
+        updates.leftSidebarTintColor
+      )
+    }
+    if ('leftSidebarTintOpacity' in updates) {
+      sanitizedUpdates.leftSidebarTintOpacity = normalizeLeftSidebarTintOpacity(
+        updates.leftSidebarTintOpacity
       )
     }
     if ('visibleTaskProviders' in updates || 'defaultTaskSource' in updates) {

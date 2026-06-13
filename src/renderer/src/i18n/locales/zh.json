@@ -274,7 +274,8 @@
           "760bc6883d": "Codex",
           "a5fc0cb622": "OpenClaude",
           "bf53f09bf8": "Claude Agent Teams",
-          "0708ed89f1": "Claude"
+          "0708ed89f1": "Claude",
+          "fc80296033": "Devin"
         },
         "skill": {
           "cli": {
@@ -1551,7 +1552,9 @@
         "a2a279b32a": "保存超时或失败。关闭前修复错误。",
         "46e08bc5c8": "该文件有未保存的更改。",
         "61ed600d29": "“{{value0}}”有未保存的更改。您想在关闭前保存吗？",
-        "cdc9ac4b2d": "编辑"
+        "cdc9ac4b2d": "编辑",
+        "e57db40c11": "Could not build launch command for {{value0}}.",
+        "5b2c1a9e44": "No agent CLI detected — install one or pick a default agent in Settings."
       },
       "TerminalSearch": {
         "db234b7519": "关闭",
@@ -3935,6 +3938,30 @@
             }
           }
         },
+        "LinearAgentSkillSetupPrompt": {
+          "missingCliAndSkill": "缺少 Orca CLI 和 Linear agent 技能。",
+          "modalTitle": "启用 Linear ticket 访问",
+          "modalDescription": "从 terminal 安装 Linear 技能。",
+          "modalPrompt": "允许 Agent 读取和编辑已附加的 Linear ticket。",
+          "dontShowAgain": "不再显示",
+          "notNow": "暂不",
+          "missingBoth": "缺少 Orca CLI 和 Linear agent 技能。",
+          "missingCli": "缺少 Orca CLI。",
+          "missingSkill": "缺少 Linear agent 技能。",
+          "title": "设置 Linear agent 技能",
+          "remoteCopy": "这会安装主机设置；远程 agent 环境可能需要单独设置。",
+          "hostCopy": "为已链接 Linear 工作的主机 agent 交接安装此项。",
+          "dismiss": "关闭 Linear agent 技能设置",
+          "setup": "设置",
+          "recheck": "重新检查",
+          "panelTitle": "Linear agent 技能",
+          "panelDescription": "安装主机 agent 技能，用于已链接 Linear 任务交接。",
+          "terminalTitle": "安装 Linear agent 技能",
+          "terminalAria": "Linear agent 技能安装 terminal",
+          "install": "安装 CLI 和技能",
+          "wslCopy": "为已链接 Linear 工作的 WSL agent 交接安装此项。",
+          "wslLabel": "WSL 默认值"
+        },
         "FolderWorkspaceComposerDialog": {
           "connectFailed": "无法连接到项目。",
           "noRepos": "在此文件夹下添加 Git 项目，以关联 GitHub 或 GitLab 任务。",
@@ -4164,7 +4191,19 @@
           "7d26ccabe8": "深色",
           "fb0e0b4453": "系统",
           "932ff1fbff": "主题",
-          "0f28e7b30c": "选择 Orca 在应用程序窗口中的外观。"
+          "0f28e7b30c": "选择 Orca 在应用程序窗口中的外观。",
+          "leftSidebarAppearance": {
+            "title": "左侧边栏外观",
+            "description": "让左侧边栏匹配终端、保持默认，或使用色调。",
+            "rowDescription": "让左侧边栏匹配终端、保持默认，或使用色调。",
+            "default": "默认",
+            "matchTerminal": "匹配终端",
+            "tinted": "色调",
+            "tintColor": "边栏色调",
+            "tintColorDescription": "混入左侧边栏表面的颜色。",
+            "tintOpacity": "色调强度",
+            "tintOpacityDescription": "控制色调混入边栏的强度。"
+          }
         },
         "AutoRenameBranchFromWorkSetting": {
           "1626524572": "Nautilus",
@@ -4321,6 +4360,8 @@
           "8671e406f0": "取消",
           "a4aafe46e3": "目标路径：",
           "e8012c03a1": "使 Agent 能够使用 Orca 工作区、terminal 和进度命令。",
+          "cliSkillTerminalTitle": "CLI 技能设置",
+          "cliSkillTerminalAria": "CLI 技能安装 terminal",
           "6053cf736c": "CLI技能",
           "36a6f919ba": "为 Agent 提供 Orca 感知的工作区、terminal 和进度工作流程。",
           "04873eea3e": "Agent 技能",
@@ -4972,7 +5013,8 @@
           "9bedd2a6e5": "使 Agent 能够通过 Orca 传递上下文并协调工作。",
           "07641b9768": "编排技能",
           "2aacdb0517": "跨切换、工作树切换和子 Agent 工作协调编码 Agent。",
-          "191ac34567": "Agent 编排"
+          "191ac34567": "Agent 编排",
+          "thisDevice": "This device"
         },
         "OrchestrationSetupCard": {
           "e7d2a5146c": "使 Agent 能够通过 Orca 传递上下文并协调工作。",
@@ -5385,7 +5427,8 @@
           "9abb9be3bc": "初始设置",
           "23c6874fdf": "AI 能力",
           "2309068a6f": "destructive",
-          "65358016ea": "放弃"
+          "65358016ea": "放弃",
+          "thisDevice": "This device"
         },
         "SettingsFormControls": {
           "42a4d15a30": "没有匹配的字体。",
@@ -6166,6 +6209,10 @@
               "locale": "区域设置",
               "i18n": "国际化",
               "translation": "翻译"
+            },
+            "leftSidebarAppearance": {
+              "title": "左侧边栏外观",
+              "description": "让左侧边栏匹配终端、保持默认，或使用色调。"
             }
           }
         },
@@ -7534,7 +7581,16 @@
                 "eae4a9f16b": "Add Linear access to browse and link issues.",
                 "fe9231215b": "Checking Linear access before showing setup actions.",
                 "e1f5e6424c": "{{value0}} workspace{{value1}} connected",
-                "disconnect_all": "Disconnect"
+                "disconnect_all": "全部断开连接",
+                "linearSkillTitle": "Linear agent 技能",
+                "linearSkillDescription": "安装主机 agent 技能，供 Agent 用于更丰富的已链接 Linear 任务交接。",
+                "linearSkillTerminalTitle": "安装 Linear agent 技能",
+                "linearSkillTerminalAria": "Linear agent 技能安装 terminal",
+                "linearSkillInstall": "安装 CLI 和技能",
+                "linearSkillOptionalHint": "可选下一步：安装 Linear agent 技能，让 agent 交接更了解 ticket 背景。",
+                "linearSkillDismissHint": "关闭可选的 Linear agent 技能设置提示",
+                "linearSkillWslDescription": "安装 WSL agent 技能，供 Agent 用于更丰富的已链接 Linear 任务交接。",
+                "linearSkillWslLabel": "WSL 默认值"
               }
             }
           }
@@ -7580,6 +7636,19 @@
               }
             }
           }
+        },
+        "computerUseSummary": {
+          "permissionsRequired": "{{value0}} permission{{value1}} required before agents can operate app windows.",
+          "checkingTitle": "Checking Computer Use access.",
+          "checkingDescription": "Orca is checking macOS privacy permissions for the Computer Use helper.",
+          "unavailableTitle": "Computer Use is unavailable.",
+          "unavailableDescription": "Computer Use permissions are unavailable because {{value0}}.",
+          "readyTitle": "Computer Use is ready.",
+          "readyDescription": "Agents can inspect and operate app windows when you ask.",
+          "permissionsTitle": "Finish setup to use local apps."
+        },
+        "computerUseSkillRuntime": {
+          "thisDevice": "This device"
         }
       },
       "right": {
@@ -8494,7 +8563,10 @@
           "c5292c409d": "按你的要求，Agent 可查看应用窗口并操作本地应用。",
           "1ecfb490ac": "计算机控制",
           "01426f3a23": "Agent 可浏览网站、检查页面并完成浏览器任务。",
-          "ea85d9e628": "Agent 浏览器操控"
+          "ea85d9e628": "Agent 浏览器操控",
+          "linearTicketsTitle": "Linear agent 技能",
+          "linearTicketsDescription": "Agent 可使用已链接的 Linear 任务，完成更了解 ticket 背景的交接。",
+          "linearTicketsSetupSummary": "推荐用于 Linear 工作区；不会影响 Linear 连接设置。"
         },
         "FeatureSetupInlineTerminal": {
           "789b59936e": "按 Enter 运行命令并在询问时确认 npx。您也可以稍后在“设置”中进行设置。",
@@ -8636,7 +8708,7 @@
           }
         },
         "AgentFeatureSetupStep": {
-          "97dcdc010f": "启用功能"
+          "97dcdc010f": "安装 CLI 和技能"
         }
       },
       "new": {
@@ -8909,7 +8981,9 @@
             "3a59452a67": "技能命令已复制并插入到下方以供评审。",
             "c605f51f2b": "能力设置就绪",
             "1aa657d8f4": "一些能力设置需要注意",
-            "c89534cbe9": "安装 CLI 和技能"
+            "c89534cbe9": "安装 CLI 和技能",
+            "linearTicketsTitle": "Linear agent 技能",
+            "linearTicketsDescription": "当 Agent 从已链接的 Linear 任务开始工作时推荐使用。"
           },
           "AiCommitPrSettingsCard": {
             "8d4152701a": "例如llama 运行 llama3.1 {{value0}}",
@@ -10528,6 +10602,44 @@
           "countMany": "{{value0}} attached worktrees",
           "emptyTitle": "No attached worktrees yet",
           "emptyCopy": "Worktrees created from this workspace will show up here."
+        }
+      },
+      "link": {
+        "routing": {
+          "preference": {
+            "dialog": {
+              "badge": "终端链接",
+              "preview": "预览",
+              "title": "在 Orca 浏览器中打开终端链接？",
+              "description": "用 Orca 浏览器打开终端链接，或继续使用系统浏览器。",
+              "orca": {
+                "button": "在 Orca 中打开",
+                "note": "Orca 可以使用已导入的 Cookie 打开已登录的网站。"
+              },
+              "settings": {
+                "note": "之后可在设置 → 浏览器中更改。"
+              },
+              "system": {
+                "button": "使用系统浏览器"
+              },
+              "link": {
+                "label": "链接"
+              },
+              "shortcut": {
+                "note": {
+                  "prefix": "当链接在 Orca 中打开时，",
+                  "suffix": "点击可临时改用系统浏览器。"
+                }
+              },
+              "keep": {
+                "title": "继续在 Orca 浏览器中打开终端链接？",
+                "description": "或默认使用系统浏览器。",
+                "orca": {
+                  "button": "继续使用 Orca"
+                }
+              }
+            }
+          }
         }
       }
     },

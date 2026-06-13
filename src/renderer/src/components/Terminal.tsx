@@ -34,7 +34,7 @@ import {
 } from './editor/editor-autosave'
 import { isIntentionalAppRestartInProgress } from '@/lib/updater-beforeunload'
 import EditorAutosaveController from './editor/EditorAutosaveController'
-import type { Tab, TabContentType, TabGroupLayoutNode } from '../../../shared/types'
+import type { Tab, TabContentType, TabGroupLayoutNode, TuiAgent } from '../../../shared/types'
 import { hasFeatureInteraction } from '../../../shared/feature-interactions'
 import BrowserPane from './browser-pane/BrowserPane'
 import BrowserPaneOverlayLayer from './browser-pane/BrowserPaneOverlayLayer'
@@ -78,6 +78,8 @@ import {
   isWebRuntimeSessionActive
 } from '@/runtime/web-runtime-session'
 import { openMobileEmulatorTab } from '@/lib/open-mobile-emulator-tab'
+import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
+import { listBoundAgentTabActions, resolveDefaultAgentForNewTab } from '@/lib/agent-tab-shortcuts'
 import {
   createFloatingWorkspaceBrowserTab,
   createFloatingWorkspaceMarkdownTab,
@@ -845,6 +847,34 @@ function Terminal(): React.JSX.Element | null {
     ]
   )
 
+  const handleNewAgentTab = useCallback(
+    (agent: TuiAgent) => {
+      if (!activeWorktreeId) {
+        return
+      }
+      const state = useAppStore.getState()
+      const targetGroupId =
+        state.activeGroupIdByWorktree[activeWorktreeId] ??
+        state.groupsByWorktree[activeWorktreeId]?.[0]?.id
+      const result = launchAgentInNewTab({
+        agent,
+        worktreeId: activeWorktreeId,
+        groupId: targetGroupId,
+        launchSource: 'shortcut'
+      })
+      if (!result) {
+        toast.error(
+          translate(
+            'auto.components.Terminal.e57db40c11',
+            'Could not build launch command for {{value0}}.',
+            { value0: agent }
+          )
+        )
+      }
+    },
+    [activeWorktreeId]
+  )
+
   const handleNewSimulatorTab = useCallback(() => {
     if (!activeWorktreeId) {
       return
@@ -1244,6 +1274,58 @@ function Terminal(): React.JSX.Element | null {
         return
       }
 
+      // Cmd/Ctrl+Alt+T (macOS default) — launch the default agent in a new
+      // tab; per-agent chords (Settings → Shortcuts → Agents) launch their
+      // specific agent. Unlike Cmd+T this never targets the floating panel:
+      // agent sessions belong to a worktree, so the launch always lands in
+      // the active workspace's tab bar.
+      if (!e.repeat) {
+        const state = useAppStore.getState()
+        let agentActionId: KeybindingActionId | null = null
+        let agentToLaunch: TuiAgent | null = null
+        if (matchShortcut('tab.newAgent')) {
+          const connectionId = getConnectionId(activeWorktreeId)
+          agentActionId = 'tab.newAgent'
+          agentToLaunch = resolveDefaultAgentForNewTab({
+            defaultTuiAgent: state.settings?.defaultTuiAgent,
+            detectedAgentIds:
+              typeof connectionId === 'string'
+                ? state.remoteDetectedAgentIds[connectionId]
+                : state.detectedAgentIds,
+            disabledTuiAgents: state.settings?.disabledTuiAgents
+          })
+        } else {
+          for (const bound of listBoundAgentTabActions(
+            keybindings,
+            state.settings?.disabledTuiAgents
+          )) {
+            if (matchShortcut(bound.actionId)) {
+              agentActionId = bound.actionId
+              // Why: a per-agent chord is an explicit request for that agent,
+              // so launch it even when detection hasn't (or can't have)
+              // confirmed the binary; a missing CLI fails visibly in the tab.
+              agentToLaunch = bound.agent
+              break
+            }
+          }
+        }
+        if (agentActionId) {
+          e.preventDefault()
+          notifyTerminalCapture(agentActionId)
+          if (agentToLaunch) {
+            handleNewAgentTab(agentToLaunch)
+          } else {
+            toast.message(
+              translate(
+                'auto.components.Terminal.5b2c1a9e44',
+                'No agent CLI detected — install one or pick a default agent in Settings.'
+              )
+            )
+          }
+          return
+        }
+      }
+
       // Cmd/Ctrl+Shift+T — reopen closed browser tab when browser is active,
       // otherwise reopen the most recently closed editor tab.
       if (!e.repeat && matchShortcut('tab.reopenClosed')) {
@@ -1456,6 +1538,7 @@ function Terminal(): React.JSX.Element | null {
     handleNewSimulatorTab,
     handleNewFile,
     handleNewTab,
+    handleNewAgentTab,
     handleCloseTab,
     handleCloseBrowserTab,
     closeBrowserTab,

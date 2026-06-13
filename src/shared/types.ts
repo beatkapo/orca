@@ -1982,6 +1982,7 @@ export type TuiAgent =
   | 'openclaw' // OpenClaw
   | 'copilot' // GitHub Copilot CLI
   | 'grok' // xAI Grok CLI
+  | 'devin' // Devin CLI
 
 export type TaskViewPresetId = 'all' | 'issues' | 'review' | 'my-issues' | 'my-prs' | 'prs'
 
@@ -2062,6 +2063,8 @@ export type OpenInApplication = {
 
 export type SourceControlViewMode = 'list' | 'tree'
 
+export type LeftSidebarAppearanceMode = 'default' | 'match-terminal' | 'tinted'
+
 export type FloatingTerminalCwdRequest = {
   path?: string
   requireTrusted?: boolean
@@ -2086,6 +2089,10 @@ export type GlobalSettings = {
   branchPrefixCustom: string
   enableGitHubAttribution: boolean
   theme: 'system' | 'dark' | 'light'
+  /** Controls the left sidebar surface without changing terminal brightness. */
+  leftSidebarAppearanceMode: LeftSidebarAppearanceMode
+  leftSidebarTintColor?: string
+  leftSidebarTintOpacity?: number
   uiLanguage: UiLanguage
   appIcon: AppIconId
   appFontFamily: string
@@ -2205,6 +2212,9 @@ export type GlobalSettings = {
    *  The setting stays opt-in so existing workflows continue to use the system browser
    *  until the user explicitly wants worktree-scoped in-app browsing. */
   openLinksInApp: boolean
+  /** Why: terminal link routing asks once at first use instead of silently
+   *  changing where links open for new users. */
+  openLinksInAppPreferencePrompted: boolean
   /** Extra launcher rows for the worktree "Open in" submenu. VS Code is always shown first. */
   openInApplications?: OpenInApplication[]
   /** Deprecated: migration/backward-compat only. Use PersistedUIState.rightSidebarOpen. */

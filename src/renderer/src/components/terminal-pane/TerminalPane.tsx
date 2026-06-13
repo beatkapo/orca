@@ -7,6 +7,7 @@ import { X } from 'lucide-react'
 import { useAppStore } from '../../store'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useLinkRoutingPreferenceDialog } from '@/components/link-routing-preference-dialog'
 import { DaemonActionDialog, useDaemonActions } from '@/components/shared/useDaemonActions'
 import {
   DEFAULT_TERMINAL_DIVIDER_DARK,
@@ -400,12 +401,16 @@ export default function TerminalPane({
   const refreshWorkspaceSpace = useAppStore((store) => store.refreshWorkspaceSpace)
   const settings = useAppStore((store) => store.settings)
   const updateSettings = useAppStore((store) => store.updateSettings)
+  const requestLinkRoutingPreference = useLinkRoutingPreferenceDialog()
   const keybindings = useAppStore((store) => store.keybindings)
   // Why: Windows is the only platform where bare right-click is repurposed as
   // a paste gesture; on macOS/Linux the terminal still owns right-click for the
   // context menu. The settings default keeps the Windows shortcut feeling native
   // without changing the other platforms' interaction model.
   const rightClickToPaste = isWindowsUserAgent() && (settings?.terminalRightClickToPaste ?? true)
+  // Why: Windows ConPTY does not forward DECSET 2004 from foreground TUIs, so
+  // xterm may not know multi-line text needs bracketed-paste protection.
+  const forceBracketedMultilineTextPaste = isWindowsUserAgent()
   const [startup] = useState(() => useAppStore.getState().pendingStartupByTabId[tabId])
   const shouldMeasureHiddenStartup = startup !== undefined && !isVisible
   const consumeTabStartupCommand = useAppStore((store) => store.consumeTabStartupCommand)
@@ -483,6 +488,38 @@ export default function TerminalPane({
 
   const settingsRef = useRef(settings)
   settingsRef.current = settings
+  const openLinksInAppPreferencePromiseRef = useRef<Promise<boolean> | null>(null)
+
+  const requestOpenLinksInAppPreference = useCallback(
+    (url: string): Promise<boolean> | null => {
+      if (settingsRef.current?.openLinksInAppPreferencePrompted === true) {
+        return null
+      }
+      if (!settingsRef.current) {
+        return null
+      }
+      if (openLinksInAppPreferencePromiseRef.current) {
+        return openLinksInAppPreferencePromiseRef.current
+      }
+      const preferencePromise = (async () => {
+        const openInOrca = await requestLinkRoutingPreference({
+          openLinksInAppDefault: settingsRef.current?.openLinksInApp === true,
+          url
+        })
+        await updateSettings({
+          openLinksInApp: openInOrca,
+          openLinksInAppPreferencePrompted: true
+        })
+        return openInOrca
+      })()
+      openLinksInAppPreferencePromiseRef.current = preferencePromise
+      void preferencePromise.finally(() => {
+        openLinksInAppPreferencePromiseRef.current = null
+      })
+      return preferencePromise
+    },
+    [requestLinkRoutingPreference, updateSettings]
+  )
   // Why: the persisted setting can be 'auto' (default) or one of the four
   // explicit modes. useEffectiveMacOptionAsAlt resolves 'auto' into
   // 'true' | 'false' based on the probe's current layout category (US → 'true',
@@ -781,6 +818,7 @@ export default function TerminalPane({
     systemPrefersDark,
     settings,
     settingsRef,
+    requestOpenLinksInAppPreference,
     effectiveMacOptionAsAlt,
     effectiveMacOptionAsAltRef: macOptionAsAltRef,
     initialLayoutRef,
@@ -1248,9 +1286,10 @@ export default function TerminalPane({
         readClipboardText: window.api.ui.readClipboardText,
         saveClipboardImageAsTempFile: window.api.ui.saveClipboardImageAsTempFile,
         connectionId,
+        forceBracketedMultilineTextPaste,
         pasteText: (text, options) => {
           pasteTerminalText(pane.terminal, text, options)
-          if (options?.forceBracketedPaste) {
+          if (options?.recoverImagePasteWebglAtlas) {
             scheduleImagePasteWebglAtlasRecovery()
           }
         },
@@ -1356,7 +1395,7 @@ export default function TerminalPane({
       container.removeEventListener('keydown', onKeyPaste, { capture: true })
       container.removeEventListener('paste', onPaste, { capture: true })
     }
-  }, [isActive, worktreeId, keybindings])
+  }, [isActive, worktreeId, keybindings, forceBracketedMultilineTextPaste])
 
   // Why: a click inside the terminal container is a deliberate interaction
   // with the pane — dismiss the attention indicator for this tab and worktree
@@ -1685,6 +1724,7 @@ export default function TerminalPane({
     onSetTitle: handleStartRename,
     onPasteError: setTerminalError,
     onAgentSessionForkReady: setAgentSessionFork,
+    forceBracketedMultilineTextPaste,
     rightClickToPaste
   })
 

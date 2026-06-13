@@ -274,7 +274,8 @@
           "760bc6883d": "Codex",
           "a5fc0cb622": "OpenClaude",
           "bf53f09bf8": "Claude Agent Teams",
-          "0708ed89f1": "Claude"
+          "0708ed89f1": "Claude",
+          "fc80296033": "Devin"
         },
         "skill": {
           "cli": {
@@ -1551,7 +1552,9 @@
         "a2a279b32a": "저장 시간이 초과되었거나 실패했습니다. 닫기 전에 오류를 수정하세요.",
         "46e08bc5c8": "이 파일에는 저장되지 않은 변경사항이 있습니다.",
         "61ed600d29": "'{{value0}}'에 저장되지 않은 변경사항이 있습니다. 닫기 전에 저장하시겠습니까?",
-        "cdc9ac4b2d": "편집자"
+        "cdc9ac4b2d": "편집자",
+        "e57db40c11": "Could not build launch command for {{value0}}.",
+        "5b2c1a9e44": "No agent CLI detected — install one or pick a default agent in Settings."
       },
       "TerminalSearch": {
         "db234b7519": "닫기",
@@ -3935,6 +3938,30 @@
             }
           }
         },
+        "LinearAgentSkillSetupPrompt": {
+          "missingCliAndSkill": "Orca CLI와 Linear agent 스킬이 없습니다.",
+          "modalTitle": "Linear 티켓 접근 활성화",
+          "modalDescription": "terminal에서 Linear 스킬을 설치합니다.",
+          "modalPrompt": "agents가 첨부된 Linear 티켓을 읽고 편집할 수 있게 합니다.",
+          "dontShowAgain": "다시 표시하지 않음",
+          "notNow": "나중에",
+          "missingBoth": "Orca CLI와 Linear agent 스킬이 없습니다.",
+          "missingCli": "Orca CLI가 없습니다.",
+          "missingSkill": "Linear agent 스킬이 없습니다.",
+          "title": "Linear agent 스킬 설정",
+          "remoteCopy": "호스트 설정을 설치합니다. 원격 agent 환경에는 별도 설정이 필요할 수 있습니다.",
+          "hostCopy": "연결된 Linear 작업에서 호스트 agent 인계를 위해 설치합니다.",
+          "dismiss": "Linear agent 스킬 설정 닫기",
+          "setup": "설정",
+          "recheck": "다시 확인",
+          "panelTitle": "Linear agent 스킬",
+          "panelDescription": "연결된 Linear 작업 인계를 위해 호스트 agent 스킬을 설치합니다.",
+          "terminalTitle": "Linear agent 스킬 설치",
+          "terminalAria": "Linear agent 스킬 설치 terminal",
+          "install": "CLI 및 스킬 설치",
+          "wslCopy": "연결된 Linear 작업에서 WSL agent 인계를 위해 설치합니다.",
+          "wslLabel": "WSL 기본값"
+        },
         "FolderWorkspaceComposerDialog": {
           "connectFailed": "프로젝트에 연결하지 못했습니다.",
           "noRepos": "GitHub 또는 GitLab 작업을 연결하려면 이 폴더 아래에 Git 프로젝트를 추가하세요.",
@@ -4164,7 +4191,19 @@
           "7d26ccabe8": "다크",
           "fb0e0b4453": "체계",
           "932ff1fbff": "주제",
-          "0f28e7b30c": "Orca가 앱 창에 표시되는 방식을 선택합니다."
+          "0f28e7b30c": "Orca가 앱 창에 표시되는 방식을 선택합니다.",
+          "leftSidebarAppearance": {
+            "title": "왼쪽 사이드바 모양",
+            "description": "왼쪽 사이드바를 터미널에 맞추거나 기본값을 유지하거나 은은한 색조를 적용합니다.",
+            "rowDescription": "왼쪽 사이드바를 터미널에 맞추거나 기본값을 유지하거나 은은한 색조를 적용합니다.",
+            "default": "기본값",
+            "matchTerminal": "터미널에 맞춤",
+            "tinted": "색조 적용",
+            "tintColor": "사이드바 색조",
+            "tintColorDescription": "왼쪽 사이드바 표면에 섞을 색상입니다.",
+            "tintOpacity": "색조 강도",
+            "tintOpacityDescription": "사이드바에 색조를 얼마나 강하게 섞을지 조절합니다."
+          }
         },
         "AutoRenameBranchFromWorkSetting": {
           "1626524572": "Nautilus",
@@ -4321,6 +4360,8 @@
           "8671e406f0": "취소",
           "a4aafe46e3": "대상 경로:",
           "e8012c03a1": "agents가 Orca 워크스페이스, terminal 및 진행 명령을 사용할 수 있도록 합니다.",
+          "cliSkillTerminalTitle": "CLI 스킬 설정",
+          "cliSkillTerminalAria": "CLI 스킬 설치 terminal",
           "6053cf736c": "CLI 스킬",
           "36a6f919ba": "agents에게 Orca 인식 워크스페이스, terminal 및 진행 워크플로를 제공합니다.",
           "04873eea3e": "Agent 스킬",
@@ -4972,7 +5013,8 @@
           "9bedd2a6e5": "agents가 Orca를 통해 컨텍스트를 넘기고 작업을 조정할 수 있습니다.",
           "07641b9768": "오케스트레이션 스킬",
           "2aacdb0517": "핸드오프, 작업 트리 핸드오버, 하위 agents 작업 전반에 걸쳐 코딩 agents를 조정합니다.",
-          "191ac34567": "Agent 오케스트레이션"
+          "191ac34567": "Agent 오케스트레이션",
+          "thisDevice": "This device"
         },
         "OrchestrationSetupCard": {
           "e7d2a5146c": "agents가 Orca를 통해 컨텍스트를 넘기고 작업을 조정할 수 있습니다.",
@@ -5385,7 +5427,8 @@
           "9abb9be3bc": "설정 시작",
           "23c6874fdf": "AI 기능",
           "2309068a6f": "파괴적인",
-          "65358016ea": "버리기"
+          "65358016ea": "버리기",
+          "thisDevice": "This device"
         },
         "SettingsFormControls": {
           "42a4d15a30": "일치하는 글꼴이 없습니다.",
@@ -6166,6 +6209,10 @@
               "locale": "로케일",
               "i18n": "i18n",
               "translation": "번역"
+            },
+            "leftSidebarAppearance": {
+              "title": "왼쪽 사이드바 모양",
+              "description": "왼쪽 사이드바를 터미널에 맞추거나 기본값을 유지하거나 은은한 색조를 적용합니다."
             }
           }
         },
@@ -7534,7 +7581,16 @@
                 "eae4a9f16b": "Add Linear access to browse and link issues.",
                 "fe9231215b": "Checking Linear access before showing setup actions.",
                 "e1f5e6424c": "{{value0}} workspace{{value1}} connected",
-                "disconnect_all": "Disconnect"
+                "disconnect_all": "모두 연결 해제",
+                "linearSkillTitle": "Linear agent 스킬",
+                "linearSkillDescription": "연결된 Linear 작업 인계를 더 풍부하게 하기 위해 agents가 사용하는 호스트 agent 스킬을 설치합니다.",
+                "linearSkillTerminalTitle": "Linear agent 스킬 설치",
+                "linearSkillTerminalAria": "Linear agent 스킬 설치 terminal",
+                "linearSkillInstall": "CLI 및 스킬 설치",
+                "linearSkillOptionalHint": "선택적 다음 단계: 티켓 맥락을 반영한 agent 인계를 위해 Linear agent 스킬을 설치하세요.",
+                "linearSkillDismissHint": "선택적 Linear agent 스킬 설정 안내 닫기",
+                "linearSkillWslDescription": "연결된 Linear 작업 인계를 더 풍부하게 하기 위해 agents가 사용하는 WSL agent 스킬을 설치합니다.",
+                "linearSkillWslLabel": "WSL 기본값"
               }
             }
           }
@@ -7580,6 +7636,19 @@
               }
             }
           }
+        },
+        "computerUseSummary": {
+          "permissionsRequired": "{{value0}} permission{{value1}} required before agents can operate app windows.",
+          "checkingTitle": "Checking Computer Use access.",
+          "checkingDescription": "Orca is checking macOS privacy permissions for the Computer Use helper.",
+          "unavailableTitle": "Computer Use is unavailable.",
+          "unavailableDescription": "Computer Use permissions are unavailable because {{value0}}.",
+          "readyTitle": "Computer Use is ready.",
+          "readyDescription": "Agents can inspect and operate app windows when you ask.",
+          "permissionsTitle": "Finish setup to use local apps."
+        },
+        "computerUseSkillRuntime": {
+          "thisDevice": "This device"
         }
       },
       "right": {
@@ -8494,7 +8563,10 @@
           "c5292c409d": "Agents은 요청 시 앱 창을 검사하고 로컬 앱을 작동할 수 있습니다.",
           "1ecfb490ac": "컴퓨터 사용",
           "01426f3a23": "Agents는 사이트를 탐색하고, 페이지를 검사하고, 브라우저 작업을 수행할 수 있습니다.",
-          "ea85d9e628": "Agent 브라우저 사용"
+          "ea85d9e628": "Agent 브라우저 사용",
+          "linearTicketsTitle": "Linear agent 스킬",
+          "linearTicketsDescription": "Agents는 연결된 Linear 작업을 사용해 티켓 맥락을 반영한 더 풍부한 인계를 할 수 있습니다.",
+          "linearTicketsSetupSummary": "Linear 워크스페이스에 권장됩니다. Linear 연결 설정에는 영향을 주지 않습니다."
         },
         "FeatureSetupInlineTerminal": {
           "789b59936e": "Enter를 눌러 명령을 실행하고 요청 시 npx를 확인합니다. 나중에 설정에서 설정할 수도 있습니다.",
@@ -8636,7 +8708,7 @@
           }
         },
         "AgentFeatureSetupStep": {
-          "97dcdc010f": "기능 활성화"
+          "97dcdc010f": "CLI 및 스킬 설치"
         }
       },
       "new": {
@@ -8909,7 +8981,9 @@
             "3a59452a67": "리뷰를 위해 스킬 명령을 아래에 복사하여 삽입했습니다.",
             "c605f51f2b": "기능 설정 준비 완료",
             "1aa657d8f4": "일부 기능 설정에 주의가 필요합니다.",
-            "c89534cbe9": "CLI 및 스킬 설치"
+            "c89534cbe9": "CLI 및 스킬 설치",
+            "linearTicketsTitle": "Linear agent 스킬",
+            "linearTicketsDescription": "agents가 연결된 Linear 작업에서 일할 때 권장됩니다."
           },
           "AiCommitPrSettingsCard": {
             "8d4152701a": "예를 들어 올라마는 llama3.1 {{value0}}을 실행합니다.",
@@ -10528,6 +10602,44 @@
           "countMany": "{{value0}} attached worktrees",
           "emptyTitle": "No attached worktrees yet",
           "emptyCopy": "Worktrees created from this workspace will show up here."
+        }
+      },
+      "link": {
+        "routing": {
+          "preference": {
+            "dialog": {
+              "badge": "터미널 링크",
+              "preview": "미리보기",
+              "title": "터미널 링크를 Orca 브라우저에서 열까요?",
+              "description": "터미널 링크를 Orca 브라우저에서 열거나 시스템 브라우저를 계속 사용합니다.",
+              "orca": {
+                "button": "Orca에서 열기",
+                "note": "Orca는 가져온 쿠키를 사용해 로그인된 사이트를 열 수 있습니다."
+              },
+              "settings": {
+                "note": "나중에 설정 → 브라우저에서 변경할 수 있습니다."
+              },
+              "system": {
+                "button": "시스템 브라우저 사용"
+              },
+              "link": {
+                "label": "링크"
+              },
+              "shortcut": {
+                "note": {
+                  "prefix": "링크가 Orca에서 열릴 때,",
+                  "suffix": "클릭하면 한 번만 시스템 브라우저에서 열립니다."
+                }
+              },
+              "keep": {
+                "title": "터미널 링크를 Orca 브라우저에서 계속 열까요?",
+                "description": "또는 시스템 브라우저를 기본값으로 사용합니다.",
+                "orca": {
+                  "button": "Orca에서 계속 열기"
+                }
+              }
+            }
+          }
         }
       }
     },

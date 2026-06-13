@@ -274,7 +274,8 @@
           "760bc6883d": "Codex",
           "a5fc0cb622": "OpenClaude",
           "bf53f09bf8": "Claude Agent Teams",
-          "0708ed89f1": "Claude"
+          "0708ed89f1": "Claude",
+          "fc80296033": "Devin"
         },
         "skill": {
           "cli": {
@@ -1551,7 +1552,9 @@
         "a2a279b32a": "Se agotó el tiempo de guardado o falló. Corregir errores antes de cerrar.",
         "46e08bc5c8": "Este archivo tiene cambios no guardados.",
         "61ed600d29": "\"{{value0}}\" tiene cambios no guardados. ¿Quieres guardar antes de cerrar?",
-        "cdc9ac4b2d": "editor"
+        "cdc9ac4b2d": "editor",
+        "e57db40c11": "Could not build launch command for {{value0}}.",
+        "5b2c1a9e44": "No agent CLI detected — install one or pick a default agent in Settings."
       },
       "TerminalSearch": {
         "db234b7519": "Cerca",
@@ -3935,6 +3938,30 @@
         "index": {
           "b826a98b6f": "ocupado"
         },
+        "LinearAgentSkillSetupPrompt": {
+          "missingCliAndSkill": "Faltan la CLI de Orca y la habilidad de Agent de Linear.",
+          "modalTitle": "Activar acceso a tickets de Linear",
+          "modalDescription": "Instala la habilidad de Linear desde una terminal.",
+          "modalPrompt": "Permite que los Agents lean y editen el ticket de Linear adjunto.",
+          "dontShowAgain": "No volver a mostrar",
+          "notNow": "Ahora no",
+          "missingBoth": "Faltan la CLI de Orca y la habilidad de Agent de Linear.",
+          "missingCli": "Falta la CLI de Orca.",
+          "missingSkill": "Falta la habilidad de Agent de Linear.",
+          "title": "Configurar habilidad de Agent de Linear",
+          "remoteCopy": "Esto instala la configuración del host; los entornos de Agent remotos pueden necesitar una configuración separada.",
+          "hostCopy": "Instálala para traspasos de Agent del host desde trabajo Linear enlazado.",
+          "dismiss": "Descartar configuración de habilidad de Agent de Linear",
+          "setup": "Configurar",
+          "recheck": "Volver a comprobar",
+          "panelTitle": "Habilidad de Agent de Linear",
+          "panelDescription": "Instala la habilidad de Agent del host para traspasos desde tareas Linear enlazadas.",
+          "terminalTitle": "Instalar habilidad de Agent de Linear",
+          "terminalAria": "Terminal de instalación de la habilidad de Agent de Linear",
+          "install": "Instalar CLI y habilidad",
+          "wslCopy": "Instálala para traspasos de Agent en WSL desde trabajo Linear enlazado.",
+          "wslLabel": "WSL predeterminado"
+        },
         "FolderWorkspaceComposerDialog": {
           "connectFailed": "No se pudo conectar al proyecto.",
           "noRepos": "Agrega un proyecto Git en esta carpeta para adjuntar tareas de GitHub o GitLab.",
@@ -4179,7 +4206,19 @@
           "7d26ccabe8": "Oscuro",
           "fb0e0b4453": "Sistema",
           "932ff1fbff": "Tema",
-          "0f28e7b30c": "Elige cómo se ve Orca en la ventana de la aplicación."
+          "0f28e7b30c": "Elige cómo se ve Orca en la ventana de la aplicación.",
+          "leftSidebarAppearance": {
+            "title": "Apariencia de la barra lateral izquierda",
+            "description": "Haz que la barra lateral izquierda coincida con tu terminal, conserve el valor predeterminado o use un tinte.",
+            "rowDescription": "Haz que la barra lateral izquierda coincida con tu terminal, conserve el valor predeterminado o use un tinte.",
+            "default": "Predeterminado",
+            "matchTerminal": "Coincidir con terminal",
+            "tinted": "Con tinte",
+            "tintColor": "Tinte de la barra lateral",
+            "tintColorDescription": "El color que se mezcla en la superficie de la barra lateral izquierda.",
+            "tintOpacity": "Intensidad del tinte",
+            "tintOpacityDescription": "Controla con qué fuerza se mezcla el tinte en la barra lateral."
+          }
         },
         "AutoRenameBranchFromWorkSetting": {
           "1626524572": "Nautilus",
@@ -4336,6 +4375,8 @@
           "8671e406f0": "Cancelar",
           "a4aafe46e3": "Ruta de destino:",
           "e8012c03a1": "Permite a los agents utilizar el espacio de trabajo, la terminal y los comandos de progreso de Orca.",
+          "cliSkillTerminalTitle": "Configuración de habilidad CLI",
+          "cliSkillTerminalAria": "Terminal de instalación de la habilidad CLI",
           "6053cf736c": "Habilidad CLI",
           "36a6f919ba": "Ofrezca a los agents espacios de trabajo, terminales y flujos de trabajo de progreso compatibles con Orca.",
           "04873eea3e": "Habilidades del Agent",
@@ -4987,7 +5028,8 @@
           "9bedd2a6e5": "Permite a los agents traspasar contexto y coordinar el trabajo a través de Orca.",
           "07641b9768": "Habilidad de orquestación",
           "2aacdb0517": "Coordine a los agents de codificación en traspasos, traspasos de árboles de trabajo y trabajo de agents secundarios.",
-          "191ac34567": "Orquestación de Agents"
+          "191ac34567": "Orquestación de Agents",
+          "thisDevice": "This device"
         },
         "OrchestrationSetupCard": {
           "e7d2a5146c": "Permite a los agents traspasar contexto y coordinar el trabajo a través de Orca.",
@@ -5400,7 +5442,8 @@
           "9abb9be3bc": "Configuración",
           "23c6874fdf": "Capacidades de IA",
           "2309068a6f": "destructivo",
-          "65358016ea": "Desechar"
+          "65358016ea": "Desechar",
+          "thisDevice": "This device"
         },
         "SettingsFormControls": {
           "42a4d15a30": "No hay fuentes coincidentes.",
@@ -6181,6 +6224,10 @@
               "locale": "lugar",
               "i18n": "i18n",
               "translation": "traducción"
+            },
+            "leftSidebarAppearance": {
+              "title": "Apariencia de la barra lateral izquierda",
+              "description": "Haz que la barra lateral izquierda coincida con tu terminal, conserve el valor predeterminado o use un tinte."
             }
           }
         },
@@ -7534,7 +7581,16 @@
                 "eae4a9f16b": "Add Linear access to browse and link issues.",
                 "fe9231215b": "Checking Linear access before showing setup actions.",
                 "e1f5e6424c": "{{value0}} workspace{{value1}} connected",
-                "disconnect_all": "Disconnect"
+                "disconnect_all": "Desconectar todo",
+                "linearSkillTitle": "Habilidad de Agent de Linear",
+                "linearSkillDescription": "Instala la habilidad de Agent del host que los Agents usan para traspasos más completos con tareas Linear enlazadas.",
+                "linearSkillTerminalTitle": "Instalar habilidad de Agent de Linear",
+                "linearSkillTerminalAria": "Terminal de instalación de la habilidad de Agent de Linear",
+                "linearSkillInstall": "Instalar CLI y habilidad",
+                "linearSkillOptionalHint": "Paso opcional siguiente: instala la habilidad de Agent de Linear para traspasos con contexto del ticket.",
+                "linearSkillDismissHint": "Descartar la nota opcional de configuración de la habilidad de Agent de Linear",
+                "linearSkillWslDescription": "Instala la habilidad de Agent de WSL que los Agents usan para traspasos más completos con tareas Linear enlazadas.",
+                "linearSkillWslLabel": "WSL predeterminado"
               }
             }
           }
@@ -7580,6 +7636,19 @@
               }
             }
           }
+        },
+        "computerUseSummary": {
+          "permissionsRequired": "{{value0}} permission{{value1}} required before agents can operate app windows.",
+          "checkingTitle": "Checking Computer Use access.",
+          "checkingDescription": "Orca is checking macOS privacy permissions for the Computer Use helper.",
+          "unavailableTitle": "Computer Use is unavailable.",
+          "unavailableDescription": "Computer Use permissions are unavailable because {{value0}}.",
+          "readyTitle": "Computer Use is ready.",
+          "readyDescription": "Agents can inspect and operate app windows when you ask.",
+          "permissionsTitle": "Finish setup to use local apps."
+        },
+        "computerUseSkillRuntime": {
+          "thisDevice": "This device"
         }
       },
       "right": {
@@ -8494,7 +8563,10 @@
           "c5292c409d": "Los Agents pueden inspeccionar las ventanas de las aplicaciones y operar aplicaciones locales cuando usted lo solicite.",
           "1ecfb490ac": "Uso de la computadora",
           "01426f3a23": "Los Agents pueden navegar por sitios, inspeccionar páginas y realizar tareas del navegador.",
-          "ea85d9e628": "Uso del navegador del Agent"
+          "ea85d9e628": "Uso del navegador del Agent",
+          "linearTicketsTitle": "Habilidad de Agent de Linear",
+          "linearTicketsDescription": "Los Agents pueden usar tareas Linear enlazadas para traspasos más completos y conscientes del ticket.",
+          "linearTicketsSetupSummary": "Recomendado para espacios de trabajo Linear; no afecta la configuración de conexión de Linear."
         },
         "FeatureSetupInlineTerminal": {
           "789b59936e": "Presione Enter para ejecutar el comando y confirme npx si se le solicita. También puedes configurar esto más tarde en Configuración.",
@@ -8636,7 +8708,7 @@
           }
         },
         "AgentFeatureSetupStep": {
-          "97dcdc010f": "Habilitar capacidades"
+          "97dcdc010f": "Instalar CLI y habilidades"
         }
       },
       "new": {
@@ -8909,7 +8981,9 @@
             "3a59452a67": "Comando de habilidad copiado e insertado a continuación para su revisión.",
             "c605f51f2b": "Configuración de capacidad lista",
             "1aa657d8f4": "Alguna configuración de capacidad necesita atención",
-            "c89534cbe9": "Instalar CLI y habilidades"
+            "c89534cbe9": "Instalar CLI y habilidades",
+            "linearTicketsTitle": "Habilidad de Agent de Linear",
+            "linearTicketsDescription": "Recomendado cuando los Agents trabajan desde tareas Linear enlazadas."
           },
           "AiCommitPrSettingsCard": {
             "8d4152701a": "p.ej. ollama corre llama3.1 {{value0}}",
@@ -10528,6 +10602,44 @@
           "countMany": "{{value0}} attached worktrees",
           "emptyTitle": "No attached worktrees yet",
           "emptyCopy": "Worktrees created from this workspace will show up here."
+        }
+      },
+      "link": {
+        "routing": {
+          "preference": {
+            "dialog": {
+              "badge": "Enlace del terminal",
+              "preview": "Vista previa",
+              "title": "¿Abrir enlaces del terminal en el navegador de Orca?",
+              "description": "Usa el navegador de Orca para los enlaces del terminal o conserva tu navegador del sistema.",
+              "orca": {
+                "button": "Abrir en Orca",
+                "note": "Orca puede usar cookies importadas para sitios con sesión iniciada."
+              },
+              "settings": {
+                "note": "Cámbialo después en Configuración → Navegador."
+              },
+              "system": {
+                "button": "Usar navegador del sistema"
+              },
+              "link": {
+                "label": "Enlace"
+              },
+              "shortcut": {
+                "note": {
+                  "prefix": "Cuando los enlaces se abren en Orca,",
+                  "suffix": "clic abre el navegador del sistema una vez."
+                }
+              },
+              "keep": {
+                "title": "¿Mantener los enlaces del terminal en el navegador de Orca?",
+                "description": "O usa tu navegador del sistema de forma predeterminada.",
+                "orca": {
+                  "button": "Mantener Orca"
+                }
+              }
+            }
+          }
         }
       }
     },
