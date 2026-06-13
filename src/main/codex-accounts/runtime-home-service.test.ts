@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   chmodSync,
   existsSync,
+  linkSync,
   lstatSync,
   mkdtempSync,
   mkdirSync,
@@ -1091,7 +1092,7 @@ describe('CodexRuntimeHomeService', () => {
     expect(readFileSync(runtimeProfilePath, 'utf-8')).toBe('profile\n')
   })
 
-  it('does not bridge historical system Codex sessions during ordinary launch prep', async () => {
+  it('prunes bridged historical system Codex sessions during ordinary launch prep', async () => {
     const systemMissingRuntimeSessionPath = join(
       getSystemCodexHomePath(),
       'sessions',
@@ -1116,6 +1117,22 @@ describe('CodexRuntimeHomeService', () => {
       '26',
       'rollout-conflict.jsonl'
     )
+    const systemBridgedSessionPath = join(
+      getSystemCodexHomePath(),
+      'sessions',
+      '2026',
+      '05',
+      '26',
+      'rollout-bridged.jsonl'
+    )
+    const runtimeBridgedSessionPath = join(
+      getRuntimeCodexHomePath(),
+      'sessions',
+      '2026',
+      '05',
+      '26',
+      'rollout-bridged.jsonl'
+    )
     mkdirSync(join(getSystemCodexHomePath(), 'sessions', '2026', '05', '26'), { recursive: true })
     mkdirSync(join(getRuntimeCodexHomePath(), 'sessions', '2026', '05', '26'), {
       recursive: true
@@ -1123,6 +1140,8 @@ describe('CodexRuntimeHomeService', () => {
     writeFileSync(systemMissingRuntimeSessionPath, '{"id":"old"}\n', 'utf-8')
     writeFileSync(systemConflictSessionPath, '{"id":"system-conflict"}\n', 'utf-8')
     writeFileSync(runtimeConflictSessionPath, '{"id":"runtime-conflict"}\n', 'utf-8')
+    writeFileSync(systemBridgedSessionPath, '{"id":"bridged"}\n', 'utf-8')
+    linkSync(systemBridgedSessionPath, runtimeBridgedSessionPath)
     writeFileSync(join(getSystemCodexHomePath(), 'state_5.sqlite'), 'sqlite\n', 'utf-8')
     const store = createStore(createSettings())
     const { CodexRuntimeHomeService } = await import('./runtime-home-service')
@@ -1139,6 +1158,8 @@ describe('CodexRuntimeHomeService', () => {
       'rollout-old.jsonl'
     )
     expect(existsSync(runtimeMissingSessionPath)).toBe(false)
+    expect(existsSync(runtimeBridgedSessionPath)).toBe(false)
+    expect(readFileSync(systemBridgedSessionPath, 'utf-8')).toBe('{"id":"bridged"}\n')
     expect(readFileSync(runtimeConflictSessionPath, 'utf-8')).toBe('{"id":"runtime-conflict"}\n')
     expect(existsSync(join(getRuntimeCodexHomePath(), 'state_5.sqlite'))).toBe(false)
   })

@@ -51,6 +51,7 @@ vi.mock('node:os', async () => {
 })
 
 import { syncSystemCodexSessionsIntoManagedHome } from './codex-session-bridge'
+import { pruneSystemCodexSessionBridgesFromManagedHome } from './codex-session-bridge-prune'
 
 let fakeHomeDir: string
 let userDataDir: string
@@ -275,5 +276,42 @@ describe('syncSystemCodexSessionsIntoManagedHome', () => {
 
     expect(lstatSync(runtimeSessionPath).isSymbolicLink()).toBe(false)
     expect(readFileSync(runtimeSessionPath, 'utf-8')).toBe('{"id":"legacy"}\n')
+  })
+})
+
+describe('pruneSystemCodexSessionBridgesFromManagedHome', () => {
+  it('unlinks bridged system sessions while preserving runtime-owned sessions', () => {
+    const hardlinkRelativePath = join('sessions', '2026', '05', '26', 'rollout-hardlink.jsonl')
+    const symlinkRelativePath = join('sessions', '2026', '05', '26', 'rollout-symlink.jsonl')
+    const ownedRelativePath = join('sessions', '2026', '05', '26', 'rollout-owned.jsonl')
+    const systemHardlinkPath = join(getSystemCodexHomePath(), hardlinkRelativePath)
+    const systemSymlinkPath = join(getSystemCodexHomePath(), symlinkRelativePath)
+    const runtimeHardlinkPath = join(getRuntimeCodexHomePath(), hardlinkRelativePath)
+    const runtimeSymlinkPath = join(getRuntimeCodexHomePath(), symlinkRelativePath)
+    const runtimeOwnedPath = join(getRuntimeCodexHomePath(), ownedRelativePath)
+    mkdirSync(dirname(systemHardlinkPath), { recursive: true })
+    mkdirSync(dirname(runtimeHardlinkPath), { recursive: true })
+    writeFileSync(systemHardlinkPath, '{"id":"system-hardlink"}\n', 'utf-8')
+    writeFileSync(systemSymlinkPath, '{"id":"system-symlink"}\n', 'utf-8')
+    writeFileSync(runtimeOwnedPath, '{"id":"runtime-owned"}\n', 'utf-8')
+    fsMockState.failLink = false
+    syncSystemCodexSessionsIntoManagedHome()
+    rmSync(runtimeSymlinkPath, { force: true })
+    symlinkSync(
+      systemSymlinkPath,
+      runtimeSymlinkPath,
+      process.platform === 'win32' ? 'file' : undefined
+    )
+
+    const result = pruneSystemCodexSessionBridgesFromManagedHome()
+
+    expect(result.scannedManagedFiles).toBe(3)
+    expect(result.prunedHardlinks).toBe(1)
+    expect(result.prunedSymlinks).toBe(1)
+    expect(existsSync(systemHardlinkPath)).toBe(true)
+    expect(existsSync(systemSymlinkPath)).toBe(true)
+    expect(existsSync(runtimeHardlinkPath)).toBe(false)
+    expect(existsSync(runtimeSymlinkPath)).toBe(false)
+    expect(readFileSync(runtimeOwnedPath, 'utf-8')).toBe('{"id":"runtime-owned"}\n')
   })
 })

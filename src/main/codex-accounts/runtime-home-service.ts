@@ -40,6 +40,7 @@ import {
   syncSystemCodexResourcesIntoManagedHome
 } from '../codex/codex-home-paths'
 import { syncSystemConfigIntoManagedCodexHome } from '../codex/codex-config-mirror'
+import { pruneSystemCodexSessionBridgesFromManagedHome } from '../codex/codex-session-bridge-prune'
 import { parseWslUncPath } from '../../shared/wsl-paths'
 import {
   getSelectedCodexAccountIdForTarget,
@@ -132,6 +133,7 @@ export class CodexRuntimeHomeService {
     syncSystemConfigIntoManagedCodexHome()
     // Why: historical session bridging walks every system transcript; keep new
     // Codex agent launch responsive and let usage/history surfaces read both homes.
+    pruneSystemCodexSessionBridgesFromManagedHome()
     return this.getRuntimeHomePath()
   }
 
