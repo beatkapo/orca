@@ -4726,12 +4726,13 @@ const WorktreeList = React.memo(function WorktreeList({
         defaultHostId,
         collapsedHostKeys: effectiveCollapsedGroups,
         forceCollapseHosts: hostDragActive,
-        preferProjectGrouping: groupBy === 'repo'
+        // Why: projects/workspaces are now the primary sidebar object in every
+        // grouping mode; host sections are only an explicit host-filter view.
+        preferProjectGrouping: true
       }),
     [
       defaultHostId,
       effectiveCollapsedGroups,
-      groupBy,
       hostDragActive,
       orderedHostOptions,
       rows,
