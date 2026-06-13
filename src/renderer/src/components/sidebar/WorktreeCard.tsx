@@ -892,7 +892,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
     <div
       className={cn(
         'group relative flex items-start pr-1.5 pt-1.5 pb-2 cursor-pointer transition-[background-color,border-color,opacity,box-shadow] duration-200 outline-none select-none',
-        affiliateListMode ? 'gap-1 pl-0.5' : 'gap-0.5 pl-0',
+        'gap-0.5 pl-0',
         flushSurface ? 'ml-1 w-[calc(100%-0.25rem)]' : 'ml-1',
         'rounded-lg',
         isActiveSurface

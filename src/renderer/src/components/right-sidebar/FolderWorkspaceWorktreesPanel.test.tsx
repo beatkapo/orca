@@ -31,6 +31,7 @@ const testState = vi.hoisted(() => ({
     affiliateListMode?: boolean
     nativeDragEnabled?: boolean
     isActive?: boolean
+    flushSurface?: boolean
   }[]
 }))
 
@@ -49,6 +50,7 @@ vi.mock('@/components/sidebar/WorktreeCard', () => ({
     affiliateListMode?: boolean
     nativeDragEnabled?: boolean
     isActive?: boolean
+    flushSurface?: boolean
   }) => {
     testState.cardProps.push(props)
     return (
@@ -58,6 +60,7 @@ vi.mock('@/components/sidebar/WorktreeCard', () => ({
         data-affiliate-list-mode={props.affiliateListMode ? 'true' : 'false'}
         data-native-drag-enabled={props.nativeDragEnabled ? 'true' : 'false'}
         data-active={props.isActive ? 'true' : 'false'}
+        data-flush-surface={props.flushSurface ? 'true' : 'false'}
       >
         {props.worktree.displayName}
       </div>
@@ -210,5 +213,6 @@ describe('FolderWorkspaceWorktreesPanel', () => {
     expect(testState.cardProps).toHaveLength(2)
     expect(testState.cardProps.every((props) => props.affiliateListMode === true)).toBe(true)
     expect(testState.cardProps.every((props) => props.nativeDragEnabled === false)).toBe(true)
+    expect(testState.cardProps.every((props) => props.flushSurface === true)).toBe(true)
   })
 })

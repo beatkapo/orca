@@ -110,6 +110,7 @@ export default function FolderWorkspaceWorktreesPanel(): React.JSX.Element {
                 isActiveSurface={false}
                 hideRepoBadge={false}
                 nativeDragEnabled={false}
+                flushSurface
                 affiliateListMode
               />
             ))}
