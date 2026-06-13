@@ -27,4 +27,16 @@ describe('TaskPage source switching host boundary', () => {
     expect(section).not.toContain('projectHostSetupId')
     expect(section).not.toContain('workspaceRunContext')
   })
+
+  it('treats missing remote task-source capability as source unavailable', () => {
+    const section = sourceBetween(
+      TASK_PAGE_SOURCE,
+      'function getTaskSourceHostAvailabilityForHost',
+      'function getTaskPageRepoCacheInput'
+    )
+
+    expect(section).toContain('TASK_SOURCE_CONTEXT_RUNTIME_CAPABILITY')
+    expect(section).toContain("reason: 'checking-task-source-capability'")
+    expect(section).toContain("reason: 'missing-task-source-capability'")
+  })
 })

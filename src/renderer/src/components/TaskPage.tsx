@@ -128,7 +128,10 @@ import PullRequestPage from '@/components/PullRequestPage'
 import GitLabItemDialog from '@/components/GitLabItemDialog'
 import ProjectViewWrapper from '@/components/github-project/ProjectViewWrapper'
 import { getSettingsForRepoRuntimeOwner } from '@/lib/repo-runtime-owner'
-import { buildExecutionHostRegistry } from '../../../shared/execution-host-registry'
+import {
+  buildExecutionHostRegistry,
+  type ExecutionHostRegistryEntry
+} from '../../../shared/execution-host-registry'
 import { getHostDisplayLabelOverrides } from '../../../shared/host-setting-overrides'
 import LinearIssueWorkspace from '@/components/LinearIssueWorkspace'
 import {
@@ -152,6 +155,7 @@ import { buildLinearIssueLinkedWorkItem } from '@/lib/linear-linked-work-item'
 import { isGitRepoKind } from '../../../shared/repo-kind'
 import { getRepoExecutionHostId } from '../../../shared/execution-host'
 import { projectHostSetupProjectionFromRepos } from '../../../shared/project-host-setup-projection'
+import { TASK_SOURCE_CONTEXT_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
 import {
   getTaskSourceCacheScope,
   getTaskSourceRuntimeSettings,
@@ -344,6 +348,37 @@ function getTaskPageRepoSourceContext(
     repoId: repo.id,
     providerIdentity
   })
+}
+
+function getTaskSourceHostAvailabilityForHost(
+  host: ExecutionHostRegistryEntry | null | undefined,
+  hostId: TaskSourceContext['hostId']
+): TaskSourceHostAvailability | null {
+  if (!host) {
+    return null
+  }
+  if (host.kind === 'runtime') {
+    if (!host.capabilities) {
+      return {
+        hostId,
+        reason: 'checking-task-source-capability'
+      }
+    }
+    if (!host.capabilities.includes(TASK_SOURCE_CONTEXT_RUNTIME_CAPABILITY)) {
+      return {
+        hostId,
+        reason: 'missing-task-source-capability'
+      }
+    }
+  }
+  if (host.health === 'local' || host.health === 'available') {
+    return null
+  }
+  return {
+    hostId,
+    health: host.health,
+    status: host.connectionStatus
+  }
 }
 
 function getTaskPageRepoCacheInput(repo: Repo): {
@@ -2896,16 +2931,8 @@ export default function TaskPage(): React.JSX.Element {
       taskSource === 'github' || taskSource === 'gitlab'
         ? taskSourceRepoContexts.flatMap((context) => {
             const host = hostRegistryById.get(context.hostId)
-            if (!host || host.health === 'local' || host.health === 'available') {
-              return []
-            }
-            return [
-              {
-                hostId: context.hostId,
-                health: host.health,
-                status: host.connectionStatus
-              }
-            ]
+            const availability = getTaskSourceHostAvailabilityForHost(host, context.hostId)
+            return availability ? [availability] : []
           })
         : [],
     [hostRegistryById, taskSource, taskSourceRepoContexts]
@@ -2972,16 +2999,8 @@ export default function TaskPage(): React.JSX.Element {
       return []
     }
     const host = hostRegistryById.get(accountBackedTaskSourceHostId)
-    if (!host || host.health === 'local' || host.health === 'available') {
-      return []
-    }
-    return [
-      {
-        hostId: host.id,
-        health: host.health,
-        status: host.connectionStatus
-      }
-    ]
+    const availability = getTaskSourceHostAvailabilityForHost(host, accountBackedTaskSourceHostId)
+    return availability ? [availability] : []
   }, [accountBackedTaskSourceHostId, hostRegistryById, taskSource])
   const taskSourceAvailabilityNoticeByProvider = useMemo<
     Partial<Record<TaskProvider, TaskSourceAvailabilityNotice>>
@@ -2991,22 +3010,15 @@ export default function TaskPage(): React.JSX.Element {
     ): TaskSourceHostAvailability[] =>
       contexts.flatMap((context) => {
         const host = hostRegistryById.get(context.hostId)
-        if (!host || host.health === 'local' || host.health === 'available') {
-          return []
-        }
-        return [{ hostId: context.hostId, health: host.health, status: host.connectionStatus }]
+        const availability = getTaskSourceHostAvailabilityForHost(host, context.hostId)
+        return availability ? [availability] : []
       })
     const accountHost = hostRegistryById.get(accountBackedTaskSourceHostId)
-    const accountAvailability =
-      !accountHost || accountHost.health === 'local' || accountHost.health === 'available'
-        ? []
-        : [
-            {
-              hostId: accountHost.id,
-              health: accountHost.health,
-              status: accountHost.connectionStatus
-            }
-          ]
+    const accountHostAvailability = getTaskSourceHostAvailabilityForHost(
+      accountHost,
+      accountBackedTaskSourceHostId
+    )
+    const accountAvailability = accountHostAvailability ? [accountHostAvailability] : []
     const labelFor = (provider: TaskProvider): string =>
       sourceOptions.find((source) => source.id === provider)?.label ?? provider
     return {

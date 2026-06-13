@@ -177,6 +177,49 @@ describe('task source context summary', () => {
     )
   })
 
+  it('shows remote-server task-source capability checks', () => {
+    const summary = getTaskSourceContextSummary({
+      provider: 'github',
+      providerLabel: 'GitHub',
+      selectedRepoCount: 1,
+      repoContexts: [
+        {
+          kind: 'task-source',
+          provider: 'github',
+          projectId: 'project-a',
+          hostId: 'runtime:old-server',
+          repoId: 'repo-a',
+          providerIdentity: { provider: 'github', owner: 'stablyai', repo: 'orca' }
+        }
+      ],
+      hostAvailability: [
+        { hostId: 'runtime:old-server', reason: 'checking-task-source-capability' }
+      ]
+    })
+
+    expect(summary.label).toBe('GitHub · old-server · checking server capabilities · stablyai/orca')
+    expect(summary.title).toBe(
+      'GitHub · Host: old-server · Availability: old-server checking server capabilities · Source: stablyai/orca'
+    )
+  })
+
+  it('shows remote-server task-source capability version skew', () => {
+    expect(
+      getTaskSourceAvailabilityNotice({
+        providerLabel: 'GitHub',
+        sourceCount: 1,
+        hostAvailability: [
+          { hostId: 'runtime:old-server', reason: 'missing-task-source-capability' }
+        ]
+      })
+    ).toEqual({
+      label: 'GitHub source unavailable: old-server server update needed for task sources',
+      title:
+        'Reconnect or update old-server server update needed for task sources to load this source.',
+      blocking: true
+    })
+  })
+
   it('shows account-backed Linear and Jira sources', () => {
     expect(
       getTaskSourceContextSummary({
