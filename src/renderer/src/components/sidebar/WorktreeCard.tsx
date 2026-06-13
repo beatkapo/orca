@@ -799,8 +799,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
     : hasDetailedMetaRowContent
   const showHeaderActions = showTitleRowUnread || showTitleRowPrimary || showDeleteQuickAction
   const showBranchIdentityHover = compactCards && showBranch
-  const showInlineAgentList =
-    !affiliateListMode && showDetailedCardProperties && cardProps.includes('inline-agents')
+  const showInlineAgentList = showDetailedCardProperties && cardProps.includes('inline-agents')
   // Why: sidebar rows need a small surface inset, while their content remains
   // aligned with the pre-inset layout and the repo header hierarchy.
   const cardStyle = flushSurface

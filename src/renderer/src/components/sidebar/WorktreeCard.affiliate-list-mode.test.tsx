@@ -73,7 +73,7 @@ vi.mock('./CacheTimer', () => ({
 }))
 
 vi.mock('./WorktreeCardAgents', () => ({
-  default: () => null
+  default: () => <div data-testid="inline-agents" />
 }))
 
 vi.mock('./SshDisconnectedDialog', () => ({
@@ -193,5 +193,24 @@ describe('WorktreeCard affiliate list mode', () => {
     expect(openModal).not.toHaveBeenCalled()
     expect(setRenamingWorktreeId).not.toHaveBeenCalled()
     expect(updateWorktreeMeta).not.toHaveBeenCalled()
+  })
+
+  it('still shows inline agent details in affiliate list mode', () => {
+    worktreeCardProperties = ['status', 'inline-agents']
+
+    act(() => {
+      root.render(
+        <WorktreeCard
+          worktree={makeWorktree()}
+          repo={makeRepo()}
+          isActive={false}
+          nativeDragEnabled
+          flushSurface
+          affiliateListMode
+        />
+      )
+    })
+
+    expect(container.querySelector('[data-testid="inline-agents"]')).not.toBeNull()
   })
 })
