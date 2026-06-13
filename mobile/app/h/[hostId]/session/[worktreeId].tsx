@@ -32,6 +32,7 @@ import {
   FileText,
   GitBranch,
   Globe,
+  ImagePlus,
   Keyboard as KeyboardIcon,
   MessageSquare,
   Mic,
@@ -125,6 +126,7 @@ import {
   buildMobileImagePastePayload,
   saveMobileClipboardImageAsTempFile
 } from '../../../../src/session/mobile-clipboard-image'
+import { useMobileImageAttachment } from '../../../../src/session/use-mobile-image-attachment'
 import { TerminalPaneView } from '../../../../src/session/TerminalPaneView'
 import {
   getRepoIdFromMobileWorktreeId,
@@ -815,6 +817,7 @@ export default function SessionScreen() {
   >(new Map())
   const [selectModeActive, setSelectModeActive] = useState(false)
   const [canPaste, setCanPaste] = useState(false)
+  const [showImageSourceSheet, setShowImageSourceSheet] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const toastOpacityRef = useRef(new Animated.Value(0))
   const toastHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -3088,6 +3091,26 @@ export default function SessionScreen() {
     showToast
   ])
 
+  const { attachImage } = useMobileImageAttachment({
+    client,
+    activeHandle,
+    canSend,
+    connState,
+    deviceTokenRef,
+    getActiveWorktreeConnectionId,
+    showToast,
+    onSuccess: triggerSelection,
+    onError: triggerError
+  })
+
+  const handlePickImage = useCallback(
+    (source: 'library' | 'files') => {
+      setShowImageSourceSheet(false)
+      void attachImage(source)
+    },
+    [attachImage]
+  )
+
   // Why: refresh canPaste on mount, AppState active, after paste.
   useEffect(() => {
     let mounted = true
@@ -4213,6 +4236,14 @@ export default function SessionScreen() {
                   onSubmitEditing={() => void handleSend()}
                 />
                 <Pressable
+                  style={[styles.dictationButton, !canSend && styles.sendButtonDisabled]}
+                  disabled={!canSend}
+                  onPress={() => setShowImageSourceSheet(true)}
+                  accessibilityLabel="Attach an image"
+                >
+                  <ImagePlus size={17} color={colors.textSecondary} strokeWidth={2.4} />
+                </Pressable>
+                <Pressable
                   style={[
                     styles.dictationButton,
                     (dictation.isStarting || dictation.isRecording) && styles.dictationButtonActive,
@@ -4269,6 +4300,24 @@ export default function SessionScreen() {
           </View>
         )}
       </View>
+
+      <ActionSheetModal
+        visible={showImageSourceSheet}
+        title="Attach Image"
+        onClose={() => setShowImageSourceSheet(false)}
+        actions={[
+          {
+            label: 'Photo Library',
+            icon: ImagePlus,
+            onPress: () => handlePickImage('library')
+          },
+          {
+            label: 'Browse Files',
+            icon: Folder,
+            onPress: () => handlePickImage('files')
+          }
+        ]}
+      />
 
       <ActionSheetModal
         visible={showCreateTabDrawer}
