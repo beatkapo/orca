@@ -30,7 +30,7 @@ export function getLinearAgentSkillSetupToastTitle(
   if (!cliAvailable && !skillInstalled) {
     return translate(
       'auto.components.sidebar.LinearAgentSkillSetupPrompt.toastMissingCliAndSkill',
-      'Orca CLI and Linear agent skill are missing'
+      'Orca CLI and Linear skill are missing'
     )
   }
   if (!cliAvailable) {
@@ -41,29 +41,29 @@ export function getLinearAgentSkillSetupToastTitle(
   }
   return translate(
     'auto.components.sidebar.LinearAgentSkillSetupPrompt.toastMissingSkill',
-    'Linear agent skill is missing'
+    'Linear skill is missing'
   )
 }
 
 export function getLinearAgentSkillSetupToastDescription(
-  remote: boolean,
-  agentRuntime: LocalAgentRuntime
+  cliAvailable: boolean,
+  skillInstalled: boolean
 ): string {
-  if (remote) {
+  if (!cliAvailable && !skillInstalled) {
     return translate(
-      'auto.components.sidebar.LinearAgentSkillSetupPrompt.remoteToastDescription',
-      'Install local setup for host handoffs; remote agent environments may still need their own setup.'
+      'auto.components.sidebar.LinearAgentSkillSetupPrompt.toastInstallCliAndSkillDescription',
+      'Install the Orca CLI and the Linear skill to enable your agents to read and edit Linear tasks through the Orca CLI.'
     )
   }
-  if (agentRuntime.runtime === 'wsl') {
+  if (!cliAvailable) {
     return translate(
-      'auto.components.sidebar.LinearAgentSkillSetupPrompt.wslToastDescription',
-      'Install them for the selected WSL agent runtime so linked Linear ticket handoffs include ticket context.'
+      'auto.components.sidebar.LinearAgentSkillSetupPrompt.toastInstallCliDescription',
+      'Install the Orca CLI to enable your agents to read and edit Linear tasks through the Orca CLI.'
     )
   }
   return translate(
-    'auto.components.sidebar.LinearAgentSkillSetupPrompt.hostToastDescription',
-    'Install them so agents started from linked Linear tickets can read and update the ticket context.'
+    'auto.components.sidebar.LinearAgentSkillSetupPrompt.toastInstallSkillDescription',
+    'Install the Linear skill to enable your agents to read and edit Linear tasks through the Orca CLI.'
   )
 }
 

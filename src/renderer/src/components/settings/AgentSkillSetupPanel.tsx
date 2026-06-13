@@ -84,6 +84,7 @@ export function AgentSkillSetupPanel({
     () => (getPrerequisiteStatus ?? window.api.cli.getInstallStatus)(),
     [getPrerequisiteStatus]
   )
+  const actionLabel = installed && preInstallNoticeVisible ? installLabel : installedInstallLabel
 
   useEffect(() => {
     if (!preInstallNotice) {
@@ -172,7 +173,7 @@ export function AgentSkillSetupPanel({
           disabled={terminalOpen || installDisabled}
         >
           <Terminal className="size-3.5" />
-          {installed ? installedInstallLabel : installLabel}
+          {installed ? actionLabel : installLabel}
         </Button>
       ) : null}
       {!installed || showRecheckWhenInstalled ? (

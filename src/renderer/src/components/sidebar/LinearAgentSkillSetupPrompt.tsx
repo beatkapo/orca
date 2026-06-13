@@ -183,7 +183,7 @@ export function LinearAgentSkillSetupPrompt({
 
   const toastTitle = getLinearAgentSkillSetupToastTitle(cliAvailable, skill.installed)
 
-  const toastDescription = getLinearAgentSkillSetupToastDescription(remote, agentRuntime)
+  const toastDescription = getLinearAgentSkillSetupToastDescription(cliAvailable, skill.installed)
 
   useEffect(() => {
     if (surface !== 'modal' || !missingSetup || setupDialogOpen) {
@@ -207,7 +207,7 @@ export function LinearAgentSkillSetupPrompt({
       action: {
         label: translate(
           'auto.components.sidebar.LinearAgentSkillSetupPrompt.openSetup',
-          'Open setup'
+          'Set up Linear access'
         ),
         onClick: () => setSetupDialogOpen(true)
       }
