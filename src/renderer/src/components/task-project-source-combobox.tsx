@@ -111,6 +111,11 @@ export default function TaskProjectSourceCombobox({
   const [query, setQuery] = useState('')
   const [commandValue, setCommandValue] = useState('')
   const sourceMenuCloseTimerRef = useRef<number | null>(null)
+  const sourceMenuHoverRef = useRef<{
+    projectKey: string | null
+    trigger: boolean
+    content: boolean
+  }>({ projectKey: null, trigger: false, content: false })
 
   const filteredGroups = useMemo(() => {
     const trimmed = query.trim()
@@ -126,6 +131,7 @@ export default function TaskProjectSourceCombobox({
     if (!nextOpen) {
       setQuery('')
       setSourceMenuProjectKey(null)
+      sourceMenuHoverRef.current = { projectKey: null, trigger: false, content: false }
     }
   }, [])
 
@@ -136,21 +142,25 @@ export default function TaskProjectSourceCombobox({
     }
   }, [])
 
-  const openSourceMenu = useCallback(
-    (projectKey: string) => {
+  const setSourceMenuHover = useCallback(
+    (projectKey: string, region: 'trigger' | 'content', hovered: boolean) => {
       clearSourceMenuCloseTimer()
-      setSourceMenuProjectKey(projectKey)
-    },
-    [clearSourceMenuCloseTimer]
-  )
-
-  const scheduleSourceMenuClose = useCallback(
-    (projectKey: string) => {
-      clearSourceMenuCloseTimer()
+      if (sourceMenuHoverRef.current.projectKey !== projectKey) {
+        sourceMenuHoverRef.current = { projectKey, trigger: false, content: false }
+      }
+      sourceMenuHoverRef.current[region] = hovered
+      if (hovered) {
+        setSourceMenuProjectKey(projectKey)
+        return
+      }
       sourceMenuCloseTimerRef.current = window.setTimeout(() => {
-        setSourceMenuProjectKey((current) => (current === projectKey ? null : current))
+        const hover = sourceMenuHoverRef.current
+        if (hover.projectKey === projectKey && !hover.trigger && !hover.content) {
+          setSourceMenuProjectKey((current) => (current === projectKey ? null : current))
+          sourceMenuHoverRef.current = { projectKey: null, trigger: false, content: false }
+        }
         sourceMenuCloseTimerRef.current = null
-      }, 120)
+      }, 100)
     },
     [clearSourceMenuCloseTimer]
   )
@@ -189,6 +199,7 @@ export default function TaskProjectSourceCombobox({
       next.add(source.id)
       onChange(next)
       setSourceMenuProjectKey(null)
+      sourceMenuHoverRef.current = { projectKey: null, trigger: false, content: false }
     },
     [getRepoSourceStatus, onChange, selected]
   )
@@ -318,12 +329,13 @@ export default function TaskProjectSourceCombobox({
                             'auto.components.task.project.source.combobox.chooseSource',
                             'Choose task source'
                           )}
-                          onMouseEnter={() => openSourceMenu(group.projectKey)}
-                          onMouseLeave={() => scheduleSourceMenuClose(group.projectKey)}
-                          onFocus={() => openSourceMenu(group.projectKey)}
+                          onMouseEnter={() => setSourceMenuHover(group.projectKey, 'trigger', true)}
+                          onMouseLeave={() =>
+                            setSourceMenuHover(group.projectKey, 'trigger', false)
+                          }
                           onClick={(event) => {
                             event.preventDefault()
-                            openSourceMenu(group.projectKey)
+                            event.stopPropagation()
                           }}
                           onMouseDown={(event) => event.preventDefault()}
                           className="flex w-8 shrink-0 items-center justify-center text-muted-foreground"
@@ -336,8 +348,8 @@ export default function TaskProjectSourceCombobox({
                         align="start"
                         sideOffset={6}
                         className="w-[min(300px,calc(100vw-1rem))] p-1"
-                        onMouseEnter={() => openSourceMenu(group.projectKey)}
-                        onMouseLeave={() => scheduleSourceMenuClose(group.projectKey)}
+                        onMouseEnter={() => setSourceMenuHover(group.projectKey, 'content', true)}
+                        onMouseLeave={() => setSourceMenuHover(group.projectKey, 'content', false)}
                       >
                         <div className="border-b border-border px-2 py-1.5">
                           <div className="truncate text-xs font-medium text-foreground">
