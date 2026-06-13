@@ -25,15 +25,22 @@ export class AutomationService {
   private evaluating = false
   private readonly claudeUsage: ClaudeUsageStore | null
   private readonly codexUsage: CodexUsageStore | null
+  private readonly allowRemoteHostScheduling: boolean
 
   constructor(
     store: Store,
-    opts: { tickMs?: number; claudeUsage?: ClaudeUsageStore; codexUsage?: CodexUsageStore } = {}
+    opts: {
+      tickMs?: number
+      claudeUsage?: ClaudeUsageStore
+      codexUsage?: CodexUsageStore
+      allowRemoteHostScheduling?: boolean
+    } = {}
   ) {
     this.store = store
     this.tickMs = opts.tickMs ?? DEFAULT_TICK_MS
     this.claudeUsage = opts.claudeUsage ?? null
     this.codexUsage = opts.codexUsage ?? null
+    this.allowRemoteHostScheduling = opts.allowRemoteHostScheduling ?? false
   }
 
   setWebContents(webContents: WebContents | null): void {
@@ -87,7 +94,9 @@ export class AutomationService {
     if (run.trigger !== 'scheduled' || !automation.precheck) {
       return null
     }
-    const target = resolveAutomationRunTarget(this.store, automation)
+    const target = resolveAutomationRunTarget(this.store, automation, {
+      allowRemoteHostScheduling: this.allowRemoteHostScheduling
+    })
     if (!target.ok) {
       return {
         command: automation.precheck.command,
@@ -185,7 +194,9 @@ export class AutomationService {
     automation: Automation,
     run: AutomationRun
   ): Promise<AutomationRun> {
-    const target = resolveAutomationRunTarget(this.store, automation)
+    const target = resolveAutomationRunTarget(this.store, automation, {
+      allowRemoteHostScheduling: this.allowRemoteHostScheduling
+    })
     if (!target.ok) {
       return this.store.updateAutomationRun({
         runId: run.id,

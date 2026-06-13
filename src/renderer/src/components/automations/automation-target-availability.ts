@@ -255,10 +255,7 @@ function getRuntimeAutomationAvailability(
   if (compat.kind === 'blocked') {
     return unavailable('runtime-update-required', describeRuntimeCompatBlock(compat))
   }
-  return unavailable(
-    'unsupported-host',
-    'Manual runs for remote-server automations are not available from this client yet.'
-  )
+  return { canRunNow: true, reason: 'available', message: null }
 }
 
 function getAutomationSshTargetId(automation: Automation, repo: Repo): string | null {

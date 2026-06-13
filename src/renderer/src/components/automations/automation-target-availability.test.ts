@@ -371,8 +371,8 @@ describe('automation target availability', () => {
         ])
       })
     ).toMatchObject({
-      reason: 'unsupported-host',
-      message: 'Manual runs for remote-server automations are not available from this client yet.'
+      reason: 'available',
+      message: null
     })
   })
 })

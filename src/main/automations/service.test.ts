@@ -239,6 +239,53 @@ describe('AutomationService', () => {
     expect(send).not.toHaveBeenCalled()
   })
 
+  it('dispatches remote-host scheduled automations when service runs in serve mode', async () => {
+    vi.setSystemTime(new Date('2026-05-13T08:00:00Z'))
+    const store = await createStore()
+    const runtimeHostId = toRuntimeExecutionHostId('gpu-server')
+    store.addRepo(makeRepo({ executionHostId: runtimeHostId }))
+    const setup = store.getProjectHostSetups()[0]!
+    const automation = store.createAutomation({
+      name: 'Remote check',
+      prompt: 'Check the remote repo',
+      agentId: 'claude',
+      projectId: 'r1',
+      runContext: {
+        kind: 'workspace-run',
+        projectId: setup.projectId,
+        hostId: runtimeHostId,
+        projectHostSetupId: setup.id,
+        repoId: setup.repoId,
+        path: setup.path
+      },
+      workspaceMode: 'new_per_run',
+      timezone: 'UTC',
+      rrule: 'FREQ=DAILY;BYHOUR=9;BYMINUTE=0',
+      dtstart: new Date('2026-05-14T00:00:00Z').getTime()
+    })
+    const send = vi.fn()
+    const service = new AutomationService(store, {
+      tickMs: 60_000,
+      allowRemoteHostScheduling: true
+    })
+    service.setWebContents({
+      isDestroyed: () => false,
+      send
+    } as never)
+    service.setRendererReady()
+
+    const run = await service.runNow(automation.id)
+
+    expect(run.status).toBe('dispatching')
+    expect(send).toHaveBeenCalledWith(
+      'automations:dispatchRequested',
+      expect.objectContaining({
+        automation: expect.objectContaining({ schedulerOwner: 'remote_host_service' }),
+        run: expect.objectContaining({ id: run.id, status: 'dispatching' })
+      })
+    )
+  })
+
   it('attaches provider usage when a completed run can be attributed', async () => {
     vi.setSystemTime(new Date('2026-05-13T10:00:00'))
     const store = await createStore()

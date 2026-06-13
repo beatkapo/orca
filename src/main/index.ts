@@ -1306,7 +1306,13 @@ app.whenReady().then(async () => {
     }
   })
   runtime = runtimeService
-  automations = new AutomationService(store, { claudeUsage, codexUsage })
+  automations = new AutomationService(store, {
+    claudeUsage,
+    codexUsage,
+    // Why: desktop clients may mirror remote-host automations, but only a
+    // server process should execute schedules owned by `remote_host_service`.
+    allowRemoteHostScheduling: isServeMode
+  })
   runtimeService.setAutomationService(automations)
   runtimeService.setAccountServices({ claudeAccounts, codexAccounts, rateLimits })
   runtimeService.setCommitMessageAgentEnvironmentResolvers({

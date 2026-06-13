@@ -9,6 +9,10 @@ export type AutomationRunTargetResult =
   | { ok: true; cwd: string; repo: Repo; setup?: ProjectHostSetup }
   | { ok: false; error: string }
 
+type AutomationRunTargetOptions = {
+  allowRemoteHostScheduling?: boolean
+}
+
 function getLegacyPrecheckCwd(store: Store, automation: Automation): string | null {
   if (automation.workspaceMode === 'existing') {
     const parsed = automation.workspaceId
@@ -21,7 +25,8 @@ function getLegacyPrecheckCwd(store: Store, automation: Automation): string | nu
 
 export function resolveAutomationRunTarget(
   store: Store,
-  automation: Automation
+  automation: Automation,
+  options: AutomationRunTargetOptions = {}
 ): AutomationRunTargetResult {
   const context = automation.runContext ?? null
   if (!context) {
@@ -33,7 +38,10 @@ export function resolveAutomationRunTarget(
     return { ok: true, cwd, repo }
   }
   const parsedHost = parseExecutionHostId(context.hostId)
-  if (parsedHost?.kind === 'runtime') {
+  if (
+    parsedHost?.kind === 'runtime' &&
+    (!options.allowRemoteHostScheduling || automation.schedulerOwner !== 'remote_host_service')
+  ) {
     return {
       ok: false,
       error:

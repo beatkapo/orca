@@ -108,6 +108,15 @@ import {
   getExternalAutomationSourceAvailability,
   isSshConnectionBusy
 } from './external-automation-source-availability'
+import {
+  createAutomationForTarget,
+  deleteAutomationForTarget,
+  getAutomationListTarget,
+  listAutomationRunsForTarget,
+  listAutomationsForTarget,
+  runAutomationNowForTarget,
+  updateAutomationForTarget
+} from './automation-host-client'
 import { getExternalAutomationScheduleDisplay } from './external-automation-schedule-display'
 import { ExternalAutomationManagers } from './ExternalAutomationManagers'
 import type { FetchExternalAutomationRuns } from './ExternalAutomationRunTable'
@@ -742,10 +751,11 @@ export default function AutomationsPage(): React.JSX.Element {
 
   const refresh = useCallback(async () => {
     setIsLoading(true)
+    const automationHostTarget = getAutomationListTarget(settings)
     try {
       const [nextAutomations, nextRuns, nextExternalManagers] = await Promise.all([
-        window.api.automations.list(),
-        window.api.automations.listRuns(),
+        listAutomationsForTarget(automationHostTarget),
+        listAutomationRunsForTarget(automationHostTarget),
         window.api.automations.listExternalManagers()
       ])
       const currentSelectedId = useAppStore.getState().selectedAutomationId
@@ -756,7 +766,7 @@ export default function AutomationsPage(): React.JSX.Element {
         ? currentSelectedId
         : (nextAutomations[0]?.id ?? null)
       const nextSelectedRuns = nextSelectedId
-        ? await window.api.automations.listRuns({ automationId: nextSelectedId })
+        ? await listAutomationRunsForTarget(automationHostTarget, nextSelectedId)
         : []
       setAutomations(nextAutomations)
       setRuns(nextRuns)
@@ -771,7 +781,7 @@ export default function AutomationsPage(): React.JSX.Element {
     } finally {
       setIsLoading(false)
     }
-  }, [selectAutomationId])
+  }, [selectAutomationId, settings])
 
   const hydratePersistedUIState = useCallback(async (): Promise<void> => {
     useAppStore.getState().hydratePersistedUI(await window.api.ui.get())
@@ -794,15 +804,17 @@ export default function AutomationsPage(): React.JSX.Element {
       return
     }
     let cancelled = false
-    void window.api.automations.listRuns({ automationId }).then((nextRuns) => {
-      if (!cancelled) {
-        setSelectedAutomationRuns({ automationId, runs: nextRuns })
+    void listAutomationRunsForTarget(getAutomationListTarget(settings), automationId).then(
+      (nextRuns) => {
+        if (!cancelled) {
+          setSelectedAutomationRuns({ automationId, runs: nextRuns })
+        }
       }
-    })
+    )
     return () => {
       cancelled = true
     }
-  }, [selected?.id, runs])
+  }, [selected?.id, runs, settings])
 
   useEffect(() => {
     const onAutomationsChanged = (): void => {
@@ -1272,7 +1284,7 @@ export default function AutomationsPage(): React.JSX.Element {
       if (editingAutomationId) {
         try {
           currentAutomation =
-            (await window.api.automations.list()).find(
+            (await listAutomationsForTarget(getAutomationListTarget(settings))).find(
               (automation) => automation.id === editingAutomationId
             ) ?? currentAutomation
         } catch {
@@ -1299,11 +1311,13 @@ export default function AutomationsPage(): React.JSX.Element {
         updates.dtstart = now
       }
       const automation = editingAutomationId
-        ? await window.api.automations.update({
-            id: editingAutomationId,
-            updates
-          })
-        : await window.api.automations.create({
+        ? currentAutomation
+          ? await updateAutomationForTarget(currentAutomation, updates)
+          : await window.api.automations.update({
+              id: editingAutomationId,
+              updates
+            })
+        : await createAutomationForTarget({
             name: draft.name,
             prompt: draft.prompt,
             precheck,
@@ -1359,15 +1373,12 @@ export default function AutomationsPage(): React.JSX.Element {
   }
 
   const toggleAutomation = async (automation: Automation): Promise<void> => {
-    await window.api.automations.update({
-      id: automation.id,
-      updates: { enabled: !automation.enabled }
-    })
+    await updateAutomationForTarget(automation, { enabled: !automation.enabled })
     await refresh()
   }
 
   const deleteAutomation = async (automation: Automation): Promise<void> => {
-    await window.api.automations.delete({ id: automation.id })
+    await deleteAutomationForTarget(automation)
     if (useAppStore.getState().selectedAutomationId === automation.id) {
       selectAutomationId(null)
     }
@@ -1445,7 +1456,7 @@ export default function AutomationsPage(): React.JSX.Element {
       toast.error(availability.message)
       return
     }
-    await window.api.automations.runNow({ id: automation.id })
+    await runAutomationNowForTarget(automation)
     useAppStore.getState().recordFeatureInteraction('automation-run')
     await hydratePersistedUIState()
     await refresh()
@@ -1455,7 +1466,6 @@ export default function AutomationsPage(): React.JSX.Element {
   }
 
   const rerunAutomationRun = async (automation: Automation, run: AutomationRun): Promise<void> => {
-    const automationId = automation.id
     const runId = run.id
     if (rerunRunIdsInFlightRef.current.has(runId)) {
       return
@@ -1464,7 +1474,7 @@ export default function AutomationsPage(): React.JSX.Element {
     rerunRunIdsInFlightRef.current.add(runId)
     setRerunRunIdsInFlight(new Set(rerunRunIdsInFlightRef.current))
     try {
-      await window.api.automations.runNow({ id: automationId })
+      await runAutomationNowForTarget(automation)
       await hydratePersistedUIState()
       await refresh()
       toast.message(
