@@ -99,7 +99,7 @@ export default function FolderWorkspaceWorktreesPanel(): React.JSX.Element {
           </div>
         </div>
       ) : (
-        <div className="scrollbar-sleek min-h-0 flex-1 overflow-y-auto px-2 py-2">
+        <div className="scrollbar-sleek min-h-0 flex-1 overflow-y-auto py-2 pl-1 pr-2">
           <div className="space-y-1">
             {childWorktrees.map((worktree) => (
               <WorktreeCard
