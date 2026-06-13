@@ -38,7 +38,7 @@ import {
 } from '../../../shared/tui-agent-launch-defaults'
 import { isTuiAgent } from '../../../shared/tui-agent-config'
 import { resumeSleepingAgentSessionsForWorktree } from '@/lib/resume-sleeping-agent-session'
-import { folderWorkspaceKey } from '../../../shared/workspace-scope'
+import { folderWorkspaceKey, parseWorkspaceKey } from '../../../shared/workspace-scope'
 import {
   folderWorkspaceActivationBlocked,
   getFolderWorkspacePathStatusDescription,
@@ -549,11 +549,17 @@ function queueSetupAndIssueCommands(
   }
 }
 
-// Why: break the import cycle — the nav-history slice must call
-// activateAndRevealWorktree from goBack/goForward, but the slice lives under
-// @/store, which activation already imports from. Registering the activator
-// at module init here lets the slice call back without importing this file.
-setWorktreeNavActivator(activateAndRevealWorktree)
+// Why: break the import cycle — the nav-history slice must activate workspace
+// entries from goBack/goForward, but it lives under @/store, which activation
+// already imports from. Registering here keeps folder workspace replay on the
+// same path as direct folder activation.
+setWorktreeNavActivator((workspaceId) => {
+  const workspaceScope = parseWorkspaceKey(workspaceId)
+  if (workspaceScope?.type === 'folder') {
+    return activateAndRevealFolderWorkspace(workspaceScope.folderWorkspaceId)
+  }
+  return activateAndRevealWorktree(workspaceId)
+})
 
 // Why: page entries in nav history replay through setActiveView(...)
 // (not open*Page) so back/forward does not mutate previousViewBefore* or
