@@ -305,6 +305,48 @@ function shouldKeepHiddenStartupRendererQueriesLive(
   return startup?.telemetry?.agent_kind === 'codex' || isCodexStartupCommand(startup?.command ?? '')
 }
 
+function containsHiddenStartupRendererQuery(data: string): boolean {
+  // Why: hidden Codex startup must not live-render ordinary redraw floods, but
+  // query chunks still need xterm's built-in terminal replies to unblock TUIs.
+  return containsCsiRendererQuery(data) || data.includes('\x1b]10;?') || data.includes('\x1b]11;?')
+}
+
+function containsCsiRendererQuery(data: string): boolean {
+  let offset = data.indexOf('\x1b[')
+  while (offset !== -1) {
+    const finalByteIndex = findCsiFinalByteIndex(data, offset + 2)
+    if (finalByteIndex === -1) {
+      return false
+    }
+    const sequence = data.slice(offset, finalByteIndex + 1)
+    if (isRendererReplyCsiQuery(sequence)) {
+      return true
+    }
+    offset = data.indexOf('\x1b[', finalByteIndex + 1)
+  }
+  return false
+}
+
+function findCsiFinalByteIndex(data: string, offset: number): number {
+  for (let index = offset; index < data.length; index++) {
+    const code = data.charCodeAt(index)
+    if (code >= 0x40 && code <= 0x7e) {
+      return index
+    }
+  }
+  return -1
+}
+
+function isRendererReplyCsiQuery(sequence: string): boolean {
+  if (sequence.endsWith('c')) {
+    return true
+  }
+  if (sequence === '\x1b[5n' || sequence === '\x1b[6n') {
+    return true
+  }
+  return sequence.startsWith('\x1b[?') && sequence.endsWith('$p')
+}
+
 let codexRestartNoticePresenceSource: Record<
   string,
   { previousAccountLabel: string; nextAccountLabel: string }
@@ -2014,6 +2056,7 @@ export function connectPanePty(
     const hiddenStartupRendererQueryUntil = shouldKeepHiddenStartupRendererQueriesLive(paneStartup)
       ? Date.now() + HIDDEN_STARTUP_RENDERER_QUERY_WINDOW_MS
       : 0
+    const shouldSnapshotHiddenCodexOutput = shouldKeepHiddenStartupRendererQueriesLive(paneStartup)
 
     function canUseMainBufferSnapshot(ptyId: string | null): ptyId is string {
       return Boolean(ptyId) && !isRemoteRuntimePtyId(ptyId)
@@ -2171,7 +2214,8 @@ export function connectPanePty(
       const parseHiddenStartupOutput =
         !foreground &&
         canUseHiddenOutputSnapshot(transport.getPtyId()) &&
-        isHiddenStartupRendererQueryWindowActive()
+        isHiddenStartupRendererQueryWindowActive() &&
+        containsHiddenStartupRendererQuery(data)
       const synchronizedOutputStarted =
         shouldProtectNativeWindowsSynchronizedOutput &&
         foreground &&
@@ -2240,13 +2284,12 @@ export function connectPanePty(
     }
 
     function shouldSkipHiddenRendererOutput(foreground: boolean, data: string): boolean {
-      void foreground
-      void data
-      // Why: release correctness beats the hidden-output perf optimization.
-      // Real OpenCode tables still corrupt after workspace switching when PTY
-      // bytes bypass the renderer, so keep hidden panes on the live xterm path
-      // and leave snapshot skipping for a later perf branch.
-      return false
+      return (
+        !foreground &&
+        shouldSnapshotHiddenCodexOutput &&
+        canUseHiddenOutputSnapshot(transport.getPtyId()) &&
+        !(isHiddenStartupRendererQueryWindowActive() && containsHiddenStartupRendererQuery(data))
+      )
     }
 
     function skipHiddenRendererOutput(data: string): void {
