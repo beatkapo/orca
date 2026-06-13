@@ -48,6 +48,32 @@ describe('automation source display', () => {
     })
   })
 
+  it('uses saved remote server labels for runtime-backed sources', () => {
+    const sourceContext: TaskSourceContext = {
+      kind: 'task-source',
+      provider: 'github',
+      hostId: 'runtime:03ef704c-b180-4b10-998d-e28fbd5de9a3',
+      projectId: 'github:stablyai/orca',
+      projectHostSetupId: 'setup-runtime',
+      repoId: 'repo-runtime',
+      providerIdentity: {
+        provider: 'github',
+        owner: 'stablyai',
+        repo: 'orca'
+      }
+    }
+
+    expect(
+      getAutomationSourceDisplay(
+        sourceContext,
+        new Map([['runtime:03ef704c-b180-4b10-998d-e28fbd5de9a3', 'dev box']])
+      )
+    ).toEqual({
+      label: 'GitHub · dev box · stablyai/orca',
+      title: 'GitHub source · Host: dev box · Source: stablyai/orca'
+    })
+  })
+
   it('returns null when no source context is saved', () => {
     expect(getAutomationSourceDisplay(null)).toBeNull()
   })

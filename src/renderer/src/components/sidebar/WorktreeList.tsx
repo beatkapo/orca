@@ -225,6 +225,7 @@ import { HostSectionHeaderMenu } from './HostSectionHeaderMenu'
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
 import { folderWorkspaceKey } from '../../../../shared/workspace-scope'
+import { getHostDisplayLabelOverrides } from '../../../../shared/host-setting-overrides'
 import {
   isConfirmedStaleFolderPathStatus,
   type FolderWorkspacePathStatus
@@ -4617,6 +4618,32 @@ const WorktreeList = React.memo(function WorktreeList({
       }),
     [pendingCreationKeys]
   )
+  const hostLabelOverrides = useMemo(() => getHostDisplayLabelOverrides(settings), [settings])
+  const hostOptions = useMemo(
+    () =>
+      buildSidebarHostOptions({
+        repos,
+        sshTargetLabels,
+        sshConnectionStates,
+        settings,
+        runtimeEnvironments,
+        runtimeStatusByEnvironmentId,
+        hostLabelOverrides
+      }),
+    [
+      repos,
+      sshTargetLabels,
+      sshConnectionStates,
+      settings,
+      runtimeEnvironments,
+      runtimeStatusByEnvironmentId,
+      hostLabelOverrides
+    ]
+  )
+  const hostLabelById = useMemo(
+    () => new Map(hostOptions.map((host) => [host.id, host.label])),
+    [hostOptions]
+  )
 
   // Build flat row list for rendering
   const rows: Row[] = useMemo(
@@ -4639,7 +4666,8 @@ const WorktreeList = React.memo(function WorktreeList({
         importedWorktreesByRepo,
         pendingCreations,
         projectGrouping,
-        visibleFolderWorkspacesForRows
+        visibleFolderWorkspacesForRows,
+        hostLabelById
       ),
     [
       groupBy,
@@ -4658,26 +4686,8 @@ const WorktreeList = React.memo(function WorktreeList({
       visibleFolderWorkspacesForRows,
       placeholderRepoIds,
       importedWorktreesByRepo,
-      pendingCreations
-    ]
-  )
-  const hostOptions = useMemo(
-    () =>
-      buildSidebarHostOptions({
-        repos,
-        sshTargetLabels,
-        sshConnectionStates,
-        settings,
-        runtimeEnvironments,
-        runtimeStatusByEnvironmentId
-      }),
-    [
-      repos,
-      sshTargetLabels,
-      sshConnectionStates,
-      settings,
-      runtimeEnvironments,
-      runtimeStatusByEnvironmentId
+      pendingCreations,
+      hostLabelById
     ]
   )
   const orderedHostOptions = useMemo(

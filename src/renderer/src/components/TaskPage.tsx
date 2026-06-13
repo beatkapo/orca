@@ -2979,6 +2979,10 @@ export default function TaskPage(): React.JSX.Element {
       runtimeStatusByEnvironmentId
     ]
   )
+  const hostLabelById = useMemo(
+    () => new Map([...hostRegistryById].map(([hostId, host]) => [hostId, host.label])),
+    [hostRegistryById]
+  )
   const runtimeTaskSourceHostIds = useMemo(() => {
     if (taskSource !== 'github' && taskSource !== 'gitlab') {
       return []
@@ -3185,6 +3189,7 @@ export default function TaskPage(): React.JSX.Element {
         getTaskSourceAvailabilityNotice({
           providerLabel: labelFor('github'),
           sourceCount: selectedRepos.length,
+          hostLabelById,
           hostAvailability: availabilityForContexts(
             'github',
             selectedRepos
@@ -3196,6 +3201,7 @@ export default function TaskPage(): React.JSX.Element {
         getTaskSourceAvailabilityNotice({
           providerLabel: labelFor('gitlab'),
           sourceCount: selectedRepos.length,
+          hostLabelById,
           hostAvailability: availabilityForContexts(
             'gitlab',
             selectedRepos
@@ -3207,18 +3213,21 @@ export default function TaskPage(): React.JSX.Element {
         getTaskSourceAvailabilityNotice({
           providerLabel: labelFor('linear'),
           sourceCount: 1,
+          hostLabelById,
           hostAvailability: accountAvailability
         }) ?? undefined,
       jira:
         getTaskSourceAvailabilityNotice({
           providerLabel: labelFor('jira'),
           sourceCount: 1,
+          hostLabelById,
           hostAvailability: accountAvailability
         }) ?? undefined
     }
   }, [
     accountBackedTaskSourceHostId,
     hostRegistryById,
+    hostLabelById,
     preflightStatus,
     preflightStatusChecked,
     preflightStatusCurrent,
@@ -3238,6 +3247,7 @@ export default function TaskPage(): React.JSX.Element {
           ? accountBackedTaskSourceHostAvailability
           : taskSourceHostAvailability,
       accountHostId: accountBackedTaskSourceHostId,
+      hostLabelById,
       selectedRepoCount: selectedRepos.length,
       linearWorkspaceName:
         selectedLinearWorkspace?.organizationName ?? selectedLinearWorkspace?.id ?? null,
@@ -3251,6 +3261,7 @@ export default function TaskPage(): React.JSX.Element {
     taskSource,
     accountBackedTaskSourceHostAvailability,
     accountBackedTaskSourceHostId,
+    hostLabelById,
     taskSourceHostAvailability,
     taskSourceRepoContexts
   ])
@@ -3266,10 +3277,12 @@ export default function TaskPage(): React.JSX.Element {
       hostAvailability:
         taskSource === 'linear' || taskSource === 'jira'
           ? accountBackedTaskSourceHostAvailability
-          : taskSourceHostAvailability
+          : taskSourceHostAvailability,
+      hostLabelById
     })
   }, [
     accountBackedTaskSourceHostAvailability,
+    hostLabelById,
     sourceOptions,
     taskSource,
     taskSourceHostAvailability,

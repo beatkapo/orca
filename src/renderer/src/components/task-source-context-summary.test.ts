@@ -203,6 +203,53 @@ describe('task source context summary', () => {
     )
   })
 
+  it('uses saved remote server labels in repo-backed source summaries and notices', () => {
+    const hostLabelById = new Map([['runtime:03ef704c-b180-4b10-998d-e28fbd5de9a3', 'dev box']])
+
+    expect(
+      getTaskSourceContextSummary({
+        provider: 'github',
+        providerLabel: 'GitHub',
+        selectedRepoCount: 1,
+        hostLabelById,
+        repoContexts: [
+          {
+            kind: 'task-source',
+            provider: 'github',
+            projectId: 'github:stablyai/orca',
+            hostId: 'runtime:03ef704c-b180-4b10-998d-e28fbd5de9a3',
+            repoId: 'repo-runtime',
+            providerIdentity: { provider: 'github', owner: 'stablyai', repo: 'orca' }
+          }
+        ],
+        hostAvailability: [
+          {
+            hostId: 'runtime:03ef704c-b180-4b10-998d-e28fbd5de9a3',
+            health: 'blocked'
+          }
+        ]
+      })
+    ).toEqual({
+      label: 'GitHub · dev box · server update needed · stablyai/orca',
+      title:
+        'GitHub · Host: dev box · Availability: dev box server update needed · Source: stablyai/orca'
+    })
+
+    expect(
+      getTaskSourceAvailabilityNotice({
+        providerLabel: 'GitHub',
+        sourceCount: 1,
+        hostLabelById,
+        hostAvailability: [
+          {
+            hostId: 'runtime:03ef704c-b180-4b10-998d-e28fbd5de9a3',
+            reason: 'missing-task-source-capability'
+          }
+        ]
+      })?.label
+    ).toBe('GitHub source unavailable: dev box server update needed for task sources')
+  })
+
   it('shows remote-server task-source capability version skew', () => {
     expect(
       getTaskSourceAvailabilityNotice({

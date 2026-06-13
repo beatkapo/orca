@@ -86,6 +86,7 @@ import {
   lookupGitHubWorkItemForSource
 } from '@/lib/github-work-item-source-lookup'
 import type { SettingsNavTarget } from '@/lib/settings-navigation-types'
+import { getHostDisplayLabelOverrides } from '../../../shared/host-setting-overrides'
 import type { BrowserPage, BrowserWorkspace, Worktree } from '../../../shared/types'
 import { isGitRepoKind } from '../../../shared/repo-kind'
 import { buildTaskSourceContextFromRepo } from '../../../shared/task-source-context'
@@ -351,6 +352,7 @@ export default function WorktreeJumpPalette(): React.JSX.Element | null {
   const preserveCreateLookupOnCloseRef = useRef(false)
 
   const repoMap = useMemo(() => new Map(repos.map((r) => [r.id, r])), [repos])
+  const hostLabelOverrides = useMemo(() => getHostDisplayLabelOverrides(settings), [settings])
   // Why: host badges only appear when more than one execution host exists; reuse
   // the same registry the sidebar host-scope strip builds so labels stay in sync.
   const hostOptions = useMemo(
@@ -361,7 +363,8 @@ export default function WorktreeJumpPalette(): React.JSX.Element | null {
         sshConnectionStates,
         settings,
         runtimeEnvironments,
-        runtimeStatusByEnvironmentId
+        runtimeStatusByEnvironmentId,
+        hostLabelOverrides
       }),
     [
       repos,
@@ -369,7 +372,8 @@ export default function WorktreeJumpPalette(): React.JSX.Element | null {
       sshConnectionStates,
       settings,
       runtimeEnvironments,
-      runtimeStatusByEnvironmentId
+      runtimeStatusByEnvironmentId,
+      hostLabelOverrides
     ]
   )
   const canCreateWorktree = repos.length > 0

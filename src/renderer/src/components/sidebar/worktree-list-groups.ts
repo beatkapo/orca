@@ -504,25 +504,31 @@ function appendWorktreeRows(
 function getRepoHostLabel(
   repoId: string,
   repoMap: Map<string, Repo>,
-  projectIndex: ProjectGroupingIndex | null
+  projectIndex: ProjectGroupingIndex | null,
+  hostLabelById: ReadonlyMap<string, string> | undefined
 ): string | null {
   const setup = projectIndex?.setupByRepoId.get(repoId)
   if (setup) {
-    return getExecutionHostLabel(setup.hostId)
+    return hostLabelById?.get(setup.hostId) ?? getExecutionHostLabel(setup.hostId)
   }
   const repo = repoMap.get(repoId)
-  return repo ? getExecutionHostLabel(getRepoExecutionHostId(repo)) : null
+  if (!repo) {
+    return null
+  }
+  const hostId = getRepoExecutionHostId(repo)
+  return hostLabelById?.get(hostId) ?? getExecutionHostLabel(hostId)
 }
 
 function getMixedHostContextLabels(
   group: WorktreeGroupEntry,
   repoMap: Map<string, Repo>,
-  projectIndex: ProjectGroupingIndex | null
+  projectIndex: ProjectGroupingIndex | null,
+  hostLabelById: ReadonlyMap<string, string> | undefined
 ): Map<string, string> | undefined {
   const labelsByRepoId = new Map<string, string>()
   const uniqueLabels = new Set<string>()
   for (const repoId of group.repoIds) {
-    const label = getRepoHostLabel(repoId, repoMap, projectIndex)
+    const label = getRepoHostLabel(repoId, repoMap, projectIndex, hostLabelById)
     if (!label) {
       continue
     }
@@ -662,7 +668,8 @@ export function buildRows(
   importedWorktreesByRepo: ReadonlyMap<string, ImportedWorktreesCardCandidate> = new Map(),
   pendingCreations: readonly PendingCreationRef[] = [],
   projectGrouping?: ProjectGroupingModel,
-  folderWorkspaces: readonly FolderWorkspace[] = []
+  folderWorkspaces: readonly FolderWorkspace[] = [],
+  hostLabelById?: ReadonlyMap<string, string>
 ): Row[] {
   const result: Row[] = []
   const projectIndex = buildProjectGroupingIndex(projectGrouping)
@@ -912,7 +919,9 @@ export function buildRows(
         }
         const items = groupBy === 'repo' ? orderMainWorktreeFirst(group.items) : group.items
         const hostContextLabelByRepoId =
-          groupBy === 'repo' ? getMixedHostContextLabels(group, repoMap, projectIndex) : undefined
+          groupBy === 'repo'
+            ? getMixedHostContextLabels(group, repoMap, projectIndex, hostLabelById)
+            : undefined
         appendWorktreeRows(result, items, repoMap, lineageById, worktreeMap, {
           nestLineage,
           collapsedGroups,

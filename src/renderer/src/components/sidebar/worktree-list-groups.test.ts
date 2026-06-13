@@ -343,6 +343,64 @@ describe('buildRows with pinned worktrees', () => {
     ])
   })
 
+  it('uses saved host labels for mixed-host sidebar card badges', () => {
+    const runtimeRepo: Repo = {
+      ...remoteRepo,
+      id: 'repo-runtime',
+      path: '/Users/alice/runtime-orca',
+      connectionId: null,
+      executionHostId: 'runtime:03ef704c-b180-4b10-998d-e28fbd5de9a3'
+    }
+    const runtimeWorktree: Worktree = {
+      ...remoteWorktree,
+      id: 'wt-runtime',
+      repoId: runtimeRepo.id
+    }
+    const runtimeSetup: ProjectHostSetup = {
+      ...projectHostSetups[1]!,
+      id: runtimeRepo.id,
+      hostId: 'runtime:03ef704c-b180-4b10-998d-e28fbd5de9a3',
+      repoId: runtimeRepo.id,
+      path: runtimeRepo.path
+    }
+    const rows = buildRows(
+      'repo',
+      [worktree, runtimeWorktree],
+      new Map([
+        [repo.id, repo],
+        [runtimeRepo.id, runtimeRepo]
+      ]),
+      null,
+      new Set(),
+      undefined,
+      undefined,
+      undefined,
+      {},
+      new Map([
+        [worktree.id, worktree],
+        [runtimeWorktree.id, runtimeWorktree]
+      ]),
+      false,
+      undefined,
+      [],
+      new Set(),
+      new Map(),
+      [],
+      { projects: [project], projectHostSetups: [projectHostSetups[0]!, runtimeSetup] },
+      [],
+      new Map([
+        ['local', 'Local Mac'],
+        ['runtime:03ef704c-b180-4b10-998d-e28fbd5de9a3', 'dev box']
+      ])
+    )
+
+    expect(rows).toMatchObject([
+      { type: 'header', key: 'project:github:stablyai/orca', label: 'Orca', count: 2 },
+      { type: 'item', worktree: { id: worktree.id }, hostContextLabel: 'Local Mac' },
+      { type: 'item', worktree: { id: runtimeWorktree.id }, hostContextLabel: 'dev box' }
+    ])
+  })
+
   it('omits host context labels when a project group only has one host', () => {
     const secondLocalWorktree: Worktree = {
       ...worktree,

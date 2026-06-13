@@ -28,11 +28,18 @@ export type TaskSourceHostAvailability = {
     | 'unsupported-provider'
 }
 
+type HostLabelLookup = ReadonlyMap<string, string> | undefined
+
+function getHostLabel(hostId: ExecutionHostScope, hostLabelById: HostLabelLookup): string {
+  return hostLabelById?.get(hostId) ?? getExecutionHostLabel(hostId)
+}
+
 export function getTaskSourceContextSummary(args: {
   provider: TaskProvider
   providerLabel: string
   repoContexts?: readonly TaskSourceContext[]
   hostAvailability?: readonly TaskSourceHostAvailability[]
+  hostLabelById?: HostLabelLookup
   accountHostId?: ExecutionHostScope | null
   selectedRepoCount?: number
   linearWorkspaceName?: string | null
@@ -46,12 +53,14 @@ export function getTaskSourceContextSummary(args: {
       return getAccountBackedTaskSourceSummary(args.providerLabel, {
         accountLabel: args.linearWorkspaceName,
         accountHostId: args.accountHostId,
+        hostLabelById: args.hostLabelById,
         hostAvailability: args.hostAvailability
       })
     case 'jira':
       return getAccountBackedTaskSourceSummary(args.providerLabel, {
         accountLabel: args.jiraSiteName,
         accountHostId: args.accountHostId,
+        hostLabelById: args.hostLabelById,
         hostAvailability: args.hostAvailability
       })
   }
@@ -60,9 +69,10 @@ export function getTaskSourceContextSummary(args: {
 export function getTaskSourceAvailabilityNotice(args: {
   providerLabel: string
   hostAvailability?: readonly TaskSourceHostAvailability[]
+  hostLabelById?: HostLabelLookup
   sourceCount?: number
 }): TaskSourceAvailabilityNotice | null {
-  const unavailableHosts = getUnavailableHosts(args.hostAvailability ?? [])
+  const unavailableHosts = getUnavailableHosts(args.hostAvailability ?? [], args.hostLabelById)
   if (unavailableHosts.length === 0) {
     return null
   }
@@ -84,11 +94,14 @@ function getRepoBackedTaskSourceSummary(args: {
   providerLabel: string
   repoContexts?: readonly TaskSourceContext[]
   hostAvailability?: readonly TaskSourceHostAvailability[]
+  hostLabelById?: HostLabelLookup
   selectedRepoCount?: number
 }): TaskSourceContextSummary {
   const contexts = args.repoContexts ?? []
-  const hostLabels = uniqueLabels(contexts.map((context) => getExecutionHostLabel(context.hostId)))
-  const unavailableHosts = getUnavailableHosts(args.hostAvailability ?? [])
+  const hostLabels = uniqueLabels(
+    contexts.map((context) => getHostLabel(context.hostId, args.hostLabelById))
+  )
+  const unavailableHosts = getUnavailableHosts(args.hostAvailability ?? [], args.hostLabelById)
   const availabilityLabel = getAvailabilityLabel(unavailableHosts)
   const identityLabels = uniqueLabels(
     contexts.map((context) => getProviderIdentityLabel(context.providerIdentity))
@@ -129,12 +142,13 @@ function getAccountBackedTaskSourceSummary(
   args: {
     accountLabel: string | null | undefined
     accountHostId: ExecutionHostScope | null | undefined
+    hostLabelById?: HostLabelLookup
     hostAvailability?: readonly TaskSourceHostAvailability[]
   }
 ): TaskSourceContextSummary {
   const target = args.accountLabel?.trim() || 'Current account'
-  const hostLabel = getExecutionHostLabel(args.accountHostId ?? 'local')
-  const unavailableHosts = getUnavailableHosts(args.hostAvailability ?? [])
+  const hostLabel = getHostLabel(args.accountHostId ?? 'local', args.hostLabelById)
+  const unavailableHosts = getUnavailableHosts(args.hostAvailability ?? [], args.hostLabelById)
   const availabilityLabel = getAvailabilityLabel(unavailableHosts)
   const titleParts = [
     `${providerLabel} source`,
@@ -188,7 +202,10 @@ function uniqueLabels(labels: readonly (string | null | undefined)[]): string[] 
   return result
 }
 
-function getUnavailableHosts(hostAvailability: readonly TaskSourceHostAvailability[]): {
+function getUnavailableHosts(
+  hostAvailability: readonly TaskSourceHostAvailability[],
+  hostLabelById?: HostLabelLookup
+): {
   hostLabel: string
   statusLabel: string
 }[] {
@@ -199,7 +216,7 @@ function getUnavailableHosts(hostAvailability: readonly TaskSourceHostAvailabili
     if (!statusLabel) {
       continue
     }
-    const hostLabel = getExecutionHostLabel(availability.hostId)
+    const hostLabel = getHostLabel(availability.hostId, hostLabelById)
     const key = `${hostLabel}\u0000${statusLabel}`
     if (seen.has(key)) {
       continue

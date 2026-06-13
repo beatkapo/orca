@@ -39,6 +39,7 @@ type BuildReadySetupOptionsInput = {
   projectId: string
   projectHostSetups: readonly ProjectHostSetup[]
   eligibleRepos: readonly Repo[]
+  hosts: readonly ExecutionHostRegistryEntry[]
 }
 
 type BuildNeedsSetupOptionsInput = {
@@ -64,7 +65,12 @@ export function buildProjectHostSetupOptions({
   if (!projectId) {
     return []
   }
-  const readyOptions = buildReadySetupOptions({ projectId, projectHostSetups, eligibleRepos })
+  const readyOptions = buildReadySetupOptions({
+    projectId,
+    projectHostSetups,
+    eligibleRepos,
+    hosts
+  })
   const readySetupByHost = new Map(readyOptions.map((option) => [option.hostId, option]))
   const pendingSetupByHost = getPendingSetupByHost(projectId, projectHostSetups)
   return [
@@ -97,9 +103,11 @@ function getPendingSetupByHost(
 function buildReadySetupOptions({
   projectId,
   projectHostSetups,
-  eligibleRepos
+  eligibleRepos,
+  hosts
 }: BuildReadySetupOptionsInput): ReadyProjectHostSetupOption[] {
   const eligibleRepoIds = new Set(eligibleRepos.map((repo) => repo.id))
+  const hostLabelById = new Map(hosts.map((host) => [host.id, host.label]))
   return projectHostSetups
     .filter(
       (setup) =>
@@ -113,7 +121,7 @@ function buildReadySetupOptions({
       projectId: setup.projectId,
       hostId: setup.hostId,
       repoId: setup.repoId,
-      label: getExecutionHostLabel(setup.hostId),
+      label: hostLabelById.get(setup.hostId) || getExecutionHostLabel(setup.hostId),
       detail: setup.displayName,
       path: setup.path
     }))

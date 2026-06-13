@@ -7,13 +7,15 @@ export type AutomationSourceDisplay = {
 }
 
 export function getAutomationSourceDisplay(
-  sourceContext: TaskSourceContext | null | undefined
+  sourceContext: TaskSourceContext | null | undefined,
+  hostLabelById?: ReadonlyMap<string, string>
 ): AutomationSourceDisplay | null {
   if (!sourceContext) {
     return null
   }
   const providerLabel = getProviderLabel(sourceContext.provider)
-  const hostLabel = getExecutionHostLabel(sourceContext.hostId)
+  const hostLabel =
+    hostLabelById?.get(sourceContext.hostId) ?? getExecutionHostLabel(sourceContext.hostId)
   const identityLabel = getSourceIdentityLabel(sourceContext)
   const label = [providerLabel, hostLabel, identityLabel]
     .filter((part): part is string => Boolean(part))

@@ -23,6 +23,7 @@ type AutomationDetailProps = {
   projectName: string
   workspaceName: string
   projectDefaultBaseRef: string | null
+  hostLabelById?: ReadonlyMap<string, string>
   runNowAvailability: AutomationTargetAvailability | null
   now: number
   onRunNow: (automation: Automation) => void
@@ -99,6 +100,7 @@ export function AutomationDetail({
   projectName,
   workspaceName,
   projectDefaultBaseRef,
+  hostLabelById,
   runNowAvailability,
   now,
   onRunNow,
@@ -129,7 +131,7 @@ export function AutomationDetail({
     automation.workspaceMode === 'new_per_run'
       ? (automation.baseBranch ?? projectDefaultBaseRef ?? 'Project default')
       : workspaceName
-  const sourceDisplay = getAutomationSourceDisplay(automation.sourceContext)
+  const sourceDisplay = getAutomationSourceDisplay(automation.sourceContext, hostLabelById)
   const runNowDisabled = runNowAvailability?.canRunNow === false
 
   return (

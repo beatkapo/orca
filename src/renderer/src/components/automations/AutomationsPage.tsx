@@ -55,6 +55,7 @@ import type {
 } from '../../../../shared/automations-types'
 import { getAutomationRunRepoId } from '../../../../shared/automation-run-identity'
 import { getRepoExecutionHostId, parseExecutionHostId } from '../../../../shared/execution-host'
+import { getHostDisplayLabelOverrides } from '../../../../shared/host-setting-overrides'
 import { TASK_SOURCE_CONTEXT_RUNTIME_CAPABILITY } from '../../../../shared/protocol-version'
 import type { PreflightStatus } from '../../../../preload/api-types'
 import type { RuntimeStatus } from '../../../../shared/runtime-types'
@@ -336,6 +337,7 @@ export default function AutomationsPage(): React.JSX.Element {
   const retainedAgentsByPaneKey = useAppStore((s) => s.retainedAgentsByPaneKey)
   const sshConnectionStates = useAppStore((s) => s.sshConnectionStates)
   const sshTargetLabels = useAppStore((s) => s.sshTargetLabels)
+  const runtimeEnvironments = useAppStore((s) => s.runtimeEnvironments)
   const runtimeStatusByEnvironmentId = useAppStore((s) => s.runtimeStatusByEnvironmentId)
   const settings = useAppStore((s) => s.settings)
   const preflightStatus = useAppStore((s) => s.preflightStatus)
@@ -737,12 +739,29 @@ export default function AutomationsPage(): React.JSX.Element {
         return sshTargetLabels.get(parsed.targetId) ?? parsed.targetId
       }
       if (parsed?.kind === 'runtime') {
-        return parsed.environmentId
+        return (
+          runtimeEnvironments.find((environment) => environment.id === parsed.environmentId)
+            ?.name ?? parsed.environmentId
+        )
       }
       return 'Local Mac'
     },
-    [sshTargetLabels]
+    [runtimeEnvironments, sshTargetLabels]
   )
+  const hostLabelOverrides = useMemo(() => getHostDisplayLabelOverrides(settings), [settings])
+  const hostLabelById = useMemo(() => {
+    const labels = new Map<string, string>([['local', 'Local Mac']])
+    for (const [targetId, label] of sshTargetLabels) {
+      labels.set(`ssh:${encodeURIComponent(targetId)}`, label)
+    }
+    for (const environment of runtimeEnvironments) {
+      labels.set(`runtime:${encodeURIComponent(environment.id)}`, environment.name)
+    }
+    for (const [hostId, label] of hostLabelOverrides) {
+      labels.set(hostId, label)
+    }
+    return labels
+  }, [hostLabelOverrides, runtimeEnvironments, sshTargetLabels])
 
   useEffect(() => {
     if ((!selected || selectedExternal) && activePaneTab === 'runs') {
@@ -2536,6 +2555,7 @@ export default function AutomationsPage(): React.JSX.Element {
                       ? 'New workspace each run'
                       : (selectedWorktree?.displayName ?? 'Missing workspace')
                   }
+                  hostLabelById={hostLabelById}
                   runNowAvailability={selectedRunNowAvailability}
                   now={relativeNow}
                   onRunNow={(automation) => void runNow(automation)}

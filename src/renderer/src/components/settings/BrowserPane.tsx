@@ -17,6 +17,7 @@ import {
   resolveBrowserHomePageDraftState
 } from './browser-home-page-draft-state'
 import { buildSidebarHostOptions } from '../sidebar/sidebar-host-options'
+import { getHostDisplayLabelOverrides } from '../../../../shared/host-setting-overrides'
 import {
   getSettingsFocusedExecutionHostId,
   parseExecutionHostId,
@@ -100,6 +101,7 @@ export function BrowserPane({
   const showBrowserUse = matchesSettingsSearch(searchQuery, getBrowserUsePaneSearchEntries())
   const isMac = isMacUserAgent()
   const linkRoutingDescription = getBrowserLinkRoutingDescription({ isMac })
+  const hostLabelOverrides = useMemo(() => getHostDisplayLabelOverrides(settings), [settings])
   const browserSessionHostOptions = useMemo(
     () =>
       buildSidebarHostOptions({
@@ -108,7 +110,8 @@ export function BrowserPane({
         sshConnectionStates,
         settings,
         runtimeEnvironments,
-        runtimeStatusByEnvironmentId
+        runtimeStatusByEnvironmentId,
+        hostLabelOverrides
       })
         .filter((host) => host.kind === 'local' || host.kind === 'runtime')
         .map((host) => ({
@@ -128,7 +131,8 @@ export function BrowserPane({
       sshConnectionStates,
       settings,
       runtimeEnvironments,
-      runtimeStatusByEnvironmentId
+      runtimeStatusByEnvironmentId,
+      hostLabelOverrides
     ]
   )
   const selectedBrowserSessionHostId = getSettingsFocusedExecutionHostId(settings)

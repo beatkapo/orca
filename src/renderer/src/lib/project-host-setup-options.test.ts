@@ -75,6 +75,36 @@ describe('buildProjectHostSetupOptions', () => {
     expect(options[1]).toMatchObject({ label: 'builder', repoId: 'remote-repo' })
   })
 
+  it('uses saved host labels for ready runtime setup choices', () => {
+    const options = buildProjectHostSetupOptions({
+      projectId: 'project-1',
+      eligibleRepos: [repo('runtime-repo')],
+      hosts: [
+        host('runtime:03ef704c-b180-4b10-998d-e28fbd5de9a3', {
+          label: 'dev box',
+          capabilities: FULL_HOST_MODEL_RUNTIME_CAPABILITIES
+        })
+      ],
+      projectHostSetups: [
+        setup(
+          'runtime',
+          'project-1',
+          'runtime:03ef704c-b180-4b10-998d-e28fbd5de9a3',
+          'runtime-repo'
+        )
+      ]
+    })
+
+    expect(options).toEqual([
+      expect.objectContaining({
+        id: 'runtime',
+        kind: 'ready',
+        label: 'dev box',
+        repoId: 'runtime-repo'
+      })
+    ])
+  })
+
   it('omits setups that are not ready or cannot create through an eligible repo', () => {
     const options = buildProjectHostSetupOptions({
       projectId: 'project-1',
