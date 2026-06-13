@@ -929,7 +929,13 @@ const WorktreeCard = React.memo(function WorktreeCard({
       )}
 
       {showCombinedStatusSlot ? (
-        <div className="flex shrink-0 items-start justify-center pt-[2px]">
+        <div
+          className={cn(
+            'flex shrink-0 items-start justify-center pt-[2px]',
+            affiliateListMode && 'px-1'
+          )}
+          data-worktree-card-status-slot=""
+        >
           <WorktreeCardStatusSlot
             worktreeId={worktree.id}
             showStatus={showStatus}
