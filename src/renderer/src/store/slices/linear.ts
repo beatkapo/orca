@@ -328,7 +328,8 @@ function largestCachedCollectionBelowLimit<T>(
 function patchLinearIssueCollectionCache(
   cache: Record<string, CacheEntry<LinearCollectionResult<LinearIssue>>>,
   issueId: string,
-  patch: Partial<LinearIssue>
+  patch: Partial<LinearIssue>,
+  canPatchCacheKey: (key: string) => boolean
 ): {
   cache: Record<string, CacheEntry<LinearCollectionResult<LinearIssue>>>
   changed: boolean
@@ -336,7 +337,7 @@ function patchLinearIssueCollectionCache(
   let changed = false
   const nextCache = { ...cache }
   for (const [key, entry] of Object.entries(nextCache)) {
-    if (!entry?.data) {
+    if (!canPatchCacheKey(key) || !entry?.data) {
       continue
     }
     const idx = entry.data.items.findIndex((item) => item.id === issueId)
@@ -359,6 +360,7 @@ type LinearIssueReadArgs =
   | { kind: 'list'; filter?: 'assigned' | 'created' | 'all' | 'completed'; limit?: number }
 
 type LinearFetchOptions = { force?: boolean; sourceContext?: TaskSourceContext | null }
+type LinearPatchOptions = { sourceContext?: TaskSourceContext | null }
 
 type LinearReadScope = {
   settings: AppState['settings'] | TaskSourceContext | null
@@ -533,7 +535,11 @@ export type LinearSlice = {
     limit?: number,
     options?: LinearFetchOptions
   ) => Promise<LinearCollectionResult<LinearProjectSummary>>
-  patchLinearIssue: (issueId: string, patch: Partial<LinearIssue>) => void
+  patchLinearIssue: (
+    issueId: string,
+    patch: Partial<LinearIssue>,
+    options?: LinearPatchOptions
+  ) => void
 }
 
 export const createLinearSlice: StateCreator<AppState, [], [], LinearSlice> = (set, get) => ({
@@ -2046,13 +2052,19 @@ export const createLinearSlice: StateCreator<AppState, [], [], LinearSlice> = (s
     return promise
   },
 
-  patchLinearIssue: (issueId, patch) => {
+  patchLinearIssue: (issueId, patch, options) => {
+    const sourceScope =
+      options?.sourceContext?.provider === 'linear'
+        ? getTaskSourceCacheScope(options.sourceContext)
+        : null
+    const canPatchCacheKey = (key: string): boolean =>
+      sourceScope === null || key.startsWith(`${sourceScope}::`)
     set((s) => {
       let changed = false
 
       const nextIssueCache = { ...s.linearIssueCache }
       for (const [key, issueEntry] of Object.entries(nextIssueCache)) {
-        if (issueEntry?.data?.id !== issueId) {
+        if (!canPatchCacheKey(key) || issueEntry?.data?.id !== issueId) {
           continue
         }
         // Why: set fetchedAt to 0 so the next fetchLinearIssue call
@@ -2068,7 +2080,7 @@ export const createLinearSlice: StateCreator<AppState, [], [], LinearSlice> = (s
       const nextSearchCache = { ...s.linearSearchCache }
       for (const key of Object.keys(nextSearchCache)) {
         const entry = nextSearchCache[key]
-        if (!entry?.data) {
+        if (!canPatchCacheKey(key) || !entry?.data) {
           continue
         }
         const idx = entry.data.findIndex((item) => item.id === issueId)
@@ -2081,7 +2093,12 @@ export const createLinearSlice: StateCreator<AppState, [], [], LinearSlice> = (s
         changed = true
       }
 
-      const nextListCache = patchLinearIssueCollectionCache(s.linearListCache, issueId, patch)
+      const nextListCache = patchLinearIssueCollectionCache(
+        s.linearListCache,
+        issueId,
+        patch,
+        canPatchCacheKey
+      )
       if (nextListCache.changed) {
         changed = true
       }
@@ -2089,7 +2106,8 @@ export const createLinearSlice: StateCreator<AppState, [], [], LinearSlice> = (s
       const nextProjectIssueCache = patchLinearIssueCollectionCache(
         s.linearProjectIssueCache,
         issueId,
-        patch
+        patch,
+        canPatchCacheKey
       )
       if (nextProjectIssueCache.changed) {
         changed = true
@@ -2098,7 +2116,8 @@ export const createLinearSlice: StateCreator<AppState, [], [], LinearSlice> = (s
       const nextCustomViewIssueCache = patchLinearIssueCollectionCache(
         s.linearCustomViewIssueCache,
         issueId,
-        patch
+        patch,
+        canPatchCacheKey
       )
       if (nextCustomViewIssueCache.changed) {
         changed = true

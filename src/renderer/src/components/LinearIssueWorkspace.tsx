@@ -383,7 +383,7 @@ function LinearIssueSidebarProjectCard({
         )
         if (result.ok) {
           onProjectChanged(project)
-          patchLinearIssue(issue.id, { project })
+          patchLinearIssue(issue.id, { project }, { sourceContext })
           toast.success(
             translate('auto.components.LinearIssueWorkspace.f9d4ef9807', 'Project updated')
           )
@@ -404,7 +404,14 @@ function LinearIssueSidebarProjectCard({
         setSavingProjectId(null)
       }
     },
-    [issue.id, issue.workspaceId, onProjectChanged, patchLinearIssue, providerSettings]
+    [
+      issue.id,
+      issue.workspaceId,
+      onProjectChanged,
+      patchLinearIssue,
+      providerSettings,
+      sourceContext
+    ]
   )
 
   return (

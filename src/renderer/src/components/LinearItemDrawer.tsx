@@ -192,11 +192,11 @@ export function LinearIssueEditSection({
         mutate: () => linearUpdateIssue(providerSettings, issue.id, { stateId }, issue.workspaceId),
         onOptimistic: () => {
           onEditStateChange({ state: stateValue })
-          patchLinearIssue(issue.id, { state: stateValue })
+          patchLinearIssue(issue.id, { state: stateValue }, { sourceContext })
         },
         onRevert: () => {
           onEditStateChange({ state: prevState })
-          patchLinearIssue(issue.id, { state: prevState })
+          patchLinearIssue(issue.id, { state: prevState }, { sourceContext })
         },
         onSuccess: () => {
           useAppStore.getState().recordFeatureInteraction('linear-tasks')
@@ -212,7 +212,8 @@ export function LinearIssueEditSection({
       states.data,
       patchLinearIssue,
       run,
-      onEditStateChange
+      onEditStateChange,
+      sourceContext
     ]
   )
 
@@ -225,11 +226,11 @@ export function LinearIssueEditSection({
           linearUpdateIssue(providerSettings, issue.id, { priority }, issue.workspaceId),
         onOptimistic: () => {
           onEditStateChange({ priority })
-          patchLinearIssue(issue.id, { priority })
+          patchLinearIssue(issue.id, { priority }, { sourceContext })
         },
         onRevert: () => {
           onEditStateChange({ priority: prevPriority })
-          patchLinearIssue(issue.id, { priority: prevPriority })
+          patchLinearIssue(issue.id, { priority: prevPriority }, { sourceContext })
         },
         onSuccess: () => {
           useAppStore.getState().recordFeatureInteraction('linear-tasks')
@@ -244,7 +245,8 @@ export function LinearIssueEditSection({
       providerSettings,
       patchLinearIssue,
       run,
-      onEditStateChange
+      onEditStateChange,
+      sourceContext
     ]
   )
 
@@ -256,12 +258,12 @@ export function LinearIssueEditSection({
           linearUpdateIssue(providerSettings, issue.id, { estimate }, issue.workspaceId),
         onOptimistic: () => {
           onEditStateChange({ estimate })
-          patchLinearIssue(issue.id, { estimate })
+          patchLinearIssue(issue.id, { estimate }, { sourceContext })
           setEstimatePopoverOpen(false)
         },
         onRevert: () => {
           onEditStateChange({ estimate: prevEstimate })
-          patchLinearIssue(issue.id, { estimate: prevEstimate })
+          patchLinearIssue(issue.id, { estimate: prevEstimate }, { sourceContext })
         },
         onSuccess: () => {
           useAppStore.getState().recordFeatureInteraction('linear-tasks')
@@ -276,7 +278,8 @@ export function LinearIssueEditSection({
       providerSettings,
       patchLinearIssue,
       run,
-      onEditStateChange
+      onEditStateChange,
+      sourceContext
     ]
   )
 
@@ -314,11 +317,11 @@ export function LinearIssueEditSection({
           linearUpdateIssue(providerSettings, issue.id, { assigneeId }, issue.workspaceId),
         onOptimistic: () => {
           onEditStateChange({ assignee: newAssignee })
-          patchLinearIssue(issue.id, { assignee: newAssignee })
+          patchLinearIssue(issue.id, { assignee: newAssignee }, { sourceContext })
         },
         onRevert: () => {
           onEditStateChange({ assignee: prevAssignee })
-          patchLinearIssue(issue.id, { assignee: prevAssignee })
+          patchLinearIssue(issue.id, { assignee: prevAssignee }, { sourceContext })
         },
         onSuccess: () => {
           useAppStore.getState().recordFeatureInteraction('linear-tasks')
@@ -334,7 +337,8 @@ export function LinearIssueEditSection({
       members.data,
       patchLinearIssue,
       run,
-      onEditStateChange
+      onEditStateChange,
+      sourceContext
     ]
   )
 
@@ -360,11 +364,19 @@ export function LinearIssueEditSection({
           ),
         onOptimistic: () => {
           onEditStateChange({ labelIds: newLabelIds, labels: newLabels })
-          patchLinearIssue(issue.id, { labelIds: newLabelIds, labels: newLabels })
+          patchLinearIssue(
+            issue.id,
+            { labelIds: newLabelIds, labels: newLabels },
+            { sourceContext }
+          )
         },
         onRevert: () => {
           onEditStateChange({ labelIds: prevLabelIds, labels: prevLabels })
-          patchLinearIssue(issue.id, { labelIds: prevLabelIds, labels: prevLabels })
+          patchLinearIssue(
+            issue.id,
+            { labelIds: prevLabelIds, labels: prevLabels },
+            { sourceContext }
+          )
         },
         onSuccess: () => {
           useAppStore.getState().recordFeatureInteraction('linear-tasks')
@@ -381,7 +393,8 @@ export function LinearIssueEditSection({
       labels.data,
       patchLinearIssue,
       run,
-      onEditStateChange
+      onEditStateChange,
+      sourceContext
     ]
   )
 

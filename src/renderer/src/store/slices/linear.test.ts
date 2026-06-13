@@ -12,7 +12,10 @@ import type {
   LinearTeam,
   LinearViewer
 } from '../../../../shared/types'
-import type { TaskSourceContext } from '../../../../shared/task-source-context'
+import {
+  getTaskSourceCacheScope,
+  type TaskSourceContext
+} from '../../../../shared/task-source-context'
 import { credentialDecryptionMessage } from '../../../../shared/integration-credential-errors'
 import { createLinearSlice } from './linear'
 
@@ -835,6 +838,78 @@ describe('createLinearSlice caching', () => {
       store.getState().linearCustomViewIssueCache['workspace-1::custom-view-issues::view-1::20']
         .data?.items[0]?.title
     ).toBe('Updated')
+  })
+
+  it('scopes optimistic issue patches to the selected Linear source context', () => {
+    const store = createTestStore()
+    const localSource = linearSourceContext('local-runtime')
+    const remoteSource = linearSourceContext('remote-runtime')
+    const localScope = getTaskSourceCacheScope(localSource)
+    const remoteScope = getTaskSourceCacheScope(remoteSource)
+
+    store.setState({
+      linearIssueCache: {
+        [`${localScope}::workspace-1::issue-id`]: {
+          data: { ...issue('issue-id'), title: 'Local title' },
+          fetchedAt: Date.now()
+        },
+        [`${remoteScope}::workspace-1::issue-id`]: {
+          data: { ...issue('issue-id'), title: 'Remote title' },
+          fetchedAt: Date.now()
+        }
+      },
+      linearSearchCache: {
+        [`${localScope}::workspace-1::search::query::20`]: {
+          data: [{ ...issue('issue-id'), title: 'Local title' }],
+          fetchedAt: Date.now()
+        },
+        [`${remoteScope}::workspace-1::search::query::20`]: {
+          data: [{ ...issue('issue-id'), title: 'Remote title' }],
+          fetchedAt: Date.now()
+        }
+      },
+      linearListCache: {
+        [`${localScope}::workspace-1::list::all::36`]: {
+          data: { items: [{ ...issue('issue-id'), title: 'Local title' }] },
+          fetchedAt: Date.now()
+        },
+        [`${remoteScope}::workspace-1::list::all::36`]: {
+          data: { items: [{ ...issue('issue-id'), title: 'Remote title' }] },
+          fetchedAt: Date.now()
+        }
+      }
+    })
+
+    store.getState().patchLinearIssue(
+      'issue-id',
+      { title: 'Patched local title' },
+      {
+        sourceContext: localSource
+      }
+    )
+
+    expect(
+      store.getState().linearIssueCache[`${localScope}::workspace-1::issue-id`]?.data?.title
+    ).toBe('Patched local title')
+    expect(
+      store.getState().linearIssueCache[`${remoteScope}::workspace-1::issue-id`]?.data?.title
+    ).toBe('Remote title')
+    expect(
+      store.getState().linearSearchCache[`${localScope}::workspace-1::search::query::20`]?.data?.[0]
+        ?.title
+    ).toBe('Patched local title')
+    expect(
+      store.getState().linearSearchCache[`${remoteScope}::workspace-1::search::query::20`]
+        ?.data?.[0]?.title
+    ).toBe('Remote title')
+    expect(
+      store.getState().linearListCache[`${localScope}::workspace-1::list::all::36`]?.data?.items[0]
+        ?.title
+    ).toBe('Patched local title')
+    expect(
+      store.getState().linearListCache[`${remoteScope}::workspace-1::list::all::36`]?.data?.items[0]
+        ?.title
+    ).toBe('Remote title')
   })
 })
 
