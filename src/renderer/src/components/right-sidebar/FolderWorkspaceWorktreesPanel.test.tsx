@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
 
-import { act } from 'react'
+import { act, type MouseEvent, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Repo, Worktree, WorkspaceLineage } from '../../../../shared/types'
+import type { Repo, Worktree, WorktreeLineage, WorkspaceLineage } from '../../../../shared/types'
 import { folderWorkspaceKey, worktreeWorkspaceKey } from '../../../../shared/workspace-scope'
 
 type MockStoreState = {
@@ -14,6 +14,7 @@ type MockStoreState = {
     folderPath: string
   }[]
   workspaceLineageByChildKey: Record<string, WorkspaceLineage>
+  worktreeLineageById: Record<string, WorktreeLineage>
   worktreesByRepo: Record<string, Worktree[]>
   repos: Repo[]
 }
@@ -23,6 +24,7 @@ const testState = vi.hoisted(() => ({
     activeWorktreeId: null,
     folderWorkspaces: [],
     workspaceLineageByChildKey: {},
+    worktreeLineageById: {},
     worktreesByRepo: {},
     repos: []
   } as MockStoreState,
@@ -32,6 +34,10 @@ const testState = vi.hoisted(() => ({
     nativeDragEnabled?: boolean
     isActive?: boolean
     flushSurface?: boolean
+    lineageChildCount?: number
+    lineageCollapsed?: boolean
+    lineageChildren?: ReactNode
+    onLineageToggle?: (event: MouseEvent<HTMLButtonElement>) => void
   }[]
 }))
 
@@ -51,6 +57,10 @@ vi.mock('@/components/sidebar/WorktreeCard', () => ({
     nativeDragEnabled?: boolean
     isActive?: boolean
     flushSurface?: boolean
+    lineageChildCount?: number
+    lineageCollapsed?: boolean
+    lineageChildren?: ReactNode
+    onLineageToggle?: (event: MouseEvent<HTMLButtonElement>) => void
   }) => {
     testState.cardProps.push(props)
     return (
@@ -61,8 +71,16 @@ vi.mock('@/components/sidebar/WorktreeCard', () => ({
         data-native-drag-enabled={props.nativeDragEnabled ? 'true' : 'false'}
         data-active={props.isActive ? 'true' : 'false'}
         data-flush-surface={props.flushSurface ? 'true' : 'false'}
+        data-lineage-child-count={props.lineageChildCount ?? 0}
+        data-lineage-collapsed={props.lineageCollapsed ? 'true' : 'false'}
       >
         {props.worktree.displayName}
+        {props.lineageChildCount ? (
+          <button type="button" data-testid="lineage-toggle" onClick={props.onLineageToggle}>
+            toggle
+          </button>
+        ) : null}
+        {props.lineageChildren}
       </div>
     )
   }
@@ -125,6 +143,23 @@ function makeWorkspaceLineage(
   }
 }
 
+function makeWorktreeLineage(
+  child: Worktree,
+  parent: Worktree,
+  overrides: Partial<WorktreeLineage> = {}
+): WorktreeLineage {
+  return {
+    worktreeId: child.id,
+    worktreeInstanceId: child.instanceId ?? '',
+    parentWorktreeId: parent.id,
+    parentWorktreeInstanceId: parent.instanceId ?? '',
+    origin: 'cli',
+    capture: { source: 'env-workspace', confidence: 'inferred' },
+    createdAt: 1,
+    ...overrides
+  }
+}
+
 function renderPanel(): void {
   act(() => {
     root.render(<FolderWorkspaceWorktreesPanel />)
@@ -141,6 +176,7 @@ describe('FolderWorkspaceWorktreesPanel', () => {
       activeWorktreeId: folderWorkspaceKey('folder-1'),
       folderWorkspaces: [{ id: 'folder-1', name: 'Platform folder', folderPath: '/platform' }],
       workspaceLineageByChildKey: {},
+      worktreeLineageById: {},
       worktreesByRepo: {},
       repos: [makeRepo()]
     }
@@ -214,5 +250,49 @@ describe('FolderWorkspaceWorktreesPanel', () => {
     expect(testState.cardProps.every((props) => props.affiliateListMode === true)).toBe(true)
     expect(testState.cardProps.every((props) => props.nativeDragEnabled === false)).toBe(true)
     expect(testState.cardProps.every((props) => props.flushSurface === true)).toBe(true)
+  })
+
+  it('renders nested worktree lineage under attached worktrees', () => {
+    const parent = makeWorktree({
+      id: 'repo-1::/parent',
+      displayName: 'Parent child',
+      instanceId: 'parent-instance',
+      lastActivityAt: 50
+    })
+    const nested = makeWorktree({
+      id: 'repo-1::/nested',
+      displayName: 'Nested child',
+      instanceId: 'nested-instance',
+      lastActivityAt: 10
+    })
+    testState.store.worktreesByRepo = {
+      'repo-1': [parent, nested]
+    }
+    testState.store.workspaceLineageByChildKey = {
+      [parent.id]: makeWorkspaceLineage(parent, 'folder-1')
+    }
+    testState.store.worktreeLineageById = {
+      [nested.id]: makeWorktreeLineage(nested, parent)
+    }
+
+    renderPanel()
+
+    expect(
+      [...container.querySelectorAll('[data-testid="worktree-card"]')].map((node) =>
+        node.getAttribute('data-worktree-id')
+      )
+    ).toEqual([parent.id, nested.id])
+    expect(testState.cardProps.map((props) => props.worktree.displayName)).toEqual([
+      'Parent child',
+      'Nested child'
+    ])
+    expect(testState.cardProps[0]?.lineageChildCount).toBe(1)
+    expect(testState.cardProps[0]?.lineageCollapsed).toBe(false)
+
+    act(() => {
+      container.querySelector<HTMLButtonElement>('[data-testid="lineage-toggle"]')?.click()
+    })
+
+    expect(container.textContent).not.toContain('Nested child')
   })
 })

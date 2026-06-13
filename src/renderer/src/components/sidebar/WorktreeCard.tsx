@@ -1301,7 +1301,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
           />
         )}
 
-        {!affiliateListMode && showLineageChildChip && (
+        {showLineageChildChip && (
           <div
             className="relative -ml-1 mt-1 flex min-w-0 justify-start"
             style={{
@@ -1344,7 +1344,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
           </div>
         )}
 
-        {!affiliateListMode && lineageChildren && (
+        {lineageChildren && (
           <div className="-ml-[1.125rem] mt-1.5 w-[calc(100%+1.125rem)] space-y-1">
             {lineageChildren}
           </div>

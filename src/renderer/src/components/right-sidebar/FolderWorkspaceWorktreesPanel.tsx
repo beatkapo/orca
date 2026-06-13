@@ -2,7 +2,8 @@ import WorktreeCard from '@/components/sidebar/WorktreeCard'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
 import { folderWorkspaceKey, parseWorkspaceKey } from '../../../../shared/workspace-scope'
-import type { Worktree } from '../../../../shared/types'
+import type { Worktree, WorktreeLineage } from '../../../../shared/types'
+import { useState } from 'react'
 
 function getWorktreeActivityTime(worktree: Worktree): number {
   return Math.max(worktree.lastActivityAt ?? 0, worktree.createdAt ?? 0, worktree.sortOrder ?? 0)
@@ -12,8 +13,12 @@ export default function FolderWorkspaceWorktreesPanel(): React.JSX.Element {
   const activeWorktreeId = useAppStore((s) => s.activeWorktreeId)
   const folderWorkspaces = useAppStore((s) => s.folderWorkspaces)
   const workspaceLineageByChildKey = useAppStore((s) => s.workspaceLineageByChildKey)
+  const worktreeLineageById = useAppStore((s) => s.worktreeLineageById)
   const worktreesByRepo = useAppStore((s) => s.worktreesByRepo)
   const repos = useAppStore((s) => s.repos)
+  const [collapsedLineageWorktreeIds, setCollapsedLineageWorktreeIds] = useState<
+    ReadonlySet<string>
+  >(() => new Set())
 
   const activeScope = parseWorkspaceKey(activeWorktreeId ?? '')
   const folderWorkspace =
@@ -53,6 +58,75 @@ export default function FolderWorkspaceWorktreesPanel(): React.JSX.Element {
             left.displayName.localeCompare(right.displayName)
         )
     : []
+
+  const childWorktreeIds = new Set(childWorktrees.map((worktree) => worktree.id))
+  const lineageChildrenByParentId = getLineageChildrenByParentId(
+    worktreeLineageById,
+    worktreeById,
+    childWorktreeIds
+  )
+  const nestedChildIds = new Set<string>()
+  for (const children of lineageChildrenByParentId.values()) {
+    for (const child of children) {
+      nestedChildIds.add(child.id)
+    }
+  }
+  const topLevelChildWorktrees = childWorktrees.filter(
+    (worktree) => !nestedChildIds.has(worktree.id)
+  )
+  const rootChildWorktrees =
+    topLevelChildWorktrees.length > 0 ? topLevelChildWorktrees : childWorktrees
+
+  const toggleLineage = (worktreeId: string): void => {
+    setCollapsedLineageWorktreeIds((current) => {
+      const next = new Set(current)
+      if (next.has(worktreeId)) {
+        next.delete(worktreeId)
+      } else {
+        next.add(worktreeId)
+      }
+      return next
+    })
+  }
+
+  const renderChildWorktree = (
+    worktree: Worktree,
+    ancestorIds: ReadonlySet<string> = new Set()
+  ): React.JSX.Element => {
+    const lineageChildren = lineageChildrenByParentId.get(worktree.id) ?? []
+    const lineageCollapsed = collapsedLineageWorktreeIds.has(worktree.id)
+    const nextAncestorIds = new Set([...ancestorIds, worktree.id])
+    const safeLineageChildren = lineageChildren.filter((child) => !nextAncestorIds.has(child.id))
+    return (
+      <WorktreeCard
+        key={worktree.id}
+        worktree={worktree}
+        repo={repoById.get(worktree.repoId)}
+        isActive={activeWorktreeId === worktree.id}
+        isActiveSurface={false}
+        hideRepoBadge={false}
+        nativeDragEnabled={false}
+        flushSurface
+        affiliateListMode
+        lineageChildCount={safeLineageChildren.length}
+        lineageCollapsed={lineageCollapsed}
+        lineageChildren={
+          !lineageCollapsed && safeLineageChildren.length > 0
+            ? safeLineageChildren.map((child) => renderChildWorktree(child, nextAncestorIds))
+            : undefined
+        }
+        onLineageToggle={
+          safeLineageChildren.length > 0
+            ? (event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                toggleLineage(worktree.id)
+              }
+            : undefined
+        }
+      />
+    )
+  }
 
   if (!folderWorkspace) {
     return (
@@ -101,22 +175,71 @@ export default function FolderWorkspaceWorktreesPanel(): React.JSX.Element {
       ) : (
         <div className="scrollbar-sleek min-h-0 flex-1 overflow-y-auto py-2 pl-1 pr-2">
           <div className="space-y-1">
-            {childWorktrees.map((worktree) => (
-              <WorktreeCard
-                key={worktree.id}
-                worktree={worktree}
-                repo={repoById.get(worktree.repoId)}
-                isActive={activeWorktreeId === worktree.id}
-                isActiveSurface={false}
-                hideRepoBadge={false}
-                nativeDragEnabled={false}
-                flushSurface
-                affiliateListMode
-              />
-            ))}
+            {rootChildWorktrees.map((worktree) => renderChildWorktree(worktree))}
           </div>
         </div>
       )}
     </div>
   )
+}
+
+function getLineageChildrenByParentId(
+  lineageById: Record<string, WorktreeLineage>,
+  worktreeById: Map<string, Worktree>,
+  rootWorktreeIds: ReadonlySet<string>
+): Map<string, Worktree[]> {
+  const descendantsByParentId = new Map<string, Worktree[]>()
+  const includedIds = new Set(rootWorktreeIds)
+  let added = true
+
+  while (added) {
+    added = false
+    for (const lineage of Object.values(lineageById)) {
+      const parent = worktreeById.get(lineage.parentWorktreeId)
+      const child = worktreeById.get(lineage.worktreeId)
+      if (!parent || !child || !includedIds.has(parent.id) || includedIds.has(child.id)) {
+        continue
+      }
+      if (
+        child.instanceId !== lineage.worktreeInstanceId ||
+        parent.instanceId !== lineage.parentWorktreeInstanceId
+      ) {
+        continue
+      }
+      includedIds.add(child.id)
+      added = true
+    }
+  }
+
+  for (const worktreeId of includedIds) {
+    const child = worktreeById.get(worktreeId)
+    if (!child) {
+      continue
+    }
+    const lineage = lineageById[child.id]
+    if (!lineage || !includedIds.has(lineage.parentWorktreeId)) {
+      continue
+    }
+    const parent = worktreeById.get(lineage.parentWorktreeId)
+    if (
+      !parent ||
+      child.instanceId !== lineage.worktreeInstanceId ||
+      parent.instanceId !== lineage.parentWorktreeInstanceId
+    ) {
+      continue
+    }
+    const children = descendantsByParentId.get(parent.id) ?? []
+    children.push(child)
+    descendantsByParentId.set(parent.id, children)
+  }
+
+  for (const children of descendantsByParentId.values()) {
+    children.sort(
+      (left, right) =>
+        getWorktreeActivityTime(right) - getWorktreeActivityTime(left) ||
+        left.displayName.localeCompare(right.displayName)
+    )
+  }
+
+  return descendantsByParentId
 }
