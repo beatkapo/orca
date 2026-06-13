@@ -1091,7 +1091,7 @@ describe('CodexRuntimeHomeService', () => {
     expect(readFileSync(runtimeProfilePath, 'utf-8')).toBe('profile\n')
   })
 
-  it('bridges system Codex sessions before launch without replacing runtime sessions', async () => {
+  it('does not bridge historical system Codex sessions during ordinary launch prep', async () => {
     const systemMissingRuntimeSessionPath = join(
       getSystemCodexHomePath(),
       'sessions',
@@ -1138,8 +1138,7 @@ describe('CodexRuntimeHomeService', () => {
       '26',
       'rollout-old.jsonl'
     )
-    expect(readFileSync(runtimeMissingSessionPath, 'utf-8')).toBe('{"id":"old"}\n')
-    expectResourceLinkedOrCopied(runtimeMissingSessionPath, systemMissingRuntimeSessionPath)
+    expect(existsSync(runtimeMissingSessionPath)).toBe(false)
     expect(readFileSync(runtimeConflictSessionPath, 'utf-8')).toBe('{"id":"runtime-conflict"}\n')
     expect(existsSync(join(getRuntimeCodexHomePath(), 'state_5.sqlite'))).toBe(false)
   })
