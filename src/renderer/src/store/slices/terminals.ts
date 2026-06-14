@@ -41,7 +41,7 @@ import {
 } from '@/components/terminal-pane/pty-transport'
 import { normalizeTerminalLayoutSnapshot } from '@/components/terminal-pane/terminal-layout-leaf-ids'
 import { shutdownBufferCaptures } from '@/components/terminal-pane/shutdown-buffer-captures'
-import { callRuntimeRpc, getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
+import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
 import { parseRemoteRuntimePtyId } from '@/runtime/runtime-terminal-stream'
 import { toRuntimeWorktreeSelector } from '@/runtime/runtime-worktree-selector'
 import { createBrowserUuid } from '@/lib/browser-uuid'
@@ -49,6 +49,7 @@ import { getFolderWorkspaceConnectionId } from '@/lib/folder-workspace-connectio
 import { hasWorktreeSleepIntent } from '@/lib/worktree-sleep-intent'
 import { sanitizeTerminalLayoutPaneTitles } from '@/lib/terminal-pane-title-sanitization'
 import { focusTerminalTabSurface } from '@/lib/focus-terminal-tab-surface'
+import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
 
 function getNextTerminalOrdinal(tabs: TerminalTab[]): number {
   const usedOrdinals = new Set<number>()
@@ -132,6 +133,24 @@ function updateUnifiedTerminalLabel(
   return unifiedTabs.map((entry, index) => (index === unifiedIndex ? { ...entry, label } : entry))
 }
 
+function getDecorativeAgentTitleSignature(title: string): string | null {
+  const status = detectAgentStatusFromTitle(title)
+  if (!status) {
+    return null
+  }
+  // Why: agent spinners can emit OSC title frames many times per second; the
+  // spinner glyph is live decoration, not meaningful tab or sort state.
+  return `${status}:${title
+    .trim()
+    .replace(/^[\u2800-\u28ff\s]+/u, '')
+    .replace(/\s+/g, ' ')}`
+}
+
+function isDecorativeAgentTitleFrameChange(prevTitle: string, nextTitle: string): boolean {
+  const prevSignature = getDecorativeAgentTitleSignature(prevTitle)
+  return prevSignature !== null && prevSignature === getDecorativeAgentTitleSignature(nextTitle)
+}
+
 function updateUnifiedTerminalGeneratedLabel(
   unifiedTabs: Tab[],
   terminalTabId: string,
@@ -213,6 +232,13 @@ export function worktreeUsesRemoteConnection(
     .find((entry) => entry.id === worktreeId)
   const repo = worktree ? state.repos.find((entry) => entry.id === worktree.repoId) : null
   return Boolean(repo?.connectionId)
+}
+
+function resolveTerminalStopRuntimeEnvironmentId(
+  state: Pick<AppState, 'repos' | 'settings' | 'worktreesByRepo'>,
+  worktreeId: string
+): string | null {
+  return getRuntimeEnvironmentIdForWorktree(state, worktreeId)
 }
 
 export type TerminalSlice = {
@@ -741,7 +767,7 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
     }
     const pairedWebRuntimeEnvironmentId = (globalThis as { __ORCA_WEB_CLIENT__?: boolean })
       .__ORCA_WEB_CLIENT__
-      ? state.settings?.activeRuntimeEnvironmentId?.trim()
+      ? getRuntimeEnvironmentIdForWorktree(state, worktreeId)
       : null
     if (pairedWebRuntimeEnvironmentId) {
       const { createWebRuntimeSessionTerminal } = await import('@/runtime/web-runtime-session')
@@ -1058,6 +1084,21 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
       }
       const nextTitle = title.trim() || getFallbackTabTitle(currentTab)
       const currentUnifiedTabs = s.unifiedTabsByWorktree[ownerWorktreeId] ?? []
+      if (isDecorativeAgentTitleFrameChange(currentTab.title, nextTitle)) {
+        const unifiedTabsWithCurrentLabel = updateUnifiedTerminalLabel(
+          currentUnifiedTabs,
+          tabId,
+          currentTab.title
+        )
+        return unifiedTabsWithCurrentLabel
+          ? {
+              unifiedTabsByWorktree: {
+                ...s.unifiedTabsByWorktree,
+                [ownerWorktreeId]: unifiedTabsWithCurrentLabel
+              }
+            }
+          : s
+      }
       const unifiedTabsWithUpdatedLabel = updateUnifiedTerminalLabel(
         currentUnifiedTabs,
         tabId,
@@ -1189,6 +1230,9 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
       const currentByPane = s.runtimePaneTitlesByTabId[tabId] ?? {}
       const prevTitle = currentByPane[paneId]
       if (prevTitle === title) {
+        return s
+      }
+      if (prevTitle && isDecorativeAgentTitleFrameChange(prevTitle, title)) {
         return s
       }
       // Why: smart sort's title-heuristic fallback (Edge case 9) reads
@@ -1729,10 +1773,10 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
       return
     }
 
-    const target = getActiveRuntimeTarget(get().settings)
-    if (target.kind === 'environment') {
+    const runtimeEnvironmentId = resolveTerminalStopRuntimeEnvironmentId(get(), worktreeId)
+    if (runtimeEnvironmentId) {
       await callRuntimeRpc(
-        target,
+        { kind: 'environment', environmentId: runtimeEnvironmentId },
         'terminal.stop',
         { worktree: toRuntimeWorktreeSelector(worktreeId) },
         { timeoutMs: 15_000 }

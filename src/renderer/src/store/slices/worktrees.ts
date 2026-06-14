@@ -41,6 +41,12 @@ import { branchName } from '@/lib/git-utils'
 import { markInputQuietSchedulerInput, scheduleAfterInputQuiet } from '@/lib/input-quiet-scheduler'
 import { showLocalBaseRefUpdateSuggestionToast } from '@/components/sidebar/local-base-ref-suggestion-toast'
 import { translate } from '@/i18n/i18n'
+import {
+  getRepoExecutionHostId,
+  getSettingsFocusedExecutionHostId,
+  parseExecutionHostId,
+  type ExecutionHostId
+} from '../../../../shared/execution-host'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
 import {
   folderWorkspaceKey,
@@ -199,6 +205,9 @@ function areWorktreesEqual(current: Worktree[] | undefined, next: Worktree[]): b
       worktree.id === candidate.id &&
       worktree.instanceId === candidate.instanceId &&
       worktree.repoId === candidate.repoId &&
+      worktree.projectId === candidate.projectId &&
+      worktree.hostId === candidate.hostId &&
+      worktree.projectHostSetupId === candidate.projectHostSetupId &&
       worktree.path === candidate.path &&
       worktree.head === candidate.head &&
       worktree.branch === candidate.branch &&
@@ -377,28 +386,23 @@ function applyDetectedWorktreeUpdates(
   worktreeId: string,
   updates: Partial<WorktreeMeta>
 ): AppState['detectedWorktreesByRepo'] {
-  const repoId = getRepoIdFromWorktreeId(worktreeId)
-  const result = detectedWorktreesByRepo[repoId]
-  if (!result) {
-    return detectedWorktreesByRepo
-  }
-
   let changed = false
-  const nextWorktrees = result.worktrees.map((worktree) => {
-    if (worktree.id !== worktreeId) {
-      return worktree
-    }
-    changed = true
-    return { ...worktree, ...updates }
-  })
-  if (!changed) {
-    return detectedWorktreesByRepo
+  const nextByRepo: AppState['detectedWorktreesByRepo'] = {}
+
+  for (const [repoId, result] of Object.entries(detectedWorktreesByRepo)) {
+    let repoChanged = false
+    const nextWorktrees = result.worktrees.map((worktree) => {
+      if (worktree.id !== worktreeId) {
+        return worktree
+      }
+      repoChanged = true
+      changed = true
+      return { ...worktree, ...updates }
+    })
+    nextByRepo[repoId] = repoChanged ? { ...result, worktrees: nextWorktrees } : result
   }
 
-  return {
-    ...detectedWorktreesByRepo,
-    [repoId]: { ...result, worktrees: nextWorktrees }
-  }
+  return changed ? nextByRepo : detectedWorktreesByRepo
 }
 
 function findKnownWorktreeById(
@@ -572,6 +576,37 @@ function replaceWorktreeInRepoLists(
   }
 }
 
+function settingsForRepoOwner(state: Pick<AppState, 'repos' | 'settings'>, repoId: string) {
+  const repo = state.repos.find((entry) => entry.id === repoId)
+  if (!repo) {
+    return state.settings
+  }
+  if (!repo.executionHostId && !repo.connectionId) {
+    return state.settings
+  }
+  const parsed = parseExecutionHostId(getRepoExecutionHostId(repo))
+  if (parsed?.kind === 'runtime') {
+    return state.settings
+      ? { ...state.settings, activeRuntimeEnvironmentId: parsed.environmentId }
+      : ({ activeRuntimeEnvironmentId: parsed.environmentId } as AppState['settings'])
+  }
+  if (parsed?.kind === 'local' && state.settings?.activeRuntimeEnvironmentId) {
+    return { ...state.settings, activeRuntimeEnvironmentId: null }
+  }
+  if (parsed?.kind !== 'ssh') {
+    return state.settings
+  }
+  // Why: SSH repos are owned by the desktop client/SSH provider, not the
+  // currently focused runtime server.
+  return state.settings
+    ? { ...state.settings, activeRuntimeEnvironmentId: null }
+    : ({ activeRuntimeEnvironmentId: null } as AppState['settings'])
+}
+
+function settingsForWorktreeOwner(state: Pick<AppState, 'repos' | 'settings'>, worktreeId: string) {
+  return settingsForRepoOwner(state, getRepoIdFromWorktreeId(worktreeId))
+}
+
 async function listDetectedWorktreesForRepo(
   settings: AppState['settings'],
   repoId: string
@@ -670,18 +705,69 @@ function projectWorktreeLineageToWorkspaceLineage(
 
 async function refreshRemoteWorktreeLineageBestEffort(
   settings: AppState['settings'],
-  set: (partial: Partial<AppState>) => void
+  get: () => AppState,
+  set: (partial: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void
 ): Promise<void> {
   if (getActiveRuntimeTarget(settings).kind === 'local') {
     return
   }
   try {
-    set(await listWorktreeLineageForRuntime(settings))
+    const lineage = await listWorktreeLineageForRuntime(settings)
+    const hostId = getSettingsFocusedExecutionHostId(settings)
+    set((s) => ({
+      worktreeLineageById: mergeLineageForHost(s, hostId, lineage.worktreeLineageById),
+      workspaceLineageByChildKey: mergeWorkspaceLineageForHost(
+        s,
+        hostId,
+        lineage.workspaceLineageByChildKey
+      )
+    }))
   } catch (err) {
     // Why: lineage is supplemental to the worktree list. A remote timeout here
     // must not discard a successful worktree refresh.
     console.error('Failed to fetch worktree lineage:', err)
   }
+}
+
+function getWorktreeHostId(
+  state: Pick<AppState, 'repos'>,
+  worktreeId: string
+): ExecutionHostId | null {
+  const repoId = getRepoIdFromWorktreeId(worktreeId)
+  const repo = state.repos.find((entry) => entry.id === repoId)
+  return repo ? getRepoExecutionHostId(repo) : null
+}
+
+function mergeLineageForHost(
+  state: Pick<AppState, 'repos' | 'worktreeLineageById'>,
+  hostId: ExecutionHostId,
+  lineage: Record<string, WorktreeLineage>
+): Record<string, WorktreeLineage> {
+  const next: Record<string, WorktreeLineage> = {}
+  for (const [worktreeId, existing] of Object.entries(state.worktreeLineageById)) {
+    if (getWorktreeHostId(state, worktreeId) !== hostId) {
+      next[worktreeId] = existing
+    }
+  }
+  return { ...next, ...lineage }
+}
+
+function mergeWorkspaceLineageForHost(
+  state: Pick<AppState, 'repos' | 'workspaceLineageByChildKey'>,
+  hostId: ExecutionHostId,
+  lineage: Record<string, WorkspaceLineage>
+): Record<string, WorkspaceLineage> {
+  const next: Record<string, WorkspaceLineage> = {}
+  for (const [childKey, existing] of Object.entries(state.workspaceLineageByChildKey)) {
+    const childScope = parseWorkspaceKey(existing.childWorkspaceKey)
+    if (
+      childScope?.type !== 'worktree' ||
+      getWorktreeHostId(state, childScope.worktreeId) !== hostId
+    ) {
+      next[childKey] = existing
+    }
+  }
+  return { ...next, ...lineage }
 }
 
 async function persistWorktreeMeta(
@@ -948,7 +1034,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
 
   fetchDetectedWorktrees: async (repoId) => {
     try {
-      const result = await listDetectedWorktreesForRepo(get().settings, repoId)
+      const result = await listDetectedWorktreesForRepo(settingsForRepoOwner(get(), repoId), repoId)
       set((s) =>
         areDetectedWorktreeResultsEqual(s.detectedWorktreesByRepo[repoId], result)
           ? s
@@ -963,7 +1049,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
 
   fetchWorktrees: async (repoId, options) => {
     try {
-      const settings = get().settings
+      const settings = settingsForRepoOwner(get(), repoId)
       const detected = await listDetectedWorktreesForRepo(settings, repoId)
       if (options?.requireAuthoritative && !detected.authoritative) {
         return false
@@ -984,7 +1070,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
             ...(removedIds.length > 0 ? buildWorktreePurgeState(s, removedIds) : {})
           }
         })
-        await refreshRemoteWorktreeLineageBestEffort(settings, set)
+        await refreshRemoteWorktreeLineageBestEffort(settings, get, set)
         return detected.authoritative
       }
 
@@ -1018,7 +1104,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
           ...(removedIds.length > 0 ? buildWorktreePurgeState(s, removedIds) : {})
         }
       })
-      await refreshRemoteWorktreeLineageBestEffort(settings, set)
+      await refreshRemoteWorktreeLineageBestEffort(settings, get, set)
       return detected.authoritative
     } catch (err) {
       console.error(`Failed to fetch worktrees for repo ${repoId}:`, err)
@@ -1051,7 +1137,10 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
     const results = await Promise.all(
       repos.map(async (r) => {
         try {
-          const detected = await listDetectedWorktreesForRepo(get().settings, r.id)
+          const detected = await listDetectedWorktreesForRepo(
+            settingsForRepoOwner(get(), r.id),
+            r.id
+          )
           const list = toVisibleWorktrees(detected)
           const current = get().worktreesByRepo[r.id]
           if (
@@ -1109,7 +1198,19 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
 
   fetchWorktreeLineage: async () => {
     try {
-      set(await listWorktreeLineageForRuntime(get().settings))
+      // Why: lineage is a focused-host refresh — fetch from the focused host and
+      // host-merge so other hosts' previously fetched lineage is preserved.
+      const settings = get().settings
+      const lineage = await listWorktreeLineageForRuntime(settings)
+      const hostId = getSettingsFocusedExecutionHostId(settings)
+      set((s) => ({
+        worktreeLineageById: mergeLineageForHost(s, hostId, lineage.worktreeLineageById),
+        workspaceLineageByChildKey: mergeWorkspaceLineageForHost(
+          s,
+          hostId,
+          lineage.workspaceLineageByChildKey
+        )
+      }))
     } catch (err) {
       console.error('Failed to fetch worktree lineage:', err)
     }
@@ -1117,7 +1218,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
 
   updateWorktreeLineage: async (worktreeId, args) => {
     try {
-      const target = getActiveRuntimeTarget(get().settings)
+      const target = getActiveRuntimeTarget(settingsForWorktreeOwner(get(), worktreeId))
       let updatedRemoteWorktree: WorktreeWithLineage | undefined
       const lineage =
         target.kind === 'local'
@@ -1234,7 +1335,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
 
   prefetchWorktreeCreateBase: async (repoId, baseBranch) => {
     try {
-      const target = getActiveRuntimeTarget(get().settings)
+      const target = getActiveRuntimeTarget(settingsForRepoOwner(get(), repoId))
       if (target.kind === 'local') {
         await window.api.worktrees.prefetchCreateBase({
           repoId,
@@ -1335,7 +1436,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
             ...(startup ? { startup } : {}),
             ...(creationId ? { creationId } : {})
           }
-          const target = getActiveRuntimeTarget(get().settings)
+          const target = getActiveRuntimeTarget(settingsForRepoOwner(get(), repoId))
           const result =
             target.kind === 'local'
               ? await window.api.worktrees.create(createArgs)
@@ -1523,7 +1624,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
       const worktreeBeforeRemoval = get()
         .allWorktrees()
         .find((entry) => entry.id === worktreeId)
-      const target = getActiveRuntimeTarget(get().settings)
+      const target = getActiveRuntimeTarget(settingsForWorktreeOwner(get(), worktreeId))
       const removalResult = await (target.kind === 'local'
         ? window.api.worktrees.remove({ worktreeId, force, skipArchive })
         : callRuntimeRpc<RemoveWorktreeResult>(
@@ -1822,7 +1923,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
 
   forceDeletePreservedBranch: async (worktreeId, branchName, expectedHead) => {
     try {
-      const target = getActiveRuntimeTarget(get().settings)
+      const target = getActiveRuntimeTarget(settingsForWorktreeOwner(get(), worktreeId))
       const result = await (target.kind === 'local'
         ? window.api.worktrees.forceDeletePreservedBranch({
             worktreeId,
@@ -1889,7 +1990,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
       existingWorktree.linkedPR !== linkedPrForPushTarget &&
       !existingWorktree.pushTarget
         ? await resolveLinkedPrPushTarget(
-            get().settings,
+            settingsForRepoOwner(get(), existingWorktree.repoId),
             existingWorktree.repoId,
             linkedPrForPushTarget
           )
@@ -1943,7 +2044,8 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
               reviewBranch,
               s.settings,
               reviewRepo.id,
-              reviewRepo.connectionId
+              reviewRepo.connectionId,
+              reviewRepo.executionHostId
             )
           : null
       const prCacheKey =
@@ -1953,7 +2055,8 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
               reviewRepo.id,
               reviewBranch,
               s.settings,
-              reviewRepo.connectionId
+              reviewRepo.connectionId,
+              reviewRepo.executionHostId
             )
           : null
       const prCacheKeys =
@@ -2011,7 +2114,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
     }
 
     try {
-      await persistWorktreeMeta(get().settings, worktreeId, enriched)
+      await persistWorktreeMeta(settingsForWorktreeOwner(get(), worktreeId), worktreeId, enriched)
       if (reviewRepo && reviewBranch && typeof get().fetchHostedReviewForBranch === 'function') {
         // Why: the old cache entry may have been populated solely by linkedPR.
         // Force a no-linked refetch so an in-flight linked lookup cannot keep
@@ -2062,11 +2165,14 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
           }
     })
 
-    const settings = get().settings
     await Promise.all(
       Array.from(updatesByWorktreeId, async ([worktreeId, updates]) => {
         try {
-          await persistWorktreeMeta(settings, worktreeId, updates)
+          await persistWorktreeMeta(
+            settingsForWorktreeOwner(get(), worktreeId),
+            worktreeId,
+            updates
+          )
         } catch (err) {
           if (isRuntimeSelectorNotFoundError(err)) {
             void get().fetchWorktrees(getRepoIdFromWorktreeId(worktreeId))
@@ -2149,7 +2255,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
       return
     }
 
-    void persistWorktreeMeta(get().settings, worktreeId, {
+    void persistWorktreeMeta(settingsForWorktreeOwner(get(), worktreeId), worktreeId, {
       isUnread: true,
       lastActivityAt: now
     }).catch((err) => {
@@ -2260,7 +2366,9 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
       return
     }
 
-    void persistWorktreeMeta(get().settings, worktreeId, { isUnread: false }).catch((err) => {
+    void persistWorktreeMeta(settingsForWorktreeOwner(get(), worktreeId), worktreeId, {
+      isUnread: false
+    }).catch((err) => {
       if (isRuntimeSelectorNotFoundError(err)) {
         void get().fetchWorktrees(getRepoIdFromWorktreeId(worktreeId))
         return
@@ -2316,7 +2424,9 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
       return
     }
 
-    void persistWorktreeMeta(get().settings, worktreeId, { lastActivityAt: now }).catch((err) => {
+    void persistWorktreeMeta(settingsForWorktreeOwner(get(), worktreeId), worktreeId, {
+      lastActivityAt: now
+    }).catch((err) => {
       if (isRuntimeSelectorNotFoundError(err)) {
         return
       }
@@ -2734,7 +2844,11 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
         isUnread: false
       }
 
-      void persistWorktreeMeta(get().settings, worktreeId, updates).catch((err) => {
+      void persistWorktreeMeta(
+        settingsForWorktreeOwner(get(), worktreeId),
+        worktreeId,
+        updates
+      ).catch((err) => {
         if (isRuntimeSelectorNotFoundError(err)) {
           void get().fetchWorktrees(getRepoIdFromWorktreeId(worktreeId))
           return

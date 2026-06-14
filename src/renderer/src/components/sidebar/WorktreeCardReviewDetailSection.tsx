@@ -50,7 +50,11 @@ export function WorktreeCardReviewDetailSection({
     <WorktreeCardDetailSection>
       <DetailHeader
         icon={<ReviewIcon review={review} className="size-3" />}
-        label={`${reviewLabel} #${review.number}`}
+        label={translate(
+          'auto.components.sidebar.WorktreeCardReviewDetailSection.reviewHeader',
+          '{{value0}} #{{value1}}',
+          { value0: reviewLabel, value1: review.number }
+        )}
         actions={
           <>
             {onUnlinkReview && (

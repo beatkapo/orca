@@ -15,6 +15,7 @@ function stopNestedWorktreeCardBubble(event: React.SyntheticEvent<HTMLElement>):
 
 export default function FolderWorkspaceWorktreesPanel(): React.JSX.Element {
   const activeWorktreeId = useAppStore((s) => s.activeWorktreeId)
+  const activeWorkspaceKey = useAppStore((s) => s.activeWorkspaceKey)
   const folderWorkspaces = useAppStore((s) => s.folderWorkspaces)
   const workspaceLineageByChildKey = useAppStore((s) => s.workspaceLineageByChildKey)
   const worktreeLineageById = useAppStore((s) => s.worktreeLineageById)
@@ -24,7 +25,7 @@ export default function FolderWorkspaceWorktreesPanel(): React.JSX.Element {
     ReadonlySet<string>
   >(() => new Set())
 
-  const activeScope = parseWorkspaceKey(activeWorktreeId ?? '')
+  const activeScope = parseWorkspaceKey(activeWorkspaceKey ?? activeWorktreeId ?? '')
   const folderWorkspace =
     activeScope?.type === 'folder'
       ? folderWorkspaces.find((workspace) => workspace.id === activeScope.folderWorkspaceId)

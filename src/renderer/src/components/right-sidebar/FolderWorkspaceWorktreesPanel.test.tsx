@@ -8,6 +8,7 @@ import { folderWorkspaceKey, worktreeWorkspaceKey } from '../../../../shared/wor
 
 type MockStoreState = {
   activeWorktreeId: string | null
+  activeWorkspaceKey: string | null
   folderWorkspaces: {
     id: string
     name: string
@@ -22,6 +23,7 @@ type MockStoreState = {
 const testState = vi.hoisted(() => ({
   store: {
     activeWorktreeId: null,
+    activeWorkspaceKey: null,
     folderWorkspaces: [],
     workspaceLineageByChildKey: {},
     worktreeLineageById: {},
@@ -177,6 +179,7 @@ describe('FolderWorkspaceWorktreesPanel', () => {
     testState.cardClicks = []
     testState.store = {
       activeWorktreeId: folderWorkspaceKey('folder-1'),
+      activeWorkspaceKey: folderWorkspaceKey('folder-1'),
       folderWorkspaces: [{ id: 'folder-1', name: 'Platform folder', folderPath: '/platform' }],
       workspaceLineageByChildKey: {},
       worktreeLineageById: {},
@@ -194,11 +197,30 @@ describe('FolderWorkspaceWorktreesPanel', () => {
 
   it('shows unavailable copy outside folder workspaces', () => {
     testState.store.activeWorktreeId = 'repo-1::/worktrees/current'
+    testState.store.activeWorkspaceKey = 'repo-1::/worktrees/current'
 
     renderPanel()
 
     expect(container.textContent).toContain('Workspaces are only shown for folder workspaces.')
     expect(testState.cardProps).toEqual([])
+  })
+
+  it('uses the active workspace key when active worktree id has not caught up', () => {
+    const child = makeWorktree({
+      id: 'repo-1::/child',
+      displayName: 'Workspace-key child',
+      instanceId: 'child-instance'
+    })
+    testState.store.activeWorktreeId = null
+    testState.store.activeWorkspaceKey = folderWorkspaceKey('folder-1')
+    testState.store.worktreesByRepo = { 'repo-1': [child] }
+    testState.store.workspaceLineageByChildKey = {
+      [child.id]: makeWorkspaceLineage(child, 'folder-1')
+    }
+
+    renderPanel()
+
+    expect(container.textContent).toContain('Workspace-key child')
   })
 
   it('renders attached child worktrees as affiliate WorktreeCards in recent order', () => {
