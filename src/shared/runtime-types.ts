@@ -460,6 +460,24 @@ export type RuntimeGitLocalBranches = {
   branches: string[]
 }
 
+/** One speech model as presented to the mobile dictation-setup sheet: catalog
+ *  metadata joined with live download/ready state. */
+export type RuntimeSpeechModelSummary = {
+  id: string
+  label: string
+  provider: 'local' | 'openai'
+  sizeBytes: number | null
+  recommended: boolean
+  status: 'ready' | 'not-downloaded' | 'downloading' | 'extracting' | 'error'
+  progress: number | null
+}
+
+export type RuntimeSpeechSetupState = {
+  enabled: boolean
+  selectedModelId: string
+  models: RuntimeSpeechModelSummary[]
+}
+
 export type RuntimeGitCheckoutResult = {
   ok: true
   branch: string

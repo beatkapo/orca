@@ -131,6 +131,8 @@ import {
 import { useMobileImageAttachment } from '../../../../src/session/use-mobile-image-attachment'
 import { classifyMobileArtifact } from '../../../../src/session/mobile-artifact-kind'
 import { MobileHtmlPreview } from '../../../../src/components/MobileHtmlPreview'
+import { MobileDictationSetupSheet } from '../../../../src/components/MobileDictationSetupSheet'
+import { isDictationSetupRequiredError } from '../../../../src/dictation/mobile-dictation-setup'
 import { TerminalPaneView } from '../../../../src/session/TerminalPaneView'
 import {
   getRepoIdFromMobileWorktreeId,
@@ -857,6 +859,7 @@ export default function SessionScreen() {
   const [selectModeActive, setSelectModeActive] = useState(false)
   const [canPaste, setCanPaste] = useState(false)
   const [showImageSourceSheet, setShowImageSourceSheet] = useState(false)
+  const [showDictationSetup, setShowDictationSetup] = useState(false)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const toastOpacityRef = useRef(new Animated.Value(0))
   const toastHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1005,6 +1008,12 @@ export default function SessionScreen() {
       showToast('Dictation inserted')
     },
     onError: (err) => {
+      // Dictation isn't set up on the desktop yet → open the setup sheet so the
+      // user can download a model + enable it from here, instead of a dead-end toast.
+      if (isDictationSetupRequiredError(err.message)) {
+        setShowDictationSetup(true)
+        return
+      }
       triggerError()
       showToast(err.message)
     }
@@ -4761,6 +4770,12 @@ export default function SessionScreen() {
         onClose={() => setShowCustomKeyModal(false)}
         onKeysChanged={setCustomKeys}
         onManageShortcuts={handleManageShortcuts}
+      />
+      <MobileDictationSetupSheet
+        visible={showDictationSetup}
+        client={client}
+        onClose={() => setShowDictationSetup(false)}
+        onReady={() => setShowDictationSetup(false)}
       />
       <ActionSheetModal
         visible={deleteKeyTarget != null}
