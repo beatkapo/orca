@@ -4372,6 +4372,9 @@ export class OrcaRuntimeService {
       throw new Error('voice_dictation_unavailable')
     }
     const current = this.store.getSettings().voice ?? getDefaultVoiceSettings()
+    // An explicit '' clears the selected model (the OptionalString RPC schema
+    // maps '' → undefined, so this only matters for direct callers); any other
+    // non-empty modelId must be a known catalog entry.
     if (params.modelId !== undefined && params.modelId !== '' && !getCatalogModel(params.modelId)) {
       throw new Error('voice_model_unknown')
     }

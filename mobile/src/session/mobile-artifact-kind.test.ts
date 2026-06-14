@@ -2,10 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { classifyMobileArtifact } from './mobile-artifact-kind'
 
 describe('classifyMobileArtifact', () => {
-  it('classifies image extensions (case-insensitive)', () => {
-    for (const p of ['a.png', 'b.JPG', 'c/d.jpeg', 'e.gif', 'f.webp', 'g.bmp', 'h.svg']) {
+  it('classifies raster image extensions (case-insensitive)', () => {
+    for (const p of ['a.png', 'b.JPG', 'c/d.jpeg', 'e.gif', 'f.webp', 'g.bmp', 'h.ico']) {
       expect(classifyMobileArtifact(p)).toBe('image')
     }
+  })
+
+  it('treats svg as other (RN Image cannot decode svg data URIs; render as source)', () => {
+    expect(classifyMobileArtifact('logo.svg')).toBe('other')
   })
 
   it('classifies html extensions', () => {

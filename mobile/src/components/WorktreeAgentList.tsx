@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { StyleSheet, View } from 'react-native'
 import type { RuntimeWorktreeAgentRow } from '../../../src/shared/runtime-types'
 import { flattenAgentRowLineage } from '../worktree/agent-row-lineage'
@@ -13,9 +14,12 @@ type Props = {
 // a depth-indented WorktreeAgentRow per agent, mirroring the desktop sidebar's
 // WorktreeCardAgents.
 export function WorktreeAgentList({ agents, now, unvisited }: Props) {
+  // Why: rebuild the lineage tree only when the agent list changes, not on every
+  // re-render (the shared useNow tick re-renders this list every 30s).
+  const nodes = useMemo(() => flattenAgentRowLineage(agents), [agents])
   return (
     <View style={styles.list}>
-      {flattenAgentRowLineage(agents).map((node) => (
+      {nodes.map((node) => (
         <WorktreeAgentRow
           key={node.row.paneKey}
           agent={node.row}

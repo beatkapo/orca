@@ -214,7 +214,8 @@ export class GitHandler {
     const branch = params.branch as string
     // Defense-in-depth: reject option-like branch tokens (the RPC schema also
     // validates, but this relay entrypoint is reachable independently). The
-    // trailing `--` ensures the branch can't be parsed as a flag.
+    // `startsWith('-')` guard is what prevents flag injection; the trailing `--`
+    // marks that no pathspecs follow so the token is treated as a branch ref.
     if (typeof branch !== 'string' || branch.length === 0 || branch.startsWith('-')) {
       throw new Error('invalid_branch_name')
     }

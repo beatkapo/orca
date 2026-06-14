@@ -4,9 +4,11 @@
 // toggle; everything else stays on the existing text/syntax path.
 export type MobileArtifactKind = 'image' | 'html' | 'other'
 
-// Image extensions the host's files.readPreview returns base64 + mimeType for.
-// (PDF is previewable on the host too but needs a dedicated renderer — Tier 3.)
-const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'svg'])
+// Raster image extensions React Native's <Image> can decode from a base64 data
+// URI (host returns these via files.readPreview). SVG is intentionally excluded:
+// RN <Image> can't render image/svg+xml data URIs, so .svg falls through to the
+// text path and renders as (meaningful) XML source instead of a blank image.
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico'])
 
 const HTML_EXTENSIONS = new Set(['html', 'htm'])
 

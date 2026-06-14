@@ -42,6 +42,7 @@ import {
   unstageFile
 } from '../git/status'
 import { checkoutBranch, listLocalBranches } from '../git/checkout'
+import type { RuntimeGitCheckoutResult, RuntimeGitLocalBranches } from '../../shared/runtime-types'
 import { getHistory as getGitHistory } from '../git/history'
 import { getUpstreamStatus } from '../git/upstream'
 import { gitFastForward, gitFetch, gitPull, gitPullRebaseFromBase, gitPush } from '../git/remote'
@@ -214,7 +215,7 @@ export class RuntimeGitCommands {
   async checkoutRuntimeGitBranch(
     worktreeSelector: string,
     branch: string
-  ): Promise<{ ok: true; branch: string }> {
+  ): Promise<RuntimeGitCheckoutResult> {
     const target = await this.host.resolveRuntimeGitTarget(worktreeSelector)
     const provider = target.connectionId ? getSshGitProvider(target.connectionId) : null
     if (target.connectionId) {
@@ -228,9 +229,7 @@ export class RuntimeGitCommands {
     return { ok: true, branch }
   }
 
-  async listRuntimeGitLocalBranches(
-    worktreeSelector: string
-  ): Promise<{ current: string | null; branches: string[] }> {
+  async listRuntimeGitLocalBranches(worktreeSelector: string): Promise<RuntimeGitLocalBranches> {
     const target = await this.host.resolveRuntimeGitTarget(worktreeSelector)
     const provider = target.connectionId ? getSshGitProvider(target.connectionId) : null
     if (target.connectionId) {

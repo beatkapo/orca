@@ -15,8 +15,9 @@ export function assertValidBranchName(branch: string): void {
  * Switch the worktree to an existing local branch. Git itself refuses (and
  * surfaces a "would be overwritten by checkout" error) when uncommitted changes
  * would conflict, so we let that message propagate to the caller rather than
- * forcing — mobile shows it as a toast. The leading `--` end-of-options marker
- * ensures the branch token can never be parsed as a flag.
+ * forcing — mobile shows it as a toast. Flag-injection is prevented by
+ * `assertValidBranchName` (rejects `-…`); the trailing `--` marks that no
+ * pathspecs follow, so the token is unambiguously treated as a branch ref.
  */
 export async function checkoutBranch(worktreePath: string, branch: string): Promise<void> {
   assertValidBranchName(branch)
