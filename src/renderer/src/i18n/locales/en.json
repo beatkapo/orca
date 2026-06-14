@@ -3551,6 +3551,9 @@
         "WorktreeCardAgents": {
           "1b0a156717": "Agents"
         },
+        "WorktreeCardReviewDetailSection": {
+          "reviewHeader": "{{value0}} #{{value1}}"
+        },
         "WorktreeCardMeta": {
           "3e65e11cc6": "Workspace metadata",
           "c7fa72ead0": "Edit notes",

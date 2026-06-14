@@ -760,10 +760,10 @@ function mergeWorkspaceLineageForHost(
   const next: Record<string, WorkspaceLineage> = {}
   for (const [childKey, existing] of Object.entries(state.workspaceLineageByChildKey)) {
     const childScope = parseWorkspaceKey(existing.childWorkspaceKey)
-    if (
-      childScope?.type !== 'worktree' ||
-      getWorktreeHostId(state, childScope.worktreeId) !== hostId
-    ) {
+    const childHostId =
+      childScope?.type === 'worktree' ? getWorktreeHostId(state, childScope.worktreeId) : null
+    // A focused host refresh can no longer prove unknown-host child rows are current.
+    if (childScope?.type !== 'worktree' || (childHostId !== null && childHostId !== hostId)) {
       next[childKey] = existing
     }
   }
