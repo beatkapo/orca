@@ -3765,6 +3765,78 @@ describe('connectPanePty', () => {
     binding.dispose()
   })
 
+  it('flushes pending hidden Codex query prefixes when the pane becomes visible', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const transport = createMockTransport('pty-id')
+    const capturedDataCallback: { current: ((data: string) => void) | null } = { current: null }
+    transport.connect.mockImplementation(async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+      capturedDataCallback.current = callbacks.onData ?? null
+      return 'pty-id'
+    })
+    transportFactoryQueue.push(transport)
+
+    const isVisibleRef = { current: false }
+    const pane = createPane(1)
+    const manager = createManager(1)
+    const binding = connectPanePty(
+      pane as never,
+      manager as never,
+      createDeps({
+        isVisibleRef,
+        startup: { command: 'codex' }
+      }) as never
+    )
+    try {
+      await flushAsyncTicks(6)
+
+      capturedDataCallback.current?.('\x1b')
+      isVisibleRef.current = true
+      capturedDataCallback.current?.('[c')
+
+      expect(pane.terminal.write).toHaveBeenCalledWith('\x1b[c', expect.any(Function))
+    } finally {
+      binding.dispose()
+    }
+  })
+
+  it('drops pending hidden Codex query prefixes when the PTY changes', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const transport = createMockTransport('pty-id')
+    const capturedDataCallback: { current: ((data: string) => void) | null } = { current: null }
+    transport.connect.mockImplementation(async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+      capturedDataCallback.current = callbacks.onData ?? null
+      return 'pty-id'
+    })
+    transportFactoryQueue.push(transport)
+
+    const isVisibleRef = { current: false }
+    const pane = createPane(1)
+    const manager = createManager(1)
+    const binding = connectPanePty(
+      pane as never,
+      manager as never,
+      createDeps({
+        isVisibleRef,
+        startup: { command: 'codex' }
+      }) as never
+    )
+    try {
+      await flushAsyncTicks(6)
+
+      capturedDataCallback.current?.('\x1b')
+      ;(transport.attach as unknown as (opts: { existingPtyId: string }) => void)({
+        existingPtyId: 'pty-new'
+      })
+      isVisibleRef.current = true
+      capturedDataCallback.current?.('[c')
+
+      expect(pane.terminal.write).not.toHaveBeenCalledWith('\x1b', expect.any(Function))
+      expect(pane.terminal.write).toHaveBeenCalledWith('[c', expect.any(Function))
+    } finally {
+      binding.dispose()
+    }
+  })
+
   it('does not live-render split hidden Codex non-query CSI output', async () => {
     const { connectPanePty } = await import('./pty-connection')
     const transport = createMockTransport('pty-id')

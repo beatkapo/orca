@@ -2393,6 +2393,82 @@ export function connectPanePty(
       }
     }
 
+    function takeHiddenStartupRendererQueryPendingForForeground(data: string): {
+      queryData: string
+      remainingData: string
+      consumedCurrentChars: number
+    } {
+      const pending = hiddenStartupRendererQueryPending
+      hiddenStartupRendererQueryPending = ''
+      if (!pending) {
+        return { queryData: '', remainingData: data, consumedCurrentChars: 0 }
+      }
+
+      const input = pending + data
+      let queryData = ''
+      let consumedInputChars = pending.length
+      let nextPending = ''
+      if (input.startsWith('\x1b[')) {
+        const finalByteIndex = findCsiFinalByteIndex(input, 2)
+        if (finalByteIndex === -1) {
+          nextPending = input.slice(0, HIDDEN_STARTUP_RENDERER_QUERY_PENDING_CHARS)
+          consumedInputChars = input.length
+        } else {
+          const sequence = input.slice(0, finalByteIndex + 1)
+          if (isRendererReplyCsiQuery(sequence)) {
+            queryData = sequence
+          }
+          consumedInputChars = finalByteIndex + 1
+        }
+      } else if (input.startsWith('\x1b]')) {
+        const matchingPrefix = HIDDEN_STARTUP_OSC_COLOR_QUERY_PREFIXES.find((prefix) =>
+          input.startsWith(prefix)
+        )
+        const terminatorIndex = findOscTerminatorIndex(input, 2)
+        if (
+          !matchingPrefix &&
+          HIDDEN_STARTUP_OSC_COLOR_QUERY_PREFIXES.some((prefix) => prefix.startsWith(input))
+        ) {
+          nextPending = input
+          consumedInputChars = input.length
+        } else if (terminatorIndex === -1) {
+          nextPending = input.slice(0, HIDDEN_STARTUP_RENDERER_QUERY_PENDING_CHARS)
+          consumedInputChars = input.length
+        } else {
+          if (matchingPrefix) {
+            queryData = input.slice(0, terminatorIndex)
+          }
+          consumedInputChars = terminatorIndex
+        }
+      } else if (input.length === 1) {
+        nextPending = input
+        consumedInputChars = input.length
+      } else {
+        consumedInputChars = Math.min(2, input.length)
+      }
+
+      hiddenStartupRendererQueryPending = nextPending
+      const consumedCurrentChars = Math.max(0, consumedInputChars - pending.length)
+      return {
+        queryData,
+        remainingData: data.slice(consumedCurrentChars),
+        consumedCurrentChars
+      }
+    }
+
+    function metaAfterConsumingCurrentChars(
+      meta: PtyDataMeta | undefined,
+      consumedCurrentChars: number
+    ): PtyDataMeta | undefined {
+      if (consumedCurrentChars === 0 || typeof meta?.rawLength !== 'number') {
+        return meta
+      }
+      return {
+        ...meta,
+        rawLength: Math.max(0, meta.rawLength - consumedCurrentChars)
+      }
+    }
+
     function skipHiddenRendererOutput(data: string): void {
       writeHiddenStartupRendererQueries(data)
       respondToSkippedMode2031Subscribe(data)
@@ -2539,6 +2615,7 @@ export function connectPanePty(
 
     function clearHiddenOutputRestoreState(): void {
       clearPendingLiveChunksDuringRestore()
+      hiddenStartupRendererQueryPending = ''
       hiddenOutputRestoreNeeded = false
       hiddenOutputRestorePtyId = null
       hiddenOutputRestoreGeneration += 1
@@ -2799,6 +2876,21 @@ export function connectPanePty(
       // output the user is watching. Throttle only when the pane or whole
       // Electron document is hidden.
       const foreground = shouldWritePtyOutputForeground(deps.isVisibleRef.current)
+      // Why: a hidden Codex query can be split just before visibility changes;
+      // xterm needs the completed query, while other bytes still follow restore.
+      const pendingForegroundQuery = foreground
+        ? takeHiddenStartupRendererQueryPendingForForeground(data)
+        : null
+      const rendererData = pendingForegroundQuery?.remainingData ?? data
+      const rendererMeta = metaAfterConsumingCurrentChars(
+        meta,
+        pendingForegroundQuery?.consumedCurrentChars ?? 0
+      )
+      if (pendingForegroundQuery?.queryData) {
+        writePtyOutputToXterm(pendingForegroundQuery.queryData, true, {
+          hiddenStartupRendererQuery: true
+        })
+      }
       const restoreAppliesToCurrentPty =
         hiddenOutputRestorePtyId !== null && transport.getPtyId() === hiddenOutputRestorePtyId
       if (shouldSkipHiddenRendererOutput(foreground)) {
@@ -2808,14 +2900,14 @@ export function connectPanePty(
         restoreAppliesToCurrentPty
       ) {
         if (foreground) {
-          queueLiveChunkDuringRestore(data, meta)
+          queueLiveChunkDuringRestore(rendererData, rendererMeta)
           requestHiddenOutputRestoreIfNeeded()
         } else if (hiddenOutputRestoreInFlight) {
           hiddenOutputRestoreNeeded = true
           hiddenOutputRestoreFreshSnapshotNeeded = true
         }
       } else {
-        writePtyOutputToXterm(data, foreground)
+        writePtyOutputToXterm(rendererData, foreground)
       }
 
       schedulePendingStartupCommandDelivery()
