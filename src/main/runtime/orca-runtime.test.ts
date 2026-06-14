@@ -10483,6 +10483,7 @@ describe('OrcaRuntimeService', () => {
           linkedGitLabIssue: null,
           comment: '',
           isPinned: false,
+          isActive: false,
           status: 'active',
           unread: false,
           liveTerminalCount: 1,
@@ -10541,6 +10542,18 @@ describe('OrcaRuntimeService', () => {
         interrupted: false
       })
     ])
+  })
+
+  it('marks the desktop-active worktree as isActive', async () => {
+    const { runtimeStore } = makeRuntimeStoreWithWorkspaceSession(
+      makeWorkspaceSessionWithHeadlessTerminal()
+    )
+    const runtime = new OrcaRuntimeService(runtimeStore as never)
+
+    const { worktrees } = await runtime.getWorktreePs()
+    const active = worktrees.filter((w) => w.isActive)
+    expect(active).toHaveLength(1)
+    expect(active[0]?.worktreeId).toBe(TEST_WORKTREE_ID)
   })
 
   it('includes SSH-backed worktrees in the mobile worktree summary', async () => {

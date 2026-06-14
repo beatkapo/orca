@@ -14,9 +14,7 @@ import {
   Search,
   X,
   Pin,
-  Bell,
   GitBranch,
-  GitPullRequest,
   List,
   SlidersHorizontal,
   Layers,
@@ -43,13 +41,11 @@ import {
   type ConnectionVerdict
 } from '../../../src/transport/connection-health'
 import type { RpcSuccess } from '../../../src/transport/types'
-import { triggerMediumImpact } from '../../../src/platform/haptics'
 import { StatusDot } from '../../../src/components/StatusDot'
 import { NewWorktreeModal } from '../../../src/components/NewWorktreeModal'
-import { AgentSpinner } from '../../../src/components/AgentSpinner'
-import { WorktreeAgentList } from '../../../src/components/WorktreeAgentList'
-import { WorktreeMetaGlyphs, prStateColor } from '../../../src/components/WorktreeMetaGlyphs'
+import { WorktreeListRow } from '../../../src/components/WorktreeListRow'
 import { useNow } from '../../../src/hooks/use-now'
+import { useActiveWorktreeScroll } from '../../../src/hooks/use-active-worktree-scroll'
 import type { RuntimeWorktreeAgentRow } from '../../../../src/shared/runtime-types'
 import { PickerModal, type PickerOption } from '../../../src/components/PickerModal'
 import { ActionSheetContent } from '../../../src/components/ActionSheetModal'
@@ -98,6 +94,7 @@ type Worktree = {
   unread: boolean
   lastOutputAt?: number
   isPinned: boolean
+  isActive?: boolean
   linkedPR: { number: number; state: string } | null
   linkedIssue?: number | null
   linkedLinearIssue?: string | null
@@ -857,6 +854,8 @@ export default function HostScreen() {
     [rawSections, collapsedGroups]
   )
 
+  const { sectionListRef, onScrollToIndexFailed } = useActiveWorktreeScroll(sections)
+
   const isReadOnly = connState === 'auth-failed'
 
   if (error) {
@@ -1066,9 +1065,11 @@ export default function HostScreen() {
       {/* Worktree list */}
       {sections.length > 0 && (
         <SectionList
+          ref={sectionListRef}
           sections={sections}
           keyExtractor={(w) => w.worktreeId}
           stickySectionHeadersEnabled={false}
+          onScrollToIndexFailed={onScrollToIndexFailed}
           // Why: edge-to-edge — the list scrolls under the system nav bar
           // while reserving insets.bottom keeps the last worktree row reachable
           // above the Samsung 3-button nav / iOS home indicator.
@@ -1109,86 +1110,15 @@ export default function HostScreen() {
           }}
           ItemSeparatorComponent={ListSeparator}
           renderItem={({ item }) => (
-            <Pressable
-              style={({ pressed }) => [styles.worktreeRow, pressed && styles.worktreeRowPressed]}
-              disabled={isReadOnly}
-              onPress={() => openWorktreeSession(item)}
-              onLongPress={() => {
-                triggerMediumImpact()
-                setActionTarget(item)
-              }}
-              delayLongPress={400}
-            >
-              {/* Left indicator */}
-              <View style={styles.indicatorCol}>
-                <AgentSpinner status={getWorktreeStatus(item)} />
-                {item.unread && (
-                  <Bell
-                    size={10}
-                    color={colors.statusAmber}
-                    fill={colors.statusAmber}
-                    style={styles.unreadBell}
-                  />
-                )}
-              </View>
-
-              {/* Main content */}
-              <View style={styles.worktreeMain}>
-                <View style={styles.worktreeNameRow}>
-                  <Text
-                    style={[
-                      styles.worktreeName,
-                      item.unread && styles.worktreeNameUnread,
-                      isReadOnly && styles.textReadOnly
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {item.displayName || item.repo}
-                  </Text>
-                  {item.linkedPR && (
-                    <View style={styles.prBadge}>
-                      <GitPullRequest size={10} color={prStateColor(item.linkedPR.state)} />
-                      <Text style={[styles.prNumber, { color: prStateColor(item.linkedPR.state) }]}>
-                        #{item.linkedPR.number}
-                      </Text>
-                    </View>
-                  )}
-                  <WorktreeMetaGlyphs
-                    comment={item.comment}
-                    linkedLinearIssue={item.linkedLinearIssue}
-                    linkedGitLabMR={item.linkedGitLabMR}
-                    linkedIssue={item.linkedIssue}
-                    linkedGitLabIssue={item.linkedGitLabIssue}
-                  />
-                </View>
-                <View style={styles.worktreeMetaRow}>
-                  <View
-                    style={[
-                      styles.repoDot,
-                      { backgroundColor: uniqueRepoColors.get(item.repo) ?? repoColor(item.repo) }
-                    ]}
-                  />
-                  <Text style={styles.repoName} numberOfLines={1}>
-                    {item.repo}
-                  </Text>
-                  <Text style={styles.branchName} numberOfLines={1}>
-                    {item.branch}
-                  </Text>
-                </View>
-                {item.agents && item.agents.length > 0 ? (
-                  <WorktreeAgentList agents={item.agents} now={now} unvisited={item.unread} />
-                ) : item.preview ? (
-                  <Text style={styles.worktreePreview} numberOfLines={1}>
-                    {item.preview}
-                  </Text>
-                ) : null}
-              </View>
-
-              {/* Terminal count */}
-              {item.liveTerminalCount > 0 && (
-                <Text style={styles.terminalCount}>{item.liveTerminalCount}</Text>
-              )}
-            </Pressable>
+            <WorktreeListRow
+              item={item}
+              isReadOnly={isReadOnly}
+              now={now}
+              status={getWorktreeStatus(item)}
+              repoColor={uniqueRepoColors.get(item.repo) ?? repoColor(item.repo)}
+              onPress={openWorktreeSession}
+              onLongPress={setActionTarget}
+            />
           )}
         />
       )}
@@ -1567,94 +1497,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.borderSubtle,
     marginLeft: spacing.lg + 24,
     marginRight: spacing.lg
-  },
-  worktreeRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: spacing.sm + 2,
-    paddingHorizontal: spacing.lg
-  },
-  worktreeRowPressed: {
-    backgroundColor: colors.bgRaised
-  },
-  indicatorCol: {
-    width: 20,
-    alignItems: 'center',
-    paddingTop: 6,
-    marginRight: spacing.sm,
-    gap: 4
-  },
-  unreadBell: {
-    marginTop: 2
-  },
-  worktreeMain: {
-    flex: 1,
-    marginRight: spacing.sm
-  },
-  worktreeNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm
-  },
-  worktreeName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    flexShrink: 1
-  },
-  worktreeNameUnread: {
-    fontWeight: '700'
-  },
-  textReadOnly: {
-    opacity: 0.5
-  },
-  prBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: colors.bgRaised,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 4
-  },
-  prNumber: {
-    fontSize: 10,
-    color: colors.textSecondary
-  },
-  worktreeMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-    gap: spacing.xs
-  },
-  repoDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3
-  },
-  repoName: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    maxWidth: 100
-  },
-  branchName: {
-    fontSize: 11,
-    color: colors.textMuted,
-    fontFamily: typography.monoFamily,
-    flexShrink: 1
-  },
-  worktreePreview: {
-    fontSize: 11,
-    color: colors.textMuted,
-    fontFamily: typography.monoFamily,
-    marginTop: 2
-  },
-  terminalCount: {
-    fontSize: typography.metaSize,
-    color: colors.textMuted,
-    minWidth: 16,
-    textAlign: 'right',
-    paddingTop: 3
   },
   filterModalHeader: {
     flexDirection: 'row',

@@ -6600,6 +6600,7 @@ export class OrcaRuntimeService {
         linkedGitLabIssue: meta?.linkedGitLabIssue ?? null,
         comment: meta?.comment ?? '',
         isPinned: meta?.isPinned ?? false,
+        isActive: false,
         unread: meta?.isUnread ?? false,
         liveTerminalCount: 0,
         hasAttachedPty: false,
@@ -6683,6 +6684,20 @@ export class OrcaRuntimeService {
           summary.status,
           getSavedTabWorktreeStatus(tab.title, tab.ptyId !== null)
         )
+      }
+    }
+
+    // Why: surface the desktop's focused worktree so mobile can scroll it into
+    // view and highlight it. Resolve through getSummaryForRuntimeWorktreeId so
+    // SSH/remote path-projected ids match the same way tabsByWorktree does.
+    if (session?.activeWorktreeId) {
+      const activeSummary = this.getSummaryForRuntimeWorktreeId(
+        summaries,
+        resolvedWorktrees,
+        session.activeWorktreeId
+      )
+      if (activeSummary) {
+        activeSummary.isActive = true
       }
     }
 

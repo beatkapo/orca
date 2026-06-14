@@ -430,6 +430,10 @@ export type RuntimeWorktreePsSummary = {
   linkedGitLabIssue: number | null
   comment: string
   isPinned: boolean
+  /** True for the worktree currently focused on the desktop/host
+   *  (session.activeWorktreeId). Mobile scrolls it into view and highlights it
+   *  so the list reflects the desktop's current selection. */
+  isActive: boolean
   unread: boolean
   liveTerminalCount: number
   hasAttachedPty: boolean
