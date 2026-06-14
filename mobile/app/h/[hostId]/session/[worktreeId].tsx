@@ -4,6 +4,7 @@ import * as Clipboard from 'expo-clipboard'
 import {
   BackHandler,
   FlatList,
+  Image,
   View,
   Text,
   ScrollView,
@@ -128,6 +129,8 @@ import {
   saveMobileClipboardImageAsTempFile
 } from '../../../../src/session/mobile-clipboard-image'
 import { useMobileImageAttachment } from '../../../../src/session/use-mobile-image-attachment'
+import { classifyMobileArtifact } from '../../../../src/session/mobile-artifact-kind'
+import { MobileHtmlPreview } from '../../../../src/components/MobileHtmlPreview'
 import { TerminalPaneView } from '../../../../src/session/TerminalPaneView'
 import {
   getRepoIdFromMobileWorktreeId,
@@ -592,7 +595,8 @@ function FileReader({
     // Why: highlighting can create many nested Text nodes; defer it one tick so
     // large files show immediately as plain text before colors are applied.
     const timer = setTimeout(() => {
-      if (doc.kind === 'file') {
+      // file + html share the syntax-segment source view (html's "Source" toggle).
+      if (doc.kind === 'file' || doc.kind === 'html') {
         setFileSyntax({
           doc,
           language: syntaxLanguage,
@@ -600,11 +604,14 @@ function FileReader({
         })
         return
       }
-      setDiffSyntax({
-        doc,
-        language: syntaxLanguage,
-        lines: highlightMobileDiffLines(doc.lines, syntaxLanguage)
-      })
+      if (doc.kind === 'diff') {
+        setDiffSyntax({
+          doc,
+          language: syntaxLanguage,
+          lines: highlightMobileDiffLines(doc.lines, syntaxLanguage)
+        })
+      }
+      // image: no syntax highlighting.
     }, 0)
 
     return () => clearTimeout(timer)
@@ -692,7 +699,28 @@ function FileReader({
     )
   }
 
-  return (
+  if (doc.kind === 'image') {
+    return (
+      <View style={styles.imagePreviewContainer}>
+        <ScrollView
+          style={styles.imagePreviewScroll}
+          contentContainerStyle={styles.imagePreviewContent}
+          maximumZoomScale={4}
+          minimumZoomScale={1}
+          centerContent
+        >
+          <Image
+            source={{ uri: doc.dataUri }}
+            style={styles.imagePreview}
+            resizeMode="contain"
+            accessibilityLabel={`${title} image`}
+          />
+        </ScrollView>
+      </View>
+    )
+  }
+
+  const renderSourceText = (content: string) => (
     <View style={styles.markdownEditor}>
       <ScrollView
         style={styles.filePreviewScroll}
@@ -703,13 +731,23 @@ function FileReader({
             segments={
               fileSyntax?.doc === doc && fileSyntax.language === syntaxLanguage
                 ? fileSyntax.segments
-                : [{ text: doc.content, kind: 'plain' }]
+                : [{ text: content, kind: 'plain' }]
             }
           />
         </Text>
       </ScrollView>
     </View>
   )
+
+  if (doc.kind === 'html') {
+    return (
+      <View style={styles.markdownEditor}>
+        <MobileHtmlPreview html={doc.content} renderSource={() => renderSourceText(doc.content)} />
+      </View>
+    )
+  }
+
+  return renderSourceText(doc.content)
 }
 
 export default function SessionScreen() {
@@ -1584,6 +1622,32 @@ export default function SessionScreen() {
           )
           return
         }
+        const artifactKind = classifyMobileArtifact(tab.relativePath)
+        if (artifactKind === 'image') {
+          const preview = await client.sendRequest('files.readPreview', {
+            worktree: `id:${worktreeId}`,
+            relativePath: tab.relativePath
+          })
+          if (!preview.ok) {
+            throw new Error((preview as RpcFailure).error.message)
+          }
+          const result = (preview as RpcSuccess).result as {
+            content: string
+            isImage?: boolean
+            mimeType?: string
+          }
+          if (!result.isImage || !result.mimeType || result.content.length === 0) {
+            throw new Error('binary_file')
+          }
+          setFileDocs((prev) =>
+            new Map(prev).set(tab.id, {
+              status: 'ready',
+              kind: 'image',
+              dataUri: `data:${result.mimeType};base64,${result.content}`
+            })
+          )
+          return
+        }
         const response = await client.sendRequest('files.read', {
           worktree: `id:${worktreeId}`,
           relativePath: tab.relativePath
@@ -1595,6 +1659,16 @@ export default function SessionScreen() {
           content: string
           truncated: boolean
           byteLength: number
+        }
+        if (artifactKind === 'html') {
+          setFileDocs((prev) =>
+            new Map(prev).set(tab.id, {
+              status: 'ready',
+              kind: 'html',
+              content: result.content
+            })
+          )
+          return
         }
         setFileDocs((prev) =>
           new Map(prev).set(tab.id, {
