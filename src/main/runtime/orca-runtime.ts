@@ -182,6 +182,7 @@ import type {
   RuntimeTerminalWaitBlockedReason,
   RuntimeTerminalWaitCondition,
   RuntimeWorktreePsSummary,
+  RuntimeWorktreeAgentRow,
   RuntimeWorktreeStatus,
   RuntimeTerminalShow,
   RuntimeTerminalSummary,
@@ -791,6 +792,21 @@ export type RuntimeTerminalAgentStatusEvent = {
   worktreeId?: string
   connectionId?: string | null
   payload: ParsedAgentStatusPayload
+}
+
+// Why: the full OSC 9999 payload flows through emitTerminalAgentStatusEvents and
+// is then forwarded to the renderer and dropped. Mobile is served by the main
+// process and has no renderer store, so we retain the latest payload per pane
+// here to feed worktree.ps's inline agent rows (1:1 with the desktop sidebar).
+type RuntimeAgentRowSnapshot = {
+  paneKey: string
+  ptyId: string
+  worktreeId?: string
+  tabId?: string
+  payload: ParsedAgentStatusPayload
+  // When the current payload.state was first observed for this pane (ms).
+  stateStartedAt: number
+  updatedAt: number
 }
 
 type RuntimeHeadlessTerminal = {
@@ -1504,6 +1520,10 @@ export class OrcaRuntimeService {
     string,
     ReturnType<typeof createAgentStatusOscProcessor>
   >()
+  // Why: latest agent-status payload per pane, retained so worktree.ps can serve
+  // mobile the same inline agent rows the desktop sidebar renders. Cleared on pty
+  // teardown so dead agents don't linger. See RuntimeAgentRowSnapshot.
+  private latestAgentStatusByPaneKey = new Map<string, RuntimeAgentRowSnapshot>()
   // Why: per-PTY hydration state guards against double-hydration. Keys:
   //   'pending'  → maybeHydrateHeadlessFromRenderer is in flight
   //   'done'     → hydration completed (success or skip); never run again
@@ -3621,7 +3641,10 @@ export class OrcaRuntimeService {
   }
 
   private emitTerminalAgentStatusEvents(ptyId: string, chunk: ProcessedAgentStatusChunk): void {
-    if (!this.onTerminalAgentStatus || chunk.payloads.length === 0) {
+    // Why: snapshot retention (for mobile worktree.ps) must run even when no
+    // renderer listener is attached, so we don't early-return on a missing
+    // onTerminalAgentStatus — only the per-target emit below is gated on it.
+    if (chunk.payloads.length === 0) {
       return
     }
     const targets = new Map<
@@ -3657,6 +3680,10 @@ export class OrcaRuntimeService {
     }
     for (const payload of chunk.payloads) {
       for (const target of targets.values()) {
+        this.retainAgentRowSnapshot(ptyId, target.paneKey, target.worktreeId, target.tabId, payload)
+        if (!this.onTerminalAgentStatus) {
+          continue
+        }
         try {
           this.onTerminalAgentStatus({
             ptyId,
@@ -3672,6 +3699,39 @@ export class OrcaRuntimeService {
             err
           })
         }
+      }
+    }
+  }
+
+  private retainAgentRowSnapshot(
+    ptyId: string,
+    paneKey: string,
+    worktreeId: string | undefined,
+    tabId: string | undefined,
+    payload: ParsedAgentStatusPayload
+  ): void {
+    const now = Date.now()
+    const previous = this.latestAgentStatusByPaneKey.get(paneKey)
+    // Why: stateStartedAt must mark the transition into the current state, not
+    // every within-state ping (tool/prompt updates keep the state but refresh
+    // updatedAt) — mirrors AgentStatusEntry.stateStartedAt on the desktop side.
+    const stateStartedAt =
+      previous && previous.payload.state === payload.state ? previous.stateStartedAt : now
+    this.latestAgentStatusByPaneKey.set(paneKey, {
+      paneKey,
+      ptyId,
+      worktreeId,
+      tabId,
+      payload,
+      stateStartedAt,
+      updatedAt: now
+    })
+  }
+
+  private clearAgentRowSnapshotsForPty(ptyId: string): void {
+    for (const [paneKey, snapshot] of this.latestAgentStatusByPaneKey) {
+      if (snapshot.ptyId === ptyId) {
+        this.latestAgentStatusByPaneKey.delete(paneKey)
       }
     }
   }
@@ -4832,6 +4892,7 @@ export class OrcaRuntimeService {
     this.recentPtyOutputById.delete(ptyId)
     this.ptyOutputSequenceById.delete(ptyId)
     this.agentStatusOscProcessorsByPtyId.delete(ptyId)
+    this.clearAgentRowSnapshotsForPty(ptyId)
     // Layout state machine: clear `layouts` and `layoutQueues`. Any
     // already-queued applyLayout work for this ptyId will run, but every
     // applyLayout re-checks `layouts.has(ptyId)` (or fresh-subscribe) and
@@ -6534,13 +6595,18 @@ export class OrcaRuntimeService {
         displayName: worktree.displayName,
         linkedIssue: worktree.linkedIssue,
         linkedPR,
+        linkedLinearIssue: meta?.linkedLinearIssue ?? null,
+        linkedGitLabMR: meta?.linkedGitLabMR ?? null,
+        linkedGitLabIssue: meta?.linkedGitLabIssue ?? null,
+        comment: meta?.comment ?? '',
         isPinned: meta?.isPinned ?? false,
         unread: meta?.isUnread ?? false,
         liveTerminalCount: 0,
         hasAttachedPty: false,
         lastOutputAt: null,
         preview: '',
-        status: 'inactive'
+        status: 'inactive',
+        agents: []
       })
     }
 
@@ -6620,11 +6686,59 @@ export class OrcaRuntimeService {
       }
     }
 
+    this.attachAgentRowsToSummaries(summaries)
+
     const sorted = [...summaries.values()].sort(compareWorktreePs)
     return {
       worktrees: sorted.slice(0, limit),
       totalCount: sorted.length,
       truncated: sorted.length > limit
+    }
+  }
+
+  // Why: maps the retained per-pane agent snapshots into each worktree's inline
+  // agent list, mirroring the desktop sidebar. Lineage parent is resolved from
+  // the orchestration db (paneKey-keyed), not the OSC payload, since spawn
+  // hierarchy is pane-level state tracked separately from terminal output.
+  private attachAgentRowsToSummaries(summaries: Map<string, RuntimeWorktreePsSummary>): void {
+    if (this.latestAgentStatusByPaneKey.size === 0) {
+      return
+    }
+    const orchestrationByPaneKey = this.buildAgentOrchestrationByPaneKey()
+    const rowsByWorktree = new Map<string, RuntimeWorktreeAgentRow[]>()
+    for (const snapshot of this.latestAgentStatusByPaneKey.values()) {
+      const worktreeId = snapshot.worktreeId
+      if (!worktreeId || !summaries.has(worktreeId)) {
+        continue
+      }
+      const { payload } = snapshot
+      const row: RuntimeWorktreeAgentRow = {
+        paneKey: snapshot.paneKey,
+        parentPaneKey: orchestrationByPaneKey?.[snapshot.paneKey]?.parentPaneKey ?? null,
+        state: payload.state,
+        agentType: payload.agentType ?? null,
+        prompt: payload.prompt,
+        lastAssistantMessage: payload.lastAssistantMessage ?? null,
+        toolName: payload.toolName ?? null,
+        toolInput: payload.toolInput ?? null,
+        interrupted: payload.interrupted ?? false,
+        stateStartedAt: snapshot.stateStartedAt,
+        updatedAt: snapshot.updatedAt
+      }
+      const rows = rowsByWorktree.get(worktreeId)
+      if (rows) {
+        rows.push(row)
+      } else {
+        rowsByWorktree.set(worktreeId, [row])
+      }
+    }
+    for (const [worktreeId, rows] of rowsByWorktree) {
+      // Oldest-started first, matching the desktop dashboard's start-order sort.
+      rows.sort((a, b) => a.stateStartedAt - b.stateStartedAt)
+      const summary = summaries.get(worktreeId)
+      if (summary) {
+        summary.agents = rows
+      }
     }
   }
 
@@ -13223,6 +13337,7 @@ export class OrcaRuntimeService {
     this.recentPtyOutputById.delete(ptyId)
     this.ptyOutputSequenceById.delete(ptyId)
     this.agentStatusOscProcessorsByPtyId.delete(ptyId)
+    this.clearAgentRowSnapshotsForPty(ptyId)
     const handle = this.handleByPtyId.get(ptyId)
     if (handle) {
       this.handleByPtyId.delete(ptyId)

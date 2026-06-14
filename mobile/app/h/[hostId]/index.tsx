@@ -47,6 +47,10 @@ import { triggerMediumImpact } from '../../../src/platform/haptics'
 import { StatusDot } from '../../../src/components/StatusDot'
 import { NewWorktreeModal } from '../../../src/components/NewWorktreeModal'
 import { AgentSpinner } from '../../../src/components/AgentSpinner'
+import { WorktreeAgentList } from '../../../src/components/WorktreeAgentList'
+import { WorktreeMetaGlyphs, prStateColor } from '../../../src/components/WorktreeMetaGlyphs'
+import { useNow } from '../../../src/hooks/use-now'
+import type { RuntimeWorktreeAgentRow } from '../../../../src/shared/runtime-types'
 import { PickerModal, type PickerOption } from '../../../src/components/PickerModal'
 import { ActionSheetContent } from '../../../src/components/ActionSheetModal'
 import { ConfirmModal } from '../../../src/components/ConfirmModal'
@@ -95,7 +99,13 @@ type Worktree = {
   lastOutputAt?: number
   isPinned: boolean
   linkedPR: { number: number; state: string } | null
+  linkedIssue?: number | null
+  linkedLinearIssue?: string | null
+  linkedGitLabMR?: number | null
+  linkedGitLabIssue?: number | null
+  comment?: string
   status?: 'working' | 'active' | 'permission' | 'done' | 'inactive'
+  agents?: RuntimeWorktreeAgentRow[]
 }
 
 type RepoSummary = {
@@ -360,6 +370,8 @@ export default function HostScreen() {
   const forceReconnectHost = useForceReconnect()
   const [worktrees, setWorktrees] = useState<Worktree[]>(initialCache ?? [])
   const [worktreesLoaded, setWorktreesLoaded] = useState(initialCache != null)
+  // One tick drives every visible agent row's relative timestamp.
+  const now = useNow(30_000)
   const [repoColorsByName, setRepoColorsByName] = useState<Map<string, string>>(new Map())
   const [hostName, setHostName] = useState('')
   const [error, setError] = useState('')
@@ -1124,17 +1136,30 @@ export default function HostScreen() {
               <View style={styles.worktreeMain}>
                 <View style={styles.worktreeNameRow}>
                   <Text
-                    style={[styles.worktreeName, isReadOnly && styles.textReadOnly]}
+                    style={[
+                      styles.worktreeName,
+                      item.unread && styles.worktreeNameUnread,
+                      isReadOnly && styles.textReadOnly
+                    ]}
                     numberOfLines={1}
                   >
                     {item.displayName || item.repo}
                   </Text>
                   {item.linkedPR && (
                     <View style={styles.prBadge}>
-                      <GitPullRequest size={10} color={colors.textSecondary} />
-                      <Text style={styles.prNumber}>#{item.linkedPR.number}</Text>
+                      <GitPullRequest size={10} color={prStateColor(item.linkedPR.state)} />
+                      <Text style={[styles.prNumber, { color: prStateColor(item.linkedPR.state) }]}>
+                        #{item.linkedPR.number}
+                      </Text>
                     </View>
                   )}
+                  <WorktreeMetaGlyphs
+                    comment={item.comment}
+                    linkedLinearIssue={item.linkedLinearIssue}
+                    linkedGitLabMR={item.linkedGitLabMR}
+                    linkedIssue={item.linkedIssue}
+                    linkedGitLabIssue={item.linkedGitLabIssue}
+                  />
                 </View>
                 <View style={styles.worktreeMetaRow}>
                   <View
@@ -1150,7 +1175,9 @@ export default function HostScreen() {
                     {item.branch}
                   </Text>
                 </View>
-                {item.preview ? (
+                {item.agents && item.agents.length > 0 ? (
+                  <WorktreeAgentList agents={item.agents} now={now} unvisited={item.unread} />
+                ) : item.preview ? (
                   <Text style={styles.worktreePreview} numberOfLines={1}>
                     {item.preview}
                   </Text>
@@ -1574,6 +1601,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textPrimary,
     flexShrink: 1
+  },
+  worktreeNameUnread: {
+    fontWeight: '700'
   },
   textReadOnly: {
     opacity: 0.5

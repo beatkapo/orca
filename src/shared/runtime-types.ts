@@ -1,5 +1,10 @@
 /* eslint-disable max-lines -- Why: shared type definitions for all runtime RPC methods live in one file for discoverability and import simplicity. */
-import type { AgentStatusEntry, AgentStatusOrchestrationContext } from './agent-status-types'
+import type {
+  AgentStatusEntry,
+  AgentStatusOrchestrationContext,
+  AgentStatusState,
+  AgentType
+} from './agent-status-types'
 import type {
   BaseRefSearchResult,
   BrowserCookieImportResult,
@@ -390,6 +395,25 @@ export type RuntimeTerminalWait = {
   blockedReason?: RuntimeTerminalWaitBlockedReason
 }
 
+/** One agent's live status as carried to mobile in a worktree.ps summary.
+ *  Flat shape (parentPaneKey points to another row in the same worktree's list)
+ *  so the client can rebuild the spawn-lineage tree desktop renders inline. */
+export type RuntimeWorktreeAgentRow = {
+  paneKey: string
+  /** paneKey of the orchestration parent, or null for a root agent. */
+  parentPaneKey: string | null
+  state: AgentStatusState
+  agentType: AgentType | null
+  prompt: string
+  lastAssistantMessage: string | null
+  toolName: string | null
+  toolInput: string | null
+  interrupted: boolean
+  /** When the current `state` was first reported (ms). Drives "Xm ago". */
+  stateStartedAt: number
+  updatedAt: number
+}
+
 export type RuntimeWorktreePsSummary = {
   worktreeId: string
   repoId: string
@@ -401,6 +425,10 @@ export type RuntimeWorktreePsSummary = {
   displayName: string
   linkedIssue: number | null
   linkedPR: { number: number; state: string } | null
+  linkedLinearIssue: string | null
+  linkedGitLabMR: number | null
+  linkedGitLabIssue: number | null
+  comment: string
   isPinned: boolean
   unread: boolean
   liveTerminalCount: number
@@ -408,6 +436,9 @@ export type RuntimeWorktreePsSummary = {
   lastOutputAt: number | null
   preview: string
   status: RuntimeWorktreeStatus
+  /** Live agents in this worktree, newest-state-first. Empty for shell-only
+   *  worktrees. Mirrors desktop's inline agent list (WorktreeCardAgents). */
+  agents: RuntimeWorktreeAgentRow[]
 }
 
 export type RuntimeWorktreeStatus = 'active' | 'working' | 'permission' | 'done' | 'inactive'

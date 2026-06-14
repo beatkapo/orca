@@ -10478,18 +10478,69 @@ describe('OrcaRuntimeService', () => {
           displayName: 'foo',
           linkedIssue: 123,
           linkedPR: null,
+          linkedLinearIssue: null,
+          linkedGitLabMR: null,
+          linkedGitLabIssue: null,
+          comment: '',
           isPinned: false,
           status: 'active',
           unread: false,
           liveTerminalCount: 1,
           hasAttachedPty: true,
           lastOutputAt: 321,
-          preview: 'build green'
+          preview: 'build green',
+          agents: []
         }
       ],
       totalCount: 1,
       truncated: false
     })
+  })
+
+  it('attaches inline agent rows from the latest OSC 9999 status', async () => {
+    const runtime = new OrcaRuntimeService(store)
+    const leafId = '22222222-2222-4222-8222-222222222222'
+    runtime.attachWindow(1)
+    runtime.syncWindowGraph(1, {
+      tabs: [
+        {
+          tabId: 'tab-1',
+          worktreeId: TEST_WORKTREE_ID,
+          title: 'Claude',
+          activeLeafId: leafId,
+          layout: null
+        }
+      ],
+      leaves: [
+        {
+          tabId: 'tab-1',
+          worktreeId: TEST_WORKTREE_ID,
+          leafId,
+          paneRuntimeId: 1,
+          ptyId: 'pty-1'
+        }
+      ]
+    })
+
+    runtime.onPtyData(
+      'pty-1',
+      '\x1b]9999;{"state":"working","prompt":"ship it","agentType":"codex","lastAssistantMessage":"on it"}\x07',
+      321
+    )
+
+    const { worktrees } = await runtime.getWorktreePs()
+    const summary = worktrees.find((w) => w.worktreeId === TEST_WORKTREE_ID)
+    expect(summary?.agents).toEqual([
+      expect.objectContaining({
+        paneKey: `tab-1:${leafId}`,
+        parentPaneKey: null,
+        state: 'working',
+        agentType: 'codex',
+        prompt: 'ship it',
+        lastAssistantMessage: 'on it',
+        interrupted: false
+      })
+    ])
   })
 
   it('includes SSH-backed worktrees in the mobile worktree summary', async () => {
