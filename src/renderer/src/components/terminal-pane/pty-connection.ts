@@ -108,7 +108,6 @@ const HIDDEN_OUTPUT_RESTORE_SCROLLBACK_ROWS = 5000
 const HIDDEN_OUTPUT_RESTORE_PENDING_CHARS = 512 * 1024
 const HIDDEN_OUTPUT_RESTORE_DEFERRED_RETRY_MS = 50
 const HIDDEN_OUTPUT_RESTORE_DEFERRED_RETRY_MAX = 3
-const HIDDEN_STARTUP_RENDERER_QUERY_WINDOW_MS = 10_000
 const STARTUP_COMMAND_EXTENSION_RE = /\.(?:exe|cmd|bat|ps1)$/i
 const TERMINAL_RENDERER_RISK_SCAN_TAIL_CHARS = 256
 const CURSOR_SHOW_SEQUENCE = '\x1b[?25h'
@@ -309,6 +308,88 @@ function containsHiddenStartupRendererQuery(data: string): boolean {
   // Why: hidden Codex startup must not live-render ordinary redraw floods, but
   // query chunks still need xterm's built-in terminal replies to unblock TUIs.
   return containsCsiRendererQuery(data) || data.includes('\x1b]10;?') || data.includes('\x1b]11;?')
+}
+
+type HiddenStartupRendererQueryContinuation = 'csi' | 'osc' | null
+
+function findOscTerminatorIndex(data: string, offset: number): number {
+  for (let index = offset; index < data.length; index++) {
+    const code = data.charCodeAt(index)
+    if (code === 0x07) {
+      return index + 1
+    }
+    if (code === 0x1b && data[index + 1] === '\\') {
+      return index + 2
+    }
+  }
+  return -1
+}
+
+function findNextQueryCandidateIndex(data: string, offset: number): number {
+  const csiIndex = data.indexOf('\x1b[', offset)
+  const osc10Index = data.indexOf('\x1b]10;?', offset)
+  const osc11Index = data.indexOf('\x1b]11;?', offset)
+  return [csiIndex, osc10Index, osc11Index]
+    .filter((index) => index !== -1)
+    .reduce((min, index) => Math.min(min, index), Number.POSITIVE_INFINITY)
+}
+
+function extractHiddenStartupRendererQueryData(
+  data: string,
+  continuation: HiddenStartupRendererQueryContinuation
+): { queryData: string; continuation: HiddenStartupRendererQueryContinuation } {
+  let queryData = ''
+  let offset = 0
+  let nextContinuation = continuation
+  if (nextContinuation === 'csi') {
+    const finalByteIndex = findCsiFinalByteIndex(data, 0)
+    if (finalByteIndex === -1) {
+      return { queryData: data, continuation: 'csi' }
+    }
+    queryData += data.slice(0, finalByteIndex + 1)
+    offset = finalByteIndex + 1
+    nextContinuation = null
+  } else if (nextContinuation === 'osc') {
+    const terminatorIndex = findOscTerminatorIndex(data, 0)
+    if (terminatorIndex === -1) {
+      return { queryData: data, continuation: 'osc' }
+    }
+    queryData += data.slice(0, terminatorIndex)
+    offset = terminatorIndex
+    nextContinuation = null
+  }
+
+  while (offset < data.length) {
+    const candidateIndex = findNextQueryCandidateIndex(data, offset)
+    if (!Number.isFinite(candidateIndex)) {
+      break
+    }
+    if (data.startsWith('\x1b[', candidateIndex)) {
+      const finalByteIndex = findCsiFinalByteIndex(data, candidateIndex + 2)
+      if (finalByteIndex === -1) {
+        queryData += data.slice(candidateIndex)
+        nextContinuation = 'csi'
+        break
+      }
+      const sequence = data.slice(candidateIndex, finalByteIndex + 1)
+      if (isRendererReplyCsiQuery(sequence)) {
+        queryData += sequence
+      }
+      offset = finalByteIndex + 1
+      continue
+    }
+
+    const terminatorIndex = findOscTerminatorIndex(data, candidateIndex + 1)
+    if (terminatorIndex === -1) {
+      queryData += data.slice(candidateIndex)
+      nextContinuation = 'osc'
+      break
+    }
+    queryData += data.slice(candidateIndex, terminatorIndex)
+    offset = terminatorIndex
+  }
+
+  return { queryData, continuation: nextContinuation }
 }
 
 function containsCsiRendererQuery(data: string): boolean {
@@ -2053,10 +2134,8 @@ export function connectPanePty(
     let foregroundImmediateBudgetChars = 0
     let foregroundImmediateBudgetWindowStart = 0
     let hiddenMode2031ScanTail = ''
-    const hiddenStartupRendererQueryUntil = shouldKeepHiddenStartupRendererQueriesLive(paneStartup)
-      ? Date.now() + HIDDEN_STARTUP_RENDERER_QUERY_WINDOW_MS
-      : 0
     const shouldSnapshotHiddenCodexOutput = shouldKeepHiddenStartupRendererQueriesLive(paneStartup)
+    let hiddenStartupRendererQueryContinuation: HiddenStartupRendererQueryContinuation = null
 
     function canUseMainBufferSnapshot(ptyId: string | null): ptyId is string {
       return Boolean(ptyId) && !isRemoteRuntimePtyId(ptyId)
@@ -2087,14 +2166,6 @@ export function connectPanePty(
         return null
       }
       return transport.serializeBuffer(opts)
-    }
-
-    function isHiddenStartupRendererQueryWindowActive(): boolean {
-      return (
-        paneStartup !== null &&
-        Date.now() < hiddenStartupRendererQueryUntil &&
-        !shouldWritePtyOutputForeground(deps.isVisibleRef.current)
-      )
     }
 
     function respondToSkippedMode2031Subscribe(data: string): void {
@@ -2207,15 +2278,19 @@ export function connectPanePty(
       )
     }
 
-    function writePtyOutputToXterm(data: string, foreground: boolean): void {
+    function writePtyOutputToXterm(
+      data: string,
+      foreground: boolean,
+      opts?: { hiddenStartupRendererQuery?: boolean }
+    ): void {
       if (foreground) {
         resetHiddenOutputRestoreIfPtyChanged()
       }
       const parseHiddenStartupOutput =
         !foreground &&
         canUseHiddenOutputSnapshot(transport.getPtyId()) &&
-        isHiddenStartupRendererQueryWindowActive() &&
-        containsHiddenStartupRendererQuery(data)
+        shouldSnapshotHiddenCodexOutput &&
+        (opts?.hiddenStartupRendererQuery === true || containsHiddenStartupRendererQuery(data))
       const synchronizedOutputStarted =
         shouldProtectNativeWindowsSynchronizedOutput &&
         foreground &&
@@ -2283,16 +2358,27 @@ export function connectPanePty(
       }
     }
 
-    function shouldSkipHiddenRendererOutput(foreground: boolean, data: string): boolean {
+    function shouldSkipHiddenRendererOutput(foreground: boolean): boolean {
       return (
         !foreground &&
         shouldSnapshotHiddenCodexOutput &&
-        canUseHiddenOutputSnapshot(transport.getPtyId()) &&
-        !(isHiddenStartupRendererQueryWindowActive() && containsHiddenStartupRendererQuery(data))
+        canUseHiddenOutputSnapshot(transport.getPtyId())
       )
     }
 
+    function writeHiddenStartupRendererQueries(data: string): void {
+      const extracted = extractHiddenStartupRendererQueryData(
+        data,
+        hiddenStartupRendererQueryContinuation
+      )
+      hiddenStartupRendererQueryContinuation = extracted.continuation
+      if (extracted.queryData) {
+        writePtyOutputToXterm(extracted.queryData, false, { hiddenStartupRendererQuery: true })
+      }
+    }
+
     function skipHiddenRendererOutput(data: string): void {
+      writeHiddenStartupRendererQueries(data)
       respondToSkippedMode2031Subscribe(data)
       markHiddenOutputRestoreNeeded()
       if (hiddenOutputRestoreInFlight) {
@@ -2699,7 +2785,7 @@ export function connectPanePty(
       const foreground = shouldWritePtyOutputForeground(deps.isVisibleRef.current)
       const restoreAppliesToCurrentPty =
         hiddenOutputRestorePtyId !== null && transport.getPtyId() === hiddenOutputRestorePtyId
-      if (shouldSkipHiddenRendererOutput(foreground, data)) {
+      if (shouldSkipHiddenRendererOutput(foreground)) {
         skipHiddenRendererOutput(data)
       } else if (
         (hiddenOutputRestoreNeeded || hiddenOutputRestoreInFlight) &&

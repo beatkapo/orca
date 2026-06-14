@@ -3482,7 +3482,8 @@ describe('connectPanePty', () => {
 
     capturedDataCallback.current?.('\x1b]11;?\x1b\\startup frame\r\n')
 
-    expect(pane.terminal.write).toHaveBeenCalledWith(
+    expect(pane.terminal.write).toHaveBeenCalledWith('\x1b]11;?\x1b\\', expect.any(Function))
+    expect(pane.terminal.write).not.toHaveBeenCalledWith(
       '\x1b]11;?\x1b\\startup frame\r\n',
       expect.any(Function)
     )
@@ -3516,7 +3517,8 @@ describe('connectPanePty', () => {
 
     capturedDataCallback.current?.('\x1b]11;?\x1b\\startup frame\r\n')
 
-    expect(pane.terminal.write).toHaveBeenCalledWith(
+    expect(pane.terminal.write).toHaveBeenCalledWith('\x1b]11;?\x1b\\', expect.any(Function))
+    expect(pane.terminal.write).not.toHaveBeenCalledWith(
       '\x1b]11;?\x1b\\startup frame\r\n',
       expect.any(Function)
     )
@@ -3660,6 +3662,143 @@ describe('connectPanePty', () => {
     capturedDataCallback.current?.('\x1b[c')
 
     expect(pane.terminal.write).toHaveBeenCalledWith('\x1b[c', expect.any(Function))
+
+    binding.dispose()
+  })
+
+  it('keeps only coalesced hidden Codex terminal queries on the live xterm path', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const transport = createMockTransport('pty-id')
+    const capturedDataCallback: { current: ((data: string) => void) | null } = { current: null }
+    transport.connect.mockImplementation(async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+      capturedDataCallback.current = callbacks.onData ?? null
+      return 'pty-id'
+    })
+    transportFactoryQueue.push(transport)
+
+    const pane = createPane(1)
+    const manager = createManager(1)
+    const binding = connectPanePty(
+      pane as never,
+      manager as never,
+      createDeps({
+        isVisibleRef: { current: false },
+        startup: { command: 'codex' }
+      }) as never
+    )
+    await flushAsyncTicks(6)
+
+    const coalescedChunk = `\x1b[c\x1b[?2026h\x1b[2J\x1b[H${'codex redraw '.repeat(8_000)}`
+    capturedDataCallback.current?.(coalescedChunk)
+
+    expect(pane.terminal.write).toHaveBeenCalledWith('\x1b[c', expect.any(Function))
+    expect(pane.terminal.write).not.toHaveBeenCalledWith(coalescedChunk, expect.any(Function))
+
+    binding.dispose()
+  })
+
+  it('keeps split hidden Codex terminal queries on the live xterm path', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const transport = createMockTransport('pty-id')
+    const capturedDataCallback: { current: ((data: string) => void) | null } = { current: null }
+    transport.connect.mockImplementation(async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+      capturedDataCallback.current = callbacks.onData ?? null
+      return 'pty-id'
+    })
+    transportFactoryQueue.push(transport)
+
+    const pane = createPane(1)
+    const manager = createManager(1)
+    const binding = connectPanePty(
+      pane as never,
+      manager as never,
+      createDeps({
+        isVisibleRef: { current: false },
+        startup: { command: 'codex' }
+      }) as never
+    )
+    await flushAsyncTicks(6)
+
+    capturedDataCallback.current?.('\x1b[')
+    capturedDataCallback.current?.(`c\x1b[?2026h${'codex redraw '.repeat(8_000)}`)
+
+    expect(pane.terminal.write).toHaveBeenCalledWith('\x1b[', expect.any(Function))
+    expect(pane.terminal.write).toHaveBeenCalledWith('c', expect.any(Function))
+    expect(pane.terminal.write).not.toHaveBeenCalledWith(
+      `c\x1b[?2026h${'codex redraw '.repeat(8_000)}`,
+      expect.any(Function)
+    )
+
+    binding.dispose()
+  })
+
+  it('keeps split hidden Codex OSC color queries on the live xterm path', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const transport = createMockTransport('pty-id')
+    const capturedDataCallback: { current: ((data: string) => void) | null } = { current: null }
+    transport.connect.mockImplementation(async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+      capturedDataCallback.current = callbacks.onData ?? null
+      return 'pty-id'
+    })
+    transportFactoryQueue.push(transport)
+
+    const pane = createPane(1)
+    const manager = createManager(1)
+    const binding = connectPanePty(
+      pane as never,
+      manager as never,
+      createDeps({
+        isVisibleRef: { current: false },
+        startup: { command: 'codex' }
+      }) as never
+    )
+    await flushAsyncTicks(6)
+
+    capturedDataCallback.current?.('\x1b]11;?')
+    capturedDataCallback.current?.(`\x1b\\\x1b[?2026h${'codex redraw '.repeat(8_000)}`)
+
+    expect(pane.terminal.write).toHaveBeenCalledWith('\x1b]11;?', expect.any(Function))
+    expect(pane.terminal.write).toHaveBeenCalledWith('\x1b\\', expect.any(Function))
+    expect(pane.terminal.write).not.toHaveBeenCalledWith(
+      `\x1b\\\x1b[?2026h${'codex redraw '.repeat(8_000)}`,
+      expect.any(Function)
+    )
+
+    binding.dispose()
+  })
+
+  it('keeps later hidden Codex terminal queries on the live xterm path', async () => {
+    const { connectPanePty } = await import('./pty-connection')
+    const transport = createMockTransport('pty-id')
+    const capturedDataCallback: { current: ((data: string) => void) | null } = { current: null }
+    transport.connect.mockImplementation(async ({ callbacks }: { callbacks: ConnectCallbacks }) => {
+      capturedDataCallback.current = callbacks.onData ?? null
+      return 'pty-id'
+    })
+    transportFactoryQueue.push(transport)
+
+    const pane = createPane(1)
+    const manager = createManager(1)
+    const binding = connectPanePty(
+      pane as never,
+      manager as never,
+      createDeps({
+        isVisibleRef: { current: false },
+        startup: { command: 'codex' }
+      }) as never
+    )
+    await flushAsyncTicks(6)
+
+    vi.useFakeTimers()
+    try {
+      vi.advanceTimersByTime(30_000)
+      capturedDataCallback.current?.('\x1b[6n')
+      vi.advanceTimersByTime(50)
+
+      expect(pane.terminal.write).toHaveBeenCalledWith('\x1b[6n', expect.any(Function))
+    } finally {
+      vi.useRealTimers()
+    }
 
     binding.dispose()
   })
