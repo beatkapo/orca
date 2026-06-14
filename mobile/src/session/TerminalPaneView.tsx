@@ -23,6 +23,7 @@ type TerminalPaneViewProps = {
   onHaptic: (kind: 'selection' | 'success' | 'error' | 'edge-bump') => void
   onTerminalInput: (handle: string, bytes: string) => void
   onTerminalTap: (handle: string) => void
+  onFileTap: (handle: string, pathText: string, line: number | null, column: number | null) => void
 }
 
 export function TerminalPaneView({
@@ -39,7 +40,8 @@ export function TerminalPaneView({
   onKeyboardAvoidanceMetrics,
   onHaptic,
   onTerminalInput,
-  onTerminalTap
+  onTerminalTap,
+  onFileTap
 }: TerminalPaneViewProps) {
   const setRef = useCallback(
     (ref: TerminalWebViewHandle | null) => {
@@ -72,6 +74,7 @@ export function TerminalPaneView({
         onHaptic={onHaptic}
         onTerminalInput={(bytes) => onTerminalInput(handle, bytes)}
         onTerminalTap={() => onTerminalTap(handle)}
+        onFileTap={(pathText, line, column) => onFileTap(handle, pathText, line, column)}
       />
     </View>
   )

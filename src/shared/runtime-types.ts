@@ -293,6 +293,16 @@ export type RuntimeFileReadResult = {
   byteLength: number
 }
 
+/** Result of resolving a file path tapped in the mobile terminal against the
+ *  worktree root (+ optional cwd). relativePath is null when the path resolves
+ *  outside the worktree (not openable via the worktree-scoped file RPCs). */
+export type RuntimeTerminalPathResolution = {
+  worktree: string
+  relativePath: string | null
+  exists: boolean
+  isDirectory: boolean
+}
+
 export type RuntimeFilePreviewResult = {
   content: string
   isBinary: boolean

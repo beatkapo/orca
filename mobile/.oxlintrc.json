@@ -28,7 +28,7 @@
     {
       "files": ["src/terminal/TerminalWebView.tsx"],
       "rules": {
-        "max-lines": ["error", { "max": 2054, "skipBlankLines": true, "skipComments": true }]
+        "max-lines": ["error", { "max": 2069, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

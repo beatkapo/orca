@@ -24,11 +24,17 @@ import type {
   SearchResult,
   Worktree
 } from '../../shared/types'
+import {
+  isRuntimePathAbsolute,
+  relativePathInsideRoot,
+  resolveRuntimePath
+} from '../../shared/cross-platform-path'
 import type {
   RuntimeFileListResult,
   RuntimeFileOpenResult,
   RuntimeFilePreviewResult,
-  RuntimeFileReadResult
+  RuntimeFileReadResult,
+  RuntimeTerminalPathResolution
 } from '../../shared/runtime-types'
 import { watchFileExplorerInWorker } from './file-watcher-host'
 import { wslAwareSpawn } from '../git/runner'
@@ -241,6 +247,71 @@ export class RuntimeFileCommands {
       truncated: truncated.truncated,
       byteLength: truncated.byteLength
     }
+  }
+
+  // Resolves a path tapped in the mobile terminal (absolute, relative, or ~/…)
+  // to a worktree-relative path the file RPCs can open, plus existence. cwd is
+  // the terminal's working dir when known; relative paths resolve against it,
+  // else against the worktree root. Mirrors the desktop terminal-link resolver.
+  async resolveTerminalPath(
+    worktreeSelector: string,
+    pathText: string,
+    cwd?: string | null
+  ): Promise<RuntimeTerminalPathResolution> {
+    const store = this.host.requireStore()
+    const worktree = await this.host.resolveWorktreeSelector(worktreeSelector)
+    const repo = store.getRepo(worktree.repoId)
+    const connectionId = repo?.connectionId ?? undefined
+    const base = cwd && cwd.trim().length > 0 ? cwd : worktree.path
+
+    const expanded =
+      pathText.startsWith('~/') || pathText.startsWith('~\\')
+        ? resolveRuntimePath(base, pathText.slice(2))
+        : pathText
+    const absolutePath = isRuntimePathAbsolute(expanded)
+      ? expanded
+      : resolveRuntimePath(base, expanded)
+    const relativePath = relativePathInsideRoot(worktree.path, absolutePath)
+
+    const empty: RuntimeTerminalPathResolution = {
+      worktree: worktree.id,
+      relativePath: null,
+      exists: false,
+      isDirectory: false
+    }
+    // Outside the worktree, or not a safe relative path → not openable here.
+    if (relativePath === null || relativePath === '' || !isSafeMobileRelativePath(relativePath)) {
+      return empty
+    }
+
+    try {
+      const stats = connectionId
+        ? await this.statRemoteTerminalPath(absolutePath, connectionId)
+        : await stat(await resolveAuthorizedPath(absolutePath, store))
+      return {
+        worktree: worktree.id,
+        relativePath,
+        exists: true,
+        isDirectory: stats.isDirectory()
+      }
+    } catch (error) {
+      if (connectionId || isENOENT(error)) {
+        return { ...empty, relativePath }
+      }
+      throw error
+    }
+  }
+
+  private async statRemoteTerminalPath(
+    absolutePath: string,
+    connectionId: string
+  ): Promise<{ isDirectory: () => boolean }> {
+    const provider = getSshFilesystemProvider(connectionId)
+    if (!provider) {
+      throw new Error(SSH_FILESYSTEM_PROVIDER_UNAVAILABLE_MESSAGE)
+    }
+    const stats = await provider.stat(absolutePath)
+    return { isDirectory: () => stats.type === 'directory' }
   }
 
   async readFileExplorerDir(worktreeSelector: string, relativePath: string): Promise<DirEntry[]> {

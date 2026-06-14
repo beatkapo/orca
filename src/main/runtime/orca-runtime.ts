@@ -3296,6 +3296,8 @@ export class OrcaRuntimeService {
   readMobileFile: RuntimeFileCommands['readMobileFile'] = this.fileCommands.readMobileFile.bind(
     this.fileCommands
   )
+  resolveTerminalPath: RuntimeFileCommands['resolveTerminalPath'] =
+    this.fileCommands.resolveTerminalPath.bind(this.fileCommands)
   readFileExplorerDir: RuntimeFileCommands['readFileExplorerDir'] =
     this.fileCommands.readFileExplorerDir.bind(this.fileCommands)
   watchFileExplorer: RuntimeFileCommands['watchFileExplorer'] =

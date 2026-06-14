@@ -45,6 +45,7 @@ import {
   X
 } from 'lucide-react-native'
 import type { RpcClient } from '../../../../src/transport/rpc-client'
+import type { RuntimeTerminalPathResolution } from '../../../../../src/shared/runtime-types'
 import { loadHosts } from '../../../../src/transport/host-store'
 import {
   useHostClient,
@@ -2593,6 +2594,46 @@ export default function SessionScreen() {
     [focusLiveInput]
   )
 
+  // Tap on a file path in terminal output → resolve it on the host and open it
+  // as a file tab (mirrors desktop Cmd/Ctrl-click). Silent on a miss; the
+  // WebView only emits this when the tap landed on a detected path.
+  const handleFileTap = useCallback(
+    (handle: string, pathText: string) => {
+      if (handle !== activeHandleRef.current || !client) {
+        return
+      }
+      void (async () => {
+        try {
+          const worktree = `id:${worktreeId}`
+          const response = await client.sendRequest(
+            'files.resolveTerminalPath',
+            { worktree, pathText },
+            { timeoutMs: 10_000 }
+          )
+          if (!response.ok) {
+            return
+          }
+          const resolved = (response as RpcSuccess).result as RuntimeTerminalPathResolution
+          if (!resolved.exists || resolved.isDirectory || !resolved.relativePath) {
+            return
+          }
+          const openResponse = await client.sendRequest(
+            'files.open',
+            { worktree, relativePath: resolved.relativePath },
+            { timeoutMs: 15_000 }
+          )
+          if (!openResponse.ok) {
+            return
+          }
+          scheduleDelayedAction(() => void fetchSessionTabs(), 300)
+        } catch {
+          // Resolution/open is best-effort; a failed tap silently no-ops.
+        }
+      })()
+    },
+    [client, worktreeId, scheduleDelayedAction, fetchSessionTabs]
+  )
+
   const toggleLiveInput = useCallback(() => {
     if (!activeHandle) {
       return
@@ -4011,6 +4052,7 @@ export default function SessionScreen() {
                 onHaptic={handleHaptic}
                 onTerminalInput={handleTerminalInput}
                 onTerminalTap={handleTerminalTap}
+                onFileTap={handleFileTap}
               />
             ))}
             {toastMessage && (

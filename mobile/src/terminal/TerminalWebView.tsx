@@ -4,6 +4,7 @@ import { WebView } from 'react-native-webview'
 import type { WebViewMessageEvent } from 'react-native-webview'
 import type { RuntimeMobileTerminalTheme } from '../../../src/shared/runtime-types'
 import { colors } from '../theme/mobile-theme'
+import { TERMINAL_PATH_TAP_JS } from './terminal-path-tap-injected'
 
 type TerminalMouseTrackingMode = 'none' | 'x10' | 'vt200' | 'drag' | 'any'
 
@@ -32,6 +33,8 @@ export type TerminalSelectionEvents = {
   onHaptic?: (kind: 'selection' | 'success' | 'error' | 'edge-bump') => void
   onTerminalInput?: (bytes: string) => void
   onTerminalTap?: () => void
+  // Tap landed on a detected file path; RN resolves + opens it.
+  onFileTap?: (pathText: string, line: number | null, column: number | null) => void
 }
 
 export type TerminalWebViewHandle = {
@@ -1332,6 +1335,10 @@ const XTERM_HTML = `<!DOCTYPE html>
     return line.translateToString(false);
   }
 
+  // File-path-under-tap detection (matchFilePathAtColumn). See
+  // terminal-path-tap-injected.ts; mirrors the unit-tested terminal-path-tap.ts.
+  ${TERMINAL_PATH_TAP_JS}
+
   function seedWordSelection(col, absRow) {
     var line = getLineText(absRow);
     if (!line) {
@@ -1653,7 +1660,8 @@ const XTERM_HTML = `<!DOCTYPE html>
         if (clickInput) {
           notify({ type: 'terminal-input', bytes: clickInput });
         } else if (!isClickMouseTrackingMode(getMouseTrackingMode())) {
-          notify({ type: 'terminal-tap' });
+          // Tap on a file path → terminal-file-tap (RN opens it); else focus.
+          notifyTapOrFilePath(longPressOrigin.x, longPressOrigin.y);
         }
       }
       clearLongPress();
@@ -1916,7 +1924,8 @@ export const TerminalWebView = forwardRef<TerminalWebViewHandle, Props>(function
     onKeyboardAvoidanceMetrics,
     onHaptic,
     onTerminalInput,
-    onTerminalTap
+    onTerminalTap,
+    onFileTap
   },
   ref
 ) {
@@ -2063,6 +2072,13 @@ export const TerminalWebView = forwardRef<TerminalWebViewHandle, Props>(function
         }
       } else if (msg.type === 'terminal-tap') {
         onTerminalTap?.()
+      } else if (msg.type === 'terminal-file-tap') {
+        const pathText = typeof msg.pathText === 'string' ? msg.pathText : ''
+        if (pathText.length > 0) {
+          const line = typeof msg.line === 'number' ? msg.line : null
+          const column = typeof msg.column === 'number' ? msg.column : null
+          onFileTap?.(pathText, line, column)
+        }
       } else if (msg.type === 'keyboard-avoidance-metrics') {
         const cursorY = typeof msg.cursorY === 'number' ? msg.cursorY : 0
         const rows = typeof msg.rows === 'number' ? msg.rows : 0
@@ -2096,7 +2112,8 @@ export const TerminalWebView = forwardRef<TerminalWebViewHandle, Props>(function
       onKeyboardAvoidanceMetrics,
       onHaptic,
       onTerminalInput,
-      onTerminalTap
+      onTerminalTap,
+      onFileTap
     ]
   )
 
