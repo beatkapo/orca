@@ -310,7 +310,8 @@ function containsHiddenStartupRendererQuery(data: string): boolean {
   return containsCsiRendererQuery(data) || data.includes('\x1b]10;?') || data.includes('\x1b]11;?')
 }
 
-type HiddenStartupRendererQueryContinuation = 'csi' | 'osc' | null
+const HIDDEN_STARTUP_RENDERER_QUERY_PENDING_CHARS = 64
+const HIDDEN_STARTUP_OSC_COLOR_QUERY_PREFIXES = ['\x1b]10;?', '\x1b]11;?'] as const
 
 function findOscTerminatorIndex(data: string, offset: number): number {
   for (let index = offset; index < data.length; index++) {
@@ -327,42 +328,32 @@ function findOscTerminatorIndex(data: string, offset: number): number {
 
 function extractHiddenStartupRendererQueryData(
   data: string,
-  continuation: HiddenStartupRendererQueryContinuation
-): { queryData: string; continuation: HiddenStartupRendererQueryContinuation } {
+  pending: string
+): { queryData: string; pending: string } {
+  const input = pending + data
   let queryData = ''
   let offset = 0
-  let nextContinuation = continuation
-  if (nextContinuation === 'csi') {
-    const finalByteIndex = findCsiFinalByteIndex(data, 0)
-    if (finalByteIndex === -1) {
-      return { queryData: data, continuation: 'csi' }
-    }
-    queryData += data.slice(0, finalByteIndex + 1)
-    offset = finalByteIndex + 1
-    nextContinuation = null
-  } else if (nextContinuation === 'osc') {
-    const terminatorIndex = findOscTerminatorIndex(data, 0)
-    if (terminatorIndex === -1) {
-      return { queryData: data, continuation: 'osc' }
-    }
-    queryData += data.slice(0, terminatorIndex)
-    offset = terminatorIndex
-    nextContinuation = null
-  }
 
-  while (offset < data.length) {
-    const candidateIndex = data.indexOf('\x1b', offset)
+  while (offset < input.length) {
+    const candidateIndex = input.indexOf('\x1b', offset)
     if (candidateIndex === -1) {
       break
     }
-    if (data.startsWith('\x1b[', candidateIndex)) {
-      const finalByteIndex = findCsiFinalByteIndex(data, candidateIndex + 2)
+    if (candidateIndex + 1 >= input.length) {
+      return { queryData, pending: input.slice(candidateIndex) }
+    }
+    if (input.startsWith('\x1b[', candidateIndex)) {
+      const finalByteIndex = findCsiFinalByteIndex(input, candidateIndex + 2)
       if (finalByteIndex === -1) {
-        queryData += data.slice(candidateIndex)
-        nextContinuation = 'csi'
-        break
+        return {
+          queryData,
+          pending: input.slice(
+            candidateIndex,
+            candidateIndex + HIDDEN_STARTUP_RENDERER_QUERY_PENDING_CHARS
+          )
+        }
       }
-      const sequence = data.slice(candidateIndex, finalByteIndex + 1)
+      const sequence = input.slice(candidateIndex, finalByteIndex + 1)
       if (isRendererReplyCsiQuery(sequence)) {
         queryData += sequence
       }
@@ -370,25 +361,51 @@ function extractHiddenStartupRendererQueryData(
       continue
     }
 
-    if (
-      !data.startsWith('\x1b]10;?', candidateIndex) &&
-      !data.startsWith('\x1b]11;?', candidateIndex)
-    ) {
-      offset = candidateIndex + 1
+    if (input.startsWith('\x1b]', candidateIndex)) {
+      const remaining = input.slice(candidateIndex)
+      const matchingPrefix = HIDDEN_STARTUP_OSC_COLOR_QUERY_PREFIXES.find((prefix) =>
+        remaining.startsWith(prefix)
+      )
+      if (!matchingPrefix) {
+        if (
+          HIDDEN_STARTUP_OSC_COLOR_QUERY_PREFIXES.some((prefix) => prefix.startsWith(remaining))
+        ) {
+          return { queryData, pending: remaining }
+        }
+        offset = candidateIndex + 2
+        continue
+      }
+
+      const terminatorIndex = findOscTerminatorIndex(input, candidateIndex + matchingPrefix.length)
+      if (terminatorIndex === -1) {
+        return {
+          queryData,
+          pending: input.slice(
+            candidateIndex,
+            candidateIndex + HIDDEN_STARTUP_RENDERER_QUERY_PENDING_CHARS
+          )
+        }
+      }
+      queryData += input.slice(candidateIndex, terminatorIndex)
+      offset = terminatorIndex
       continue
     }
 
-    const terminatorIndex = findOscTerminatorIndex(data, candidateIndex + 1)
-    if (terminatorIndex === -1) {
-      queryData += data.slice(candidateIndex)
-      nextContinuation = 'osc'
-      break
+    if (
+      HIDDEN_STARTUP_OSC_COLOR_QUERY_PREFIXES.some((prefix) =>
+        prefix.startsWith(input.slice(candidateIndex))
+      )
+    ) {
+      return { queryData, pending: input.slice(candidateIndex) }
     }
-    queryData += data.slice(candidateIndex, terminatorIndex)
-    offset = terminatorIndex
+
+    {
+      offset = candidateIndex + 1
+      continue
+    }
   }
 
-  return { queryData, continuation: nextContinuation }
+  return { queryData, pending: '' }
 }
 
 function containsCsiRendererQuery(data: string): boolean {
@@ -2134,7 +2151,7 @@ export function connectPanePty(
     let foregroundImmediateBudgetWindowStart = 0
     let hiddenMode2031ScanTail = ''
     const shouldSnapshotHiddenCodexOutput = shouldKeepHiddenStartupRendererQueriesLive(paneStartup)
-    let hiddenStartupRendererQueryContinuation: HiddenStartupRendererQueryContinuation = null
+    let hiddenStartupRendererQueryPending = ''
 
     function canUseMainBufferSnapshot(ptyId: string | null): ptyId is string {
       return Boolean(ptyId) && !isRemoteRuntimePtyId(ptyId)
@@ -2368,9 +2385,9 @@ export function connectPanePty(
     function writeHiddenStartupRendererQueries(data: string): void {
       const extracted = extractHiddenStartupRendererQueryData(
         data,
-        hiddenStartupRendererQueryContinuation
+        hiddenStartupRendererQueryPending
       )
-      hiddenStartupRendererQueryContinuation = extracted.continuation
+      hiddenStartupRendererQueryPending = extracted.pending
       if (extracted.queryData) {
         writePtyOutputToXterm(extracted.queryData, false, { hiddenStartupRendererQuery: true })
       }
