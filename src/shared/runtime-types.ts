@@ -455,6 +455,16 @@ export type RuntimeWorktreePsSummary = {
   agents: RuntimeWorktreeAgentRow[]
 }
 
+export type RuntimeGitLocalBranches = {
+  current: string | null
+  branches: string[]
+}
+
+export type RuntimeGitCheckoutResult = {
+  ok: true
+  branch: string
+}
+
 export type RuntimeWorktreeStatus = 'active' | 'working' | 'permission' | 'done' | 'inactive'
 
 export type RuntimeWorktreeRecord = Worktree & {

@@ -41,6 +41,7 @@ import {
   stageFile,
   unstageFile
 } from '../git/status'
+import { checkoutBranch, listLocalBranches } from '../git/checkout'
 import { getHistory as getGitHistory } from '../git/history'
 import { getUpstreamStatus } from '../git/upstream'
 import { gitFastForward, gitFetch, gitPull, gitPullRebaseFromBase, gitPush } from '../git/remote'
@@ -208,6 +209,37 @@ export class RuntimeGitCommands {
     }
     await abortRebase(target.worktree.path)
     return { ok: true }
+  }
+
+  async checkoutRuntimeGitBranch(
+    worktreeSelector: string,
+    branch: string
+  ): Promise<{ ok: true; branch: string }> {
+    const target = await this.host.resolveRuntimeGitTarget(worktreeSelector)
+    const provider = target.connectionId ? getSshGitProvider(target.connectionId) : null
+    if (target.connectionId) {
+      if (!provider) {
+        throw new Error(SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE)
+      }
+      await provider.checkoutBranch(target.worktree.path, branch)
+      return { ok: true, branch }
+    }
+    await checkoutBranch(target.worktree.path, branch)
+    return { ok: true, branch }
+  }
+
+  async listRuntimeGitLocalBranches(
+    worktreeSelector: string
+  ): Promise<{ current: string | null; branches: string[] }> {
+    const target = await this.host.resolveRuntimeGitTarget(worktreeSelector)
+    const provider = target.connectionId ? getSshGitProvider(target.connectionId) : null
+    if (target.connectionId) {
+      if (!provider) {
+        throw new Error(SSH_GIT_PROVIDER_UNAVAILABLE_MESSAGE)
+      }
+      return provider.listLocalBranches(target.worktree.path)
+    }
+    return listLocalBranches(target.worktree.path)
   }
 
   async getRuntimeGitDiff(
