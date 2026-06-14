@@ -58,10 +58,12 @@ export function buildAgentRowLineageTree(
 export function flattenAgentRowLineage(rows: readonly RuntimeWorktreeAgentRow[]): AgentRowNode[] {
   const { rootRows, childrenByParentPaneKey } = buildAgentRowLineageTree(rows)
   const out: AgentRowNode[] = []
+  const seen = new Set<string>()
   const visit = (row: RuntimeWorktreeAgentRow, depth: number, ancestors: ReadonlySet<string>) => {
     if (ancestors.has(row.paneKey)) {
       return
     }
+    seen.add(row.paneKey)
     const node: AgentRowNode = { row, depth, children: [] }
     out.push(node)
     const nextAncestors = new Set(ancestors)
@@ -72,6 +74,15 @@ export function flattenAgentRowLineage(rows: readonly RuntimeWorktreeAgentRow[])
   }
   for (const root of rootRows) {
     visit(root, 0, new Set())
+  }
+  // Why: a cyclic component that coexists with a normal rooted tree has no entry
+  // in rootRows and is unreachable from any root, so it would silently vanish.
+  // Surface any not-yet-emitted rows as depth-0 so every agent stays visible.
+  for (const row of rows) {
+    if (!seen.has(row.paneKey)) {
+      seen.add(row.paneKey)
+      out.push({ row, depth: 0, children: [] })
+    }
   }
   return out
 }

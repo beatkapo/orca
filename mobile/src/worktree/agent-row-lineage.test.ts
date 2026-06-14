@@ -65,4 +65,12 @@ describe('flattenAgentRowLineage', () => {
       ['d', 0]
     ])
   })
+
+  it('keeps a cyclic component visible even when other roots exist', () => {
+    // 'root' is a normal root; a<->b form a disconnected cycle that has no root
+    // entry and is unreachable from 'root' — it must still be surfaced.
+    const rows = [row('root'), row('a', 'b'), row('b', 'a')]
+    const flat = flattenAgentRowLineage(rows)
+    expect(flat.map((n) => n.row.paneKey).sort()).toEqual(['a', 'b', 'root'])
+  })
 })

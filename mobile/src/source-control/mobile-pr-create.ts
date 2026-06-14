@@ -48,6 +48,60 @@ export async function fetchMobilePrEligibility(
   return (response as RpcSuccess).result as HostedReviewCreationEligibility
 }
 
+export type MobilePrPrefill = {
+  provider: HostedReviewProvider
+  base: string
+  title: string
+  body: string
+}
+
+// Fetches hosted-review eligibility and derives the PR compose prefill from it
+// — so non-GitHub repos (e.g. GitLab) get the right provider/base instead of a
+// hardcoded one. Falls back to a github/main default (with the branch label as
+// title) when branch/eligibility is unavailable.
+export async function resolveMobilePrPrefill(
+  client: Pick<RpcClient, 'sendRequest'>,
+  worktreeId: string,
+  args: {
+    branch: string | undefined
+    title: string
+    hasUncommittedChanges: boolean
+    hasUpstream: boolean
+    ahead: number
+    behind: number
+  }
+): Promise<MobilePrPrefill> {
+  const fallback: MobilePrPrefill = {
+    provider: 'github',
+    base: 'main',
+    title: args.title,
+    body: ''
+  }
+  if (!args.branch) {
+    return fallback
+  }
+  try {
+    const eligibility = await fetchMobilePrEligibility(client, worktreeId, {
+      branch: args.branch,
+      hasUncommittedChanges: args.hasUncommittedChanges,
+      hasUpstream: args.hasUpstream,
+      ahead: args.ahead,
+      behind: args.behind
+    })
+    if (!eligibility) {
+      return fallback
+    }
+    return {
+      provider: eligibility.provider,
+      base: eligibility.defaultBaseRef || 'main',
+      title: eligibility.title || args.title,
+      body: eligibility.body || ''
+    }
+  } catch {
+    return fallback
+  }
+}
+
 export type MobilePrCreateInput = {
   provider: HostedReviewProvider
   base: string

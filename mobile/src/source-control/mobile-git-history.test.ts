@@ -30,6 +30,11 @@ describe('formatCommitTime', () => {
   it('returns empty for missing timestamp', () => {
     expect(formatCommitTime(undefined, NOW)).toBe('')
   })
+
+  it('formats a real epoch-0 timestamp instead of dropping it', () => {
+    // 0 is a valid (very old) timestamp, not "missing".
+    expect(formatCommitTime(0, NOW)).not.toBe('')
+  })
 })
 
 describe('toMobileCommitRow', () => {

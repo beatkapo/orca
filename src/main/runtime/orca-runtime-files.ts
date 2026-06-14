@@ -14,6 +14,7 @@ import {
   stat,
   writeFile
 } from 'fs/promises'
+import { homedir } from 'os'
 import { basename, dirname, extname, join } from 'path'
 import type {
   DirEntry,
@@ -250,9 +251,12 @@ export class RuntimeFileCommands {
   }
 
   // Resolves a path tapped in the mobile terminal (absolute, relative, or ~/…)
-  // to a worktree-relative path the file RPCs can open, plus existence. cwd is
-  // the terminal's working dir when known; relative paths resolve against it,
-  // else against the worktree root. Mirrors the desktop terminal-link resolver.
+  // to a worktree-relative path the file RPCs can open, plus existence.
+  // Relative paths resolve against `cwd` when the caller supplies it, else
+  // against the worktree root. NOTE: the mobile tap path does not yet forward a
+  // cwd, so a token relative to a subdirectory currently resolves against the
+  // root and may miss — absolute and root-relative paths always resolve.
+  // (Threading the terminal's tracked cwd is a follow-up.)
   async resolveTerminalPath(
     worktreeSelector: string,
     pathText: string,
@@ -264,21 +268,26 @@ export class RuntimeFileCommands {
     const connectionId = repo?.connectionId ?? undefined
     const base = cwd && cwd.trim().length > 0 ? cwd : worktree.path
 
-    const expanded =
-      pathText.startsWith('~/') || pathText.startsWith('~\\')
-        ? resolveRuntimePath(base, pathText.slice(2))
-        : pathText
-    const absolutePath = isRuntimePathAbsolute(expanded)
-      ? expanded
-      : resolveRuntimePath(base, expanded)
-    const relativePath = relativePathInsideRoot(worktree.path, absolutePath)
-
     const empty: RuntimeTerminalPathResolution = {
       worktree: worktree.id,
       relativePath: null,
       exists: false,
       isDirectory: false
     }
+
+    // `~/…` is home-relative. The local home is known (os.homedir); the remote
+    // home is not, so don't guess — a tapped `~/…` on a remote worktree would
+    // mis-resolve under cwd/worktree-root, so treat it as not-openable instead.
+    const isTilde = pathText.startsWith('~/') || pathText.startsWith('~\\')
+    if (isTilde && connectionId) {
+      return empty
+    }
+    const expanded = isTilde ? resolveRuntimePath(homedir(), pathText.slice(2)) : pathText
+    const absolutePath = isRuntimePathAbsolute(expanded)
+      ? expanded
+      : resolveRuntimePath(base, expanded)
+    const relativePath = relativePathInsideRoot(worktree.path, absolutePath)
+
     // Outside the worktree, or not a safe relative path → not openable here.
     if (relativePath === null || relativePath === '' || !isSafeMobileRelativePath(relativePath)) {
       return empty
@@ -295,11 +304,25 @@ export class RuntimeFileCommands {
         isDirectory: stats.isDirectory()
       }
     } catch (error) {
-      if (connectionId || isENOENT(error)) {
+      // A genuine "not found" → the path simply doesn't exist (report it, not an
+      // error). Transport/permission/provider failures must surface so a remote
+      // session doesn't silently report every tapped path as missing.
+      if (
+        isENOENT(error) ||
+        (connectionId && RuntimeFileCommands.isRemoteNotFoundErrorMessage(error))
+      ) {
         return { ...empty, relativePath }
       }
       throw error
     }
+  }
+
+  // A remote stat failure that means "the file isn't there" vs a transport /
+  // permission / provider error. The mux drops the ErrnoException `code`, so the
+  // message is the only signal — match the not-found shapes the relay surfaces.
+  private static isRemoteNotFoundErrorMessage(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error)
+    return /\bENOENT\b|no such file|not found|does not exist/i.test(message)
   }
 
   private async statRemoteTerminalPath(

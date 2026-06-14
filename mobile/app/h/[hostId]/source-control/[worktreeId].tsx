@@ -48,6 +48,10 @@ import {
   MobilePrComposeSheet,
   openMobilePrUrl
 } from '../../../../src/components/MobilePrComposeSheet'
+import {
+  resolveMobilePrPrefill,
+  type MobilePrPrefill
+} from '../../../../src/source-control/mobile-pr-create'
 import { PickerModal } from '../../../../src/components/PickerModal'
 import type { RuntimeGitLocalBranches } from '../../../../../src/shared/runtime-types'
 
@@ -236,6 +240,7 @@ export default function MobileSourceControlScreen() {
   const [showBranchPicker, setShowBranchPicker] = useState(false)
   const [localBranches, setLocalBranches] = useState<MobileGitLocalBranches | null>(null)
   const [createdPrUrl, setCreatedPrUrl] = useState<string | null>(null)
+  const [prPrefill, setPrPrefill] = useState<MobilePrPrefill | null>(null)
   const [discardTarget, setDiscardTarget] = useState<MobileGitStatusEntry | null>(null)
   const [showActionSheet, setShowActionSheet] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -716,9 +721,24 @@ export default function MobileSourceControlScreen() {
           return
         }
       }
+      const up = status?.upstreamStatus
+      const prefill: MobilePrPrefill = client
+        ? await resolveMobilePrPrefill(client, worktreeId, {
+            branch: status?.branch,
+            title: branchLabel,
+            hasUncommittedChanges: (status?.entries?.length ?? 0) > 0,
+            hasUpstream: up?.hasUpstream === true,
+            ahead: up?.ahead ?? 0,
+            behind: up?.behind ?? 0
+          })
+        : { provider: 'github', base: 'main', title: branchLabel, body: '' }
+      if (!mountedRef.current) {
+        return
+      }
+      setPrPrefill(prefill)
       setShowPrSheet(true)
     },
-    [runGitWorkflow, sendGitRequest]
+    [branchLabel, client, runGitWorkflow, sendGitRequest, status, worktreeId]
   )
 
   const openBranchPicker = useCallback(() => {
@@ -1640,11 +1660,17 @@ export default function MobileSourceControlScreen() {
                   (stagedCount === 0 || busyAction !== null) && styles.commitButtonDisabled,
                   pressed && styles.commitButtonPressed
                 ]}
-                disabled={stagedCount === 0 || busyAction !== null || generatingMessage}
+                // Why: stay tappable while generating so the press can cancel
+                // (disabling it here made the cancel branch below unreachable).
+                disabled={stagedCount === 0 || busyAction !== null}
                 onPress={() =>
                   generatingMessage ? cancelGenerateCommitMessage() : void generateCommitMessage()
                 }
-                accessibilityLabel="Generate commit message with AI"
+                accessibilityLabel={
+                  generatingMessage
+                    ? 'Cancel commit message generation'
+                    : 'Generate commit message with AI'
+                }
               >
                 {generatingMessage ? (
                   <ActivityIndicator size="small" color={colors.textSecondary} />
@@ -1716,12 +1742,7 @@ export default function MobileSourceControlScreen() {
         visible={showPrSheet}
         client={client}
         worktreeId={worktreeId ?? ''}
-        prefill={{
-          provider: 'github',
-          base: 'main',
-          title: branchLabel,
-          body: ''
-        }}
+        prefill={prPrefill ?? { provider: 'github', base: 'main', title: branchLabel, body: '' }}
         onClose={() => setShowPrSheet(false)}
         onCreated={(url) => {
           setShowPrSheet(false)

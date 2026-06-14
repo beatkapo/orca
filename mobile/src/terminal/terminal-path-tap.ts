@@ -51,7 +51,8 @@ export function parsePathWithOptionalLineColumn(value: string): TappedFilePath |
     return null
   }
   const pathText = match[1]
-  if (!pathText || pathText.endsWith('/')) {
+  // Reject a directory-only token (trailing separator) for either slash style.
+  if (!pathText || pathText.endsWith('/') || pathText.endsWith('\\')) {
     return null
   }
   const line = match[2] ? Number.parseInt(match[2], 10) : null

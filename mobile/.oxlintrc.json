@@ -34,7 +34,7 @@
     {
       "files": ["app/h/*/source-control/*.tsx"],
       "rules": {
-        "max-lines": ["error", { "max": 2137, "skipBlankLines": true, "skipComments": true }]
+        "max-lines": ["error", { "max": 2152, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

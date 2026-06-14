@@ -1,13 +1,26 @@
 import { gitExecFileAsync } from './runner'
 
 /**
+ * Reject branch names git would parse as an option (`-`/`--…`) or that aren't a
+ * valid ref. Defense-in-depth: callers also validate at the RPC schema, but the
+ * relay entrypoint is reachable independently, so the helper guards too.
+ */
+export function assertValidBranchName(branch: string): void {
+  if (branch.length === 0 || branch.startsWith('-')) {
+    throw new Error('invalid_branch_name')
+  }
+}
+
+/**
  * Switch the worktree to an existing local branch. Git itself refuses (and
  * surfaces a "would be overwritten by checkout" error) when uncommitted changes
  * would conflict, so we let that message propagate to the caller rather than
- * forcing — mobile shows it as a toast.
+ * forcing — mobile shows it as a toast. The leading `--` end-of-options marker
+ * ensures the branch token can never be parsed as a flag.
  */
 export async function checkoutBranch(worktreePath: string, branch: string): Promise<void> {
-  await gitExecFileAsync(['checkout', branch], { cwd: worktreePath })
+  assertValidBranchName(branch)
+  await gitExecFileAsync(['checkout', branch, '--'], { cwd: worktreePath })
 }
 
 /**

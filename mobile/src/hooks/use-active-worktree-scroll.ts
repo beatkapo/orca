@@ -28,6 +28,11 @@ export function useActiveWorktreeScroll<T extends WithId, S>(
     return null
   }, [sections])
 
+  // Live mirror of the current active id so the deferred retry can bail if the
+  // selection changed during its timeout (avoids a brief scroll to a stale row).
+  const activeWorktreeIdRef = useRef<string | null>(activeWorktreeId)
+  activeWorktreeIdRef.current = activeWorktreeId
+
   const scrollToWorktree = useCallback(
     (worktreeId: string): boolean => {
       for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
@@ -62,7 +67,16 @@ export function useActiveWorktreeScroll<T extends WithId, S>(
       if (!target) {
         return
       }
-      setTimeout(() => scrollToWorktree(target), info.averageItemLength > 0 ? 120 : 0)
+      setTimeout(
+        () => {
+          // Bail if the active selection moved on while we waited — otherwise we'd
+          // scroll to a now-stale row before the effect corrects it.
+          if (activeWorktreeIdRef.current === target) {
+            scrollToWorktree(target)
+          }
+        },
+        info.averageItemLength > 0 ? 120 : 0
+      )
     },
     [scrollToWorktree]
   )

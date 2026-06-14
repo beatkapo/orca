@@ -10539,7 +10539,9 @@ describe('OrcaRuntimeService', () => {
         agentType: 'codex',
         prompt: 'ship it',
         lastAssistantMessage: 'on it',
-        interrupted: false
+        interrupted: false,
+        stateStartedAt: expect.any(Number),
+        updatedAt: expect.any(Number)
       })
     ])
   })

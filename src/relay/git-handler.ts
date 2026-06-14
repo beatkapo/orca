@@ -212,7 +212,13 @@ export class GitHandler {
   private async checkout(params: Record<string, unknown>) {
     const worktreePath = params.worktreePath as string
     const branch = params.branch as string
-    await this.git(['checkout', branch], worktreePath)
+    // Defense-in-depth: reject option-like branch tokens (the RPC schema also
+    // validates, but this relay entrypoint is reachable independently). The
+    // trailing `--` ensures the branch can't be parsed as a flag.
+    if (typeof branch !== 'string' || branch.length === 0 || branch.startsWith('-')) {
+      throw new Error('invalid_branch_name')
+    }
+    await this.git(['checkout', branch, '--'], worktreePath)
     return { ok: true as const, branch }
   }
 

@@ -8,7 +8,7 @@
 // has the regression tests; this string only exists because the WebView can't
 // import RN modules.
 export const TERMINAL_PATH_TAP_JS = String.raw`
-  var FILE_PATH_RE = /(?:~[\/]|[\/]|\.{1,2}[\/]|[A-Za-z]:[\/]|[A-Za-z0-9._-]+[\/])[A-Za-z0-9._~\-\/%+@\\()[\]]*(?::\d+)?(?::\d+)?/g;
+  var FILE_PATH_RE = /(?:~[\\/]|[\\/]|\.{1,2}[\\/]|[A-Za-z]:[\\/]|[A-Za-z0-9._-]+[\\/])[A-Za-z0-9._~\-\/%+@\\()[\]]*(?::\d+)?(?::\d+)?/g;
   var PATH_LEADING_TRIM = { '(': 1, '[': 1, '{': 1, '"': 1, "'": 1 };
   var PATH_TRAILING_TRIM = { ')': 1, ']': 1, '}': 1, '"': 1, "'": 1, ',': 1, ';': 1, '.': 1 };
 
@@ -16,7 +16,8 @@ export const TERMINAL_PATH_TAP_JS = String.raw`
     var m = /^(.*?)(?::(\d+))?(?::(\d+))?$/.exec(value);
     if (!m) return null;
     var pathText = m[1];
-    if (!pathText || pathText.charAt(pathText.length - 1) === '/') return null;
+    var last = pathText.charAt(pathText.length - 1);
+    if (!pathText || last === '/' || last === '\\') return null;
     var line = m[2] ? parseInt(m[2], 10) : null;
     var column = m[3] ? parseInt(m[3], 10) : null;
     if ((line !== null && line < 1) || (column !== null && column < 1)) return null;

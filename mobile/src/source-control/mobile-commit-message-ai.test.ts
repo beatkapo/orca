@@ -43,6 +43,13 @@ describe('requestMobileCommitMessage', () => {
     })
   })
 
+  it('coerces a malformed failure payload to a non-empty error string', async () => {
+    const client = clientWith([ok({ success: false })])
+    const result = await requestMobileCommitMessage(client, 'wt-1')
+    expect(result.success).toBe(false)
+    expect(result).toMatchObject({ success: false, error: 'No commit message generated' })
+  })
+
   it('preserves the canceled flag', async () => {
     const client = clientWith([ok({ success: false, error: 'canceled', canceled: true })])
     await expect(requestMobileCommitMessage(client, 'wt-1')).resolves.toEqual({

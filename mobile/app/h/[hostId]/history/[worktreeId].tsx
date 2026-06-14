@@ -38,6 +38,10 @@ export default function HistoryScreen() {
     if (!client || connState !== 'connected' || !worktreeId) {
       return
     }
+    // Reset prior error/rows so a successful retry doesn't stay stuck behind a
+    // stale error (error wins render precedence).
+    setError(null)
+    setRows(null)
     void (async () => {
       try {
         const result = await fetchMobileGitHistory(client, worktreeId)

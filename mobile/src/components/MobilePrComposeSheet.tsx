@@ -62,7 +62,10 @@ export function MobilePrComposeSheet({
       setDraft(false)
       setError(null)
     }
-  }, [visible, prefill])
+    // Why: depend on the prefill *fields*, not the object identity — a parent
+    // rerender that produces a new prefill object would otherwise wipe the
+    // user's in-progress edits while the sheet is open.
+  }, [visible, prefill.title, prefill.body, prefill.base])
 
   const generate = useCallback(async () => {
     if (!client || generating) {

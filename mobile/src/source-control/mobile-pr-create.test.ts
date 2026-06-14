@@ -4,7 +4,8 @@ import type { RpcFailure, RpcResponse, RpcSuccess } from '../transport/types'
 import {
   buildMobilePrCreateParams,
   createMobilePr,
-  mobileRepoSelectorFromWorktreeId
+  mobileRepoSelectorFromWorktreeId,
+  resolveMobilePrPrefill
 } from './mobile-pr-create'
 
 function ok(result: unknown): RpcSuccess {
@@ -104,5 +105,57 @@ describe('createMobilePr', () => {
       draft: false
     })
     expect(result).toEqual({ ok: false, error: 'disconnected' })
+  })
+})
+
+describe('resolveMobilePrPrefill', () => {
+  const baseArgs = {
+    branch: 'feature/x',
+    title: 'feature/x',
+    hasUncommittedChanges: false,
+    hasUpstream: true,
+    ahead: 1,
+    behind: 0
+  }
+
+  it('derives provider/base/title/body from eligibility (non-GitHub honored)', async () => {
+    const client = clientWith([
+      ok({
+        provider: 'gitlab',
+        canCreate: true,
+        review: null,
+        blockedReason: null,
+        nextAction: null,
+        defaultBaseRef: 'develop',
+        title: 'Add feature',
+        body: 'Body'
+      })
+    ])
+    await expect(resolveMobilePrPrefill(client, 'repo-1::/tmp/wt', baseArgs)).resolves.toEqual({
+      provider: 'gitlab',
+      base: 'develop',
+      title: 'Add feature',
+      body: 'Body'
+    })
+  })
+
+  it('falls back to github/main when eligibility is unavailable', async () => {
+    const client = clientWith([fail('nope')])
+    await expect(resolveMobilePrPrefill(client, 'repo-1::/tmp/wt', baseArgs)).resolves.toEqual({
+      provider: 'github',
+      base: 'main',
+      title: 'feature/x',
+      body: ''
+    })
+  })
+
+  it('falls back without calling the RPC when there is no branch', async () => {
+    const client = clientWith([])
+    const result = await resolveMobilePrPrefill(client, 'repo-1::/tmp/wt', {
+      ...baseArgs,
+      branch: undefined
+    })
+    expect(result.provider).toBe('github')
+    expect(client.calls).toEqual([])
   })
 })

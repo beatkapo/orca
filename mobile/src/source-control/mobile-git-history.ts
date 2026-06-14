@@ -13,7 +13,8 @@ export type MobileCommitRow = {
 
 // Short relative time for a commit list (just now / Xm / Xh / Xd / Xmo / Xy).
 export function formatCommitTime(timestampSeconds: number | undefined, nowMs: number): string {
-  if (!timestampSeconds) {
+  // Nullish — not falsy — so a real epoch-0 timestamp still formats.
+  if (timestampSeconds == null) {
     return ''
   }
   const delta = nowMs - timestampSeconds * 1000

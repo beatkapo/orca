@@ -483,5 +483,39 @@ describe('RuntimeFileCommands', () => {
 
       expect(result).toMatchObject({ relativePath: 'src/missing.ts', exists: false })
     })
+
+    it('does not expand ~/ on a remote worktree (home is unknown)', async () => {
+      const { commands, store } = createRuntimeFileCommands({ path: '/repo' })
+      store.getRepo.mockReturnValue({ connectionId: 'ssh-1' })
+      const stat = vi.fn()
+      vi.mocked(getSshFilesystemProvider).mockReturnValue({ stat } as never)
+
+      const result = await commands.resolveTerminalPath('id:wt-1', '~/notes.md')
+
+      expect(result).toMatchObject({ relativePath: null, exists: false })
+      expect(stat).not.toHaveBeenCalled()
+    })
+
+    it('reports a missing remote file as not existing', async () => {
+      const { commands, store } = createRuntimeFileCommands({ path: '/repo' })
+      store.getRepo.mockReturnValue({ connectionId: 'ssh-1' })
+      const stat = vi.fn().mockRejectedValue(new Error('ENOENT: no such file'))
+      vi.mocked(getSshFilesystemProvider).mockReturnValue({ stat } as never)
+
+      const result = await commands.resolveTerminalPath('id:wt-1', 'src/missing.ts')
+
+      expect(result).toMatchObject({ relativePath: 'src/missing.ts', exists: false })
+    })
+
+    it('rethrows a remote transport error instead of reporting not-found', async () => {
+      const { commands, store } = createRuntimeFileCommands({ path: '/repo' })
+      store.getRepo.mockReturnValue({ connectionId: 'ssh-1' })
+      const stat = vi.fn().mockRejectedValue(new Error('Remote connection dropped'))
+      vi.mocked(getSshFilesystemProvider).mockReturnValue({ stat } as never)
+
+      await expect(commands.resolveTerminalPath('id:wt-1', 'src/x.ts')).rejects.toThrow(
+        'Remote connection dropped'
+      )
+    })
   })
 })

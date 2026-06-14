@@ -27,9 +27,15 @@ export async function requestMobileCommitMessage(
   if (result.success === true && typeof result.message === 'string' && result.message.length > 0) {
     return { success: true, message: result.message }
   }
+  // Why: a malformed `{ success:false }` payload could leave error undefined,
+  // breaking the result contract — always coerce to a non-empty string.
+  const hostError =
+    result.success === false && typeof result.error === 'string' && result.error.length > 0
+      ? result.error
+      : 'No commit message generated'
   return {
     success: false,
-    error: result.success === false ? result.error : 'No commit message generated',
+    error: hostError,
     ...(result.success === false && result.canceled ? { canceled: true } : {})
   }
 }
