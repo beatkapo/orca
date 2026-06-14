@@ -325,15 +325,6 @@ function findOscTerminatorIndex(data: string, offset: number): number {
   return -1
 }
 
-function findNextQueryCandidateIndex(data: string, offset: number): number {
-  const csiIndex = data.indexOf('\x1b[', offset)
-  const osc10Index = data.indexOf('\x1b]10;?', offset)
-  const osc11Index = data.indexOf('\x1b]11;?', offset)
-  return [csiIndex, osc10Index, osc11Index]
-    .filter((index) => index !== -1)
-    .reduce((min, index) => Math.min(min, index), Number.POSITIVE_INFINITY)
-}
-
 function extractHiddenStartupRendererQueryData(
   data: string,
   continuation: HiddenStartupRendererQueryContinuation
@@ -360,8 +351,8 @@ function extractHiddenStartupRendererQueryData(
   }
 
   while (offset < data.length) {
-    const candidateIndex = findNextQueryCandidateIndex(data, offset)
-    if (!Number.isFinite(candidateIndex)) {
+    const candidateIndex = data.indexOf('\x1b', offset)
+    if (candidateIndex === -1) {
       break
     }
     if (data.startsWith('\x1b[', candidateIndex)) {
@@ -376,6 +367,14 @@ function extractHiddenStartupRendererQueryData(
         queryData += sequence
       }
       offset = finalByteIndex + 1
+      continue
+    }
+
+    if (
+      !data.startsWith('\x1b]10;?', candidateIndex) &&
+      !data.startsWith('\x1b]11;?', candidateIndex)
+    ) {
+      offset = candidateIndex + 1
       continue
     }
 
