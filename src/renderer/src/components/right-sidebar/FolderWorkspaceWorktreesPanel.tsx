@@ -9,6 +9,10 @@ function getWorktreeActivityTime(worktree: Worktree): number {
   return Math.max(worktree.lastActivityAt ?? 0, worktree.createdAt ?? 0, worktree.sortOrder ?? 0)
 }
 
+function stopNestedWorktreeCardBubble(event: React.SyntheticEvent<HTMLElement>): void {
+  event.stopPropagation()
+}
+
 export default function FolderWorkspaceWorktreesPanel(): React.JSX.Element {
   const activeWorktreeId = useAppStore((s) => s.activeWorktreeId)
   const folderWorkspaces = useAppStore((s) => s.folderWorkspaces)
@@ -43,7 +47,7 @@ export default function FolderWorkspaceWorktreesPanel(): React.JSX.Element {
             return null
           }
           const worktree = worktreeById.get(childScope.worktreeId)
-          if (!worktree) {
+          if (!worktree || worktree.isArchived) {
             return null
           }
           if (lineage.childInstanceId && lineage.childInstanceId !== worktree.instanceId) {
@@ -112,7 +116,16 @@ export default function FolderWorkspaceWorktreesPanel(): React.JSX.Element {
         lineageCollapsed={lineageCollapsed}
         lineageChildren={
           !lineageCollapsed && safeLineageChildren.length > 0
-            ? safeLineageChildren.map((child) => renderChildWorktree(child, nextAncestorIds))
+            ? safeLineageChildren.map((child) => (
+                <div
+                  key={child.id}
+                  onClick={stopNestedWorktreeCardBubble}
+                  onDoubleClick={stopNestedWorktreeCardBubble}
+                  onDragStart={stopNestedWorktreeCardBubble}
+                >
+                  {renderChildWorktree(child, nextAncestorIds)}
+                </div>
+              ))
             : undefined
         }
         onLineageToggle={
@@ -197,7 +210,14 @@ function getLineageChildrenByParentId(
     for (const lineage of Object.values(lineageById)) {
       const parent = worktreeById.get(lineage.parentWorktreeId)
       const child = worktreeById.get(lineage.worktreeId)
-      if (!parent || !child || !includedIds.has(parent.id) || includedIds.has(child.id)) {
+      if (
+        !parent ||
+        !child ||
+        parent.isArchived ||
+        child.isArchived ||
+        !includedIds.has(parent.id) ||
+        includedIds.has(child.id)
+      ) {
         continue
       }
       if (
@@ -223,6 +243,8 @@ function getLineageChildrenByParentId(
     const parent = worktreeById.get(lineage.parentWorktreeId)
     if (
       !parent ||
+      parent.isArchived ||
+      child.isArchived ||
       child.instanceId !== lineage.worktreeInstanceId ||
       parent.instanceId !== lineage.parentWorktreeInstanceId
     ) {

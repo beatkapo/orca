@@ -38,7 +38,8 @@ const testState = vi.hoisted(() => ({
     lineageCollapsed?: boolean
     lineageChildren?: ReactNode
     onLineageToggle?: (event: MouseEvent<HTMLButtonElement>) => void
-  }[]
+  }[],
+  cardClicks: [] as string[]
 }))
 
 vi.mock('@/store', () => ({
@@ -73,6 +74,7 @@ vi.mock('@/components/sidebar/WorktreeCard', () => ({
         data-flush-surface={props.flushSurface ? 'true' : 'false'}
         data-lineage-child-count={props.lineageChildCount ?? 0}
         data-lineage-collapsed={props.lineageCollapsed ? 'true' : 'false'}
+        onClick={() => testState.cardClicks.push(props.worktree.id)}
       >
         {props.worktree.displayName}
         {props.lineageChildCount ? (
@@ -172,6 +174,7 @@ describe('FolderWorkspaceWorktreesPanel', () => {
     document.body.appendChild(container)
     root = createRoot(container)
     testState.cardProps = []
+    testState.cardClicks = []
     testState.store = {
       activeWorktreeId: folderWorkspaceKey('folder-1'),
       folderWorkspaces: [{ id: 'folder-1', name: 'Platform folder', folderPath: '/platform' }],
@@ -290,9 +293,60 @@ describe('FolderWorkspaceWorktreesPanel', () => {
     expect(testState.cardProps[0]?.lineageCollapsed).toBe(false)
 
     act(() => {
+      container
+        .querySelectorAll<HTMLElement>('[data-testid="worktree-card"]')[1]
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(testState.cardClicks).toEqual([nested.id])
+
+    act(() => {
       container.querySelector<HTMLButtonElement>('[data-testid="lineage-toggle"]')?.click()
     })
 
     expect(container.textContent).not.toContain('Nested child')
+  })
+
+  it('omits archived attached worktrees and archived lineage descendants', () => {
+    const visible = makeWorktree({
+      id: 'repo-1::/visible',
+      displayName: 'Visible child',
+      instanceId: 'visible-instance',
+      lastActivityAt: 50
+    })
+    const archivedDirect = makeWorktree({
+      id: 'repo-1::/archived-direct',
+      displayName: 'Archived direct',
+      instanceId: 'archived-direct-instance',
+      isArchived: true,
+      lastActivityAt: 100
+    })
+    const archivedNested = makeWorktree({
+      id: 'repo-1::/archived-nested',
+      displayName: 'Archived nested',
+      instanceId: 'archived-nested-instance',
+      isArchived: true,
+      lastActivityAt: 10
+    })
+    testState.store.worktreesByRepo = {
+      'repo-1': [visible, archivedDirect, archivedNested]
+    }
+    testState.store.workspaceLineageByChildKey = {
+      [visible.id]: makeWorkspaceLineage(visible, 'folder-1'),
+      [archivedDirect.id]: makeWorkspaceLineage(archivedDirect, 'folder-1')
+    }
+    testState.store.worktreeLineageById = {
+      [archivedNested.id]: makeWorktreeLineage(archivedNested, visible)
+    }
+
+    renderPanel()
+
+    expect(
+      [...container.querySelectorAll('[data-testid="worktree-card"]')].map((node) =>
+        node.getAttribute('data-worktree-id')
+      )
+    ).toEqual([visible.id])
+    expect(container.textContent).not.toContain('Archived direct')
+    expect(container.textContent).not.toContain('Archived nested')
   })
 })

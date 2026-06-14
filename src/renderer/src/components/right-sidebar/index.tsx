@@ -133,19 +133,14 @@ function RightSidebarInner(): React.JSX.Element {
     [activityItems, isFolder, isFolderWorkspace, isSshRepo]
   )
 
-  // If the active tab is hidden (e.g. switched from a git repo to a folder),
-  // fall back to the first visible tab.
+  // If the active tab is hidden (e.g. switched from a folder workspace to a git
+  // worktree), render the first visible tab without overwriting the remembered
+  // tab. Back/forward can then restore folder-only tabs when the folder is active
+  // again.
   const normalizedActiveTab = normalizeRightSidebarRoute(rightSidebarTab).rightSidebarTab
   const effectiveTab = visibleItems.some((item) => item.id === normalizedActiveTab)
     ? normalizedActiveTab
     : visibleItems[0].id
-  useEffect(() => {
-    if (effectiveTab !== rightSidebarTab) {
-      // Why: folder workspaces hide git-only panels. Persist the fallback so
-      // panels and activity-button refs do not churn against a hidden tab.
-      setRightSidebarTab(effectiveTab)
-    }
-  }, [effectiveTab, rightSidebarTab, setRightSidebarTab])
   const selectActivityTab = (tab: typeof effectiveTab): void => {
     if (tab === 'explorer') {
       showRightSidebarFiles()

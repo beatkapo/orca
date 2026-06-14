@@ -8,6 +8,9 @@ import type { GlobalSettings, Repo, Worktree, WorktreeCardProperty } from '../..
 const openModal = vi.fn()
 const setRenamingWorktreeId = vi.fn()
 const updateWorktreeMeta = vi.fn()
+const testDoubles = vi.hoisted(() => ({
+  activateWorktreeFromSidebar: vi.fn()
+}))
 let worktreeCardProperties: WorktreeCardProperty[] = ['status', 'comment']
 let settings: Partial<GlobalSettings> | null = null
 
@@ -56,7 +59,7 @@ vi.mock('@/components/ui/tooltip', () => ({
 }))
 
 vi.mock('@/lib/sidebar-worktree-activation', () => ({
-  activateWorktreeFromSidebar: vi.fn()
+  activateWorktreeFromSidebar: testDoubles.activateWorktreeFromSidebar
 }))
 
 vi.mock('@/runtime/runtime-rpc-client', () => ({
@@ -193,6 +196,14 @@ describe('WorktreeCard affiliate list mode', () => {
     expect(openModal).not.toHaveBeenCalled()
     expect(setRenamingWorktreeId).not.toHaveBeenCalled()
     expect(updateWorktreeMeta).not.toHaveBeenCalled()
+
+    act(() => {
+      surface?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    })
+
+    expect(testDoubles.activateWorktreeFromSidebar).toHaveBeenCalledWith(
+      'repo-1::/repo/worktrees/affiliate'
+    )
   })
 
   it('still shows inline agent details in affiliate list mode', () => {
