@@ -5,6 +5,7 @@ import { SearchableSetting } from './SearchableSetting'
 import { matchesSettingsSearch } from './settings-search'
 import { getExperimentalPaneSearchEntries, getExperimentalSearchEntry } from './experimental-search'
 import { HiddenExperimentalGroup } from './HiddenExperimentalGroup'
+import { SettingsSwitch } from './SettingsFormControls'
 import { translate } from '@/i18n/i18n'
 
 export { getExperimentalPaneSearchEntries }
@@ -33,6 +34,10 @@ export function ExperimentalPane({
   const showWorktreeSymlinks = matchesSettingsSearch(searchQuery, [
     getExperimentalSearchEntry().symlinksOnWorktrees
   ])
+  const showAgentHibernation = matchesSettingsSearch(searchQuery, [
+    getExperimentalSearchEntry().agentHibernation
+  ])
+  const agentHibernationEnabled = settings.experimentalAgentHibernation === true
 
   return (
     <div className="space-y-4">
@@ -172,6 +177,51 @@ export function ExperimentalPane({
                 }`}
               />
             </button>
+          </div>
+        </SearchableSetting>
+      ) : null}
+
+      {showAgentHibernation ? (
+        <SearchableSetting
+          title={translate(
+            'auto.components.settings.ExperimentalPane.agentHibernation.title',
+            'Agent hibernation'
+          )}
+          description={translate(
+            'auto.components.settings.ExperimentalPane.agentHibernation.description',
+            'Stops idle background agent terminals after 30 minutes and resumes supported sessions when you open them again.'
+          )}
+          keywords={getExperimentalSearchEntry().agentHibernation.keywords}
+          className="space-y-3 py-2"
+          id="experimental-agent-hibernation"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 shrink space-y-0.5">
+              <Label>
+                {translate(
+                  'auto.components.settings.ExperimentalPane.agentHibernation.title',
+                  'Agent hibernation'
+                )}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {translate(
+                  'auto.components.settings.ExperimentalPane.agentHibernation.copy',
+                  'Stops idle background agent terminals after 30 minutes and resumes supported sessions when you open them again. Experimental while we tune the safety model.'
+                )}
+              </p>
+            </div>
+            <SettingsSwitch
+              checked={agentHibernationEnabled}
+              ariaLabel={translate(
+                'auto.components.settings.ExperimentalPane.agentHibernation.toggleLabel',
+                'Toggle agent hibernation'
+              )}
+              onChange={() =>
+                updateSettings({
+                  experimentalAgentHibernation: !agentHibernationEnabled
+                })
+              }
+            />
           </div>
         </SearchableSetting>
       ) : null}
