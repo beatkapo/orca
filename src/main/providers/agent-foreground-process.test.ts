@@ -53,10 +53,24 @@ describe('resolveAgentForegroundProcess', () => {
     await expect(resolveAgentForegroundProcess(100, 'node')).resolves.toBe('codex')
   })
 
-  it('falls back to recognized descendants when none hold the foreground', async () => {
-    // No '+' candidate at all (e.g. a detached/daemon descendant tree) — the
+  it('does not report a stopped agent after the shell regains foreground', async () => {
+    mockPs(
+      ['100 99 Ss+  bash -i', '101 100 T    node /Users/dev/.nvm/versions/node/bin/codex'].join(
+        '\n'
+      )
+    )
+
+    await expect(resolveAgentForegroundProcess(100, 'bash')).resolves.toBe('bash')
+  })
+
+  it('falls back to recognized descendants when no process in the PTY tree holds foreground', async () => {
+    // No '+' marker at all (e.g. a detached/daemon descendant tree) — the
     // recognized agent may still be the best available signal.
-    mockPs(['101 100 S    node /Users/dev/.nvm/versions/node/bin/codex'].join('\n'))
+    mockPs(
+      ['100 99 Ss   bash -i', '101 100 S    node /Users/dev/.nvm/versions/node/bin/codex'].join(
+        '\n'
+      )
+    )
 
     await expect(resolveAgentForegroundProcess(100, 'node')).resolves.toBe('codex')
   })
