@@ -52,16 +52,19 @@ async function fetchGiteaUser(
       headers: authHeaders(token),
       signal: controller.signal
     })
-    if (response.status === 401 || response.status === 403) {
-      return { ok: false, error: 'Gitea rejected the token. Check the token and its scopes.' }
+    if (response.status === 401) {
+      return { ok: false, error: 'Gitea rejected the token. Check that it is valid.' }
+    }
+    // Why: a 403 on /user means the token authenticated but lacks the read:user
+    // scope. The token is still valid and usable for issues, so accept the
+    // connection without an account label rather than forcing a broader scope.
+    if (response.status === 403) {
+      return { ok: true, viewer: { login: '', fullName: null } }
     }
     if (!response.ok) {
       return { ok: false, error: `Gitea request failed (${response.status}).` }
     }
     const viewer = toViewer((await response.json()) as RawGiteaUser)
-    if (!viewer.login) {
-      return { ok: false, error: 'Gitea did not return an account for this token.' }
-    }
     return { ok: true, viewer }
   } catch {
     return { ok: false, error: 'Could not reach the Gitea server.' }
@@ -114,7 +117,7 @@ export async function connect(
     baseUrl,
     apiBaseUrl,
     displayName: hostLabel(baseUrl),
-    account: result.viewer.login
+    account: result.viewer.login || null
   }
   saveToken(id, token)
   const file = getServerFile()

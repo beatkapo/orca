@@ -106,6 +106,26 @@ describe('gitea connect', () => {
     expect(result.ok).toBe(false)
   })
 
+  it('accepts a valid token that lacks the read:user scope (403)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              message: 'token does not have at least one of required scope(s): [read:user]'
+            }),
+            { status: 403 }
+          )
+      )
+    )
+    const result = await connect({ baseUrl: 'https://git.example.com', token: 'scoped' })
+    expect(result.ok).toBe(true)
+    const id = 'id:https://git.example.com/api/v1'
+    expect(store.file.activeServerId).toBe(id)
+    expect(store.file.servers[0]?.account).toBeNull()
+  })
+
   it('reports connection status from stored servers', async () => {
     vi.stubGlobal(
       'fetch',
