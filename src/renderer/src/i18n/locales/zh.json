@@ -1551,7 +1551,8 @@
         "ff90d0abc7": "从 {{value0}} 开始工作区",
         "fe28c9821f": "view",
         "8d1e17a3ef": "在 GitHub 中打开 {{value0}}",
-        "4ac8ff2275": "在 Jira 中打开 {{value0}}"
+        "4ac8ff2275": "在 Jira 中打开 {{value0}}",
+        "gitea_source_label": "Gitea"
       },
       "Terminal": {
         "73768427cf": "关闭",
