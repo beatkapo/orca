@@ -10988,6 +10988,34 @@
         "heading": "Comments",
         "empty": "No comments yet.",
         "unknown": "Unknown"
+      },
+      "giteaPrChecks": {
+        "empty": "No status checks reported for this PR.",
+        "openDetails": "Open check details"
+      },
+      "giteaPrFileDiff": {
+        "binary": "Binary file not shown."
+      },
+      "GiteaPullRequestWorkspace": {
+        "commentFailed": "Failed to add comment.",
+        "merged": "Pull request merged.",
+        "mergeFailed": "Failed to merge.",
+        "conversation": "Conversation",
+        "files": "Files",
+        "checks": "Checks",
+        "title": "Gitea pull request",
+        "description": "Review files, checks, and conversation, then merge or start work.",
+        "start": "Start workspace",
+        "openInGitea": "Open in Gitea",
+        "close": "Close",
+        "conflicts": "Conflicts",
+        "merge": "Merge",
+        "noDescription": "No description provided.",
+        "inline": "Inline",
+        "sideBySide": "Side by side",
+        "noFiles": "No changed files.",
+        "addComment": "Add a comment...",
+        "comment": "Comment"
       }
     },
     "i18n": {

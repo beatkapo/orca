@@ -231,6 +231,7 @@ import type { PreflightStatus } from '../../../preload/api-types'
 import type { GitLabProjectRef } from '../../../shared/gitlab-types'
 import { GiteaTaskList } from './GiteaTaskList'
 import { GiteaIssueWorkspace, type GiteaWorkspaceSelection } from './GiteaIssueWorkspace'
+import { GiteaPullRequestWorkspace } from './GiteaPullRequestWorkspace'
 import type { GiteaIssueScope } from '@/store/slices/gitea'
 import {
   LINEAR_ISSUE_LIST_MAX,
@@ -6256,6 +6257,7 @@ export default function TaskPage(): React.JSX.Element {
   )
 
   const [selectedGiteaItem, setSelectedGiteaItem] = useState<GiteaWorkspaceSelection | null>(null)
+  const [selectedGiteaPr, setSelectedGiteaPr] = useState<GiteaWorkspaceSelection | null>(null)
 
   const handleUseGiteaItem = useCallback(
     (repo: Repo, item: GiteaWorkItem): void => {
@@ -6285,17 +6287,17 @@ export default function TaskPage(): React.JSX.Element {
     []
   )
 
-  // Issues open the inline detail panel; PRs start a workspace directly (Gitea
-  // has no in-app PR review surface yet).
+  // Issues open the inline detail panel; PRs open the PR review drawer.
   const handleOpenGiteaItem = useCallback(
     (repo: Repo, item: GiteaWorkItem): void => {
-      if (item.type === 'issue') {
-        setSelectedGiteaItem({ repo, item, scope: makeGiteaScope(repo) })
+      const selection = { repo, item, scope: makeGiteaScope(repo) }
+      if (item.type === 'pull') {
+        setSelectedGiteaPr(selection)
         return
       }
-      handleUseGiteaItem(repo, item)
+      setSelectedGiteaItem(selection)
     },
-    [handleUseGiteaItem, makeGiteaScope]
+    [makeGiteaScope]
   )
 
   const handleCreateNewIssue = useCallback(async (): Promise<void> => {
@@ -9739,6 +9741,14 @@ export default function TaskPage(): React.JSX.Element {
                   handleUseGiteaItem(repo, item)
                 }}
                 onClose={() => setSelectedGiteaItem(null)}
+              />
+              <GiteaPullRequestWorkspace
+                selection={selectedGiteaPr}
+                onUse={(repo, item) => {
+                  setSelectedGiteaPr(null)
+                  handleUseGiteaItem(repo, item)
+                }}
+                onClose={() => setSelectedGiteaPr(null)}
               />
             </>
           ) : taskSource === 'linear' && selectedLinearIssue ? (
