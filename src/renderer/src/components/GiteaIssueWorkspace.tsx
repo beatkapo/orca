@@ -238,29 +238,7 @@ export function GiteaIssueWorkspace({
         {selection && item && repo ? (
           <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
             <div className="flex-none border-b border-border/50 bg-muted/30 px-4 py-3">
-              <div className={cn('flex items-start gap-3', isWindows && 'pr-[140px]')}>
-                <span className="mt-1 shrink-0 text-muted-foreground">
-                  {item.type === 'pull' ? (
-                    <GitPullRequest className="size-4" />
-                  ) : (
-                    <CircleDot className="size-4" />
-                  )}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
-                    <span className="font-mono">#{item.number}</span>
-                    {item.serverName ? <span>{item.serverName}</span> : null}
-                    <span>{repo.displayName}</span>
-                    {loading ? <LoaderCircle className="size-3 animate-spin" /> : null}
-                  </div>
-                  <h2 className="mt-1 text-[20px] font-semibold leading-tight text-foreground">
-                    {title}
-                  </h2>
-                </div>
-                <Button onClick={() => onUse(repo, item)} className="shrink-0 gap-2" size="sm">
-                  {translate('auto.components.GiteaIssueWorkspace.start', 'Start workspace')}
-                  <ArrowRight className="size-4" />
-                </Button>
+              <div className={cn('flex items-start gap-2', isWindows && 'pr-[140px]')}>
                 <Button
                   variant="ghost"
                   size="icon-sm"
@@ -270,6 +248,28 @@ export function GiteaIssueWorkspace({
                 >
                   <X className="size-4" />
                 </Button>
+                <Button onClick={() => onUse(repo, item)} className="shrink-0 gap-2" size="sm">
+                  {translate('auto.components.GiteaIssueWorkspace.start', 'Start workspace')}
+                  <ArrowRight className="size-4" />
+                </Button>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                    <span className="text-muted-foreground">
+                      {item.type === 'pull' ? (
+                        <GitPullRequest className="size-3.5" />
+                      ) : (
+                        <CircleDot className="size-3.5" />
+                      )}
+                    </span>
+                    <span className="font-mono">#{item.number}</span>
+                    {item.serverName ? <span>{item.serverName}</span> : null}
+                    <span>{repo.displayName}</span>
+                    {loading ? <LoaderCircle className="size-3 animate-spin" /> : null}
+                  </div>
+                  <h2 className="mt-1 text-[20px] font-semibold leading-tight text-foreground">
+                    {title}
+                  </h2>
+                </div>
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <span

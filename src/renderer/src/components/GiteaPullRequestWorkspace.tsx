@@ -276,34 +276,16 @@ export function GiteaPullRequestWorkspace({
         {selection && item && repo && scope ? (
           <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
             <div className="flex-none border-b border-border/50 bg-muted/30 px-4 py-3">
-              <div className={cn('flex items-start gap-3', isWindows && 'pr-[140px]')}>
-                <GitPullRequest className="mt-1 size-4 shrink-0 text-muted-foreground" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
-                    <span className="font-mono">#{item.number}</span>
-                    {detail ? (
-                      <span className="font-mono">
-                        {detail.headBranch} → {detail.baseBranch}
-                      </span>
-                    ) : null}
-                    {loading ? <LoaderCircle className="size-3 animate-spin" /> : null}
-                  </div>
-                  <h2 className="mt-1 text-[20px] font-semibold leading-tight text-foreground">
-                    {item.title}
-                  </h2>
-                </div>
-                <span
-                  className={cn(
-                    'mt-1 shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium capitalize',
-                    state === 'merged'
-                      ? 'bg-purple-500/15 text-purple-500'
-                      : state === 'open'
-                        ? 'bg-status-success/15 text-status-success'
-                        : 'bg-muted text-muted-foreground'
-                  )}
+              <div className={cn('flex items-start gap-2', isWindows && 'pr-[140px]')}>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="shrink-0"
+                  onClick={onClose}
+                  aria-label={translate('auto.components.GiteaPullRequestWorkspace.close', 'Close')}
                 >
-                  {state}
-                </span>
+                  <X className="size-4" />
+                </Button>
                 <Button onClick={() => onUse(repo, item)} className="shrink-0 gap-2" size="sm">
                   {translate('auto.components.GiteaPullRequestWorkspace.start', 'Start workspace')}
                   <ArrowRight className="size-4" />
@@ -320,15 +302,33 @@ export function GiteaPullRequestWorkspace({
                 >
                   <ExternalLink className="size-4" />
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="shrink-0"
-                  onClick={onClose}
-                  aria-label={translate('auto.components.GiteaPullRequestWorkspace.close', 'Close')}
-                >
-                  <X className="size-4" />
-                </Button>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                    <GitPullRequest className="size-3.5 text-muted-foreground" />
+                    <span className="font-mono">#{item.number}</span>
+                    {detail ? (
+                      <span className="font-mono">
+                        {detail.headBranch} → {detail.baseBranch}
+                      </span>
+                    ) : null}
+                    <span
+                      className={cn(
+                        'rounded-full px-2 py-0.5 text-[10px] font-medium capitalize',
+                        state === 'merged'
+                          ? 'bg-purple-500/15 text-purple-500'
+                          : state === 'open'
+                            ? 'bg-status-success/15 text-status-success'
+                            : 'bg-muted text-muted-foreground'
+                      )}
+                    >
+                      {state}
+                    </span>
+                    {loading ? <LoaderCircle className="size-3 animate-spin" /> : null}
+                  </div>
+                  <h2 className="mt-1 text-[20px] font-semibold leading-tight text-foreground">
+                    {item.title}
+                  </h2>
+                </div>
               </div>
               <div className="mt-2 flex items-center gap-1">
                 {tabs.map((entry) => (
