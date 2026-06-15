@@ -8,7 +8,7 @@ import type {
   GiteaWorkItemFilter
 } from '../../shared/gitea-types'
 import { getGiteaRepoRef, type GiteaRepoRef } from './repository-ref'
-import { encodedRepoPath, giteaRepoGet, giteaRepoWrite, type GiteaSearchParams } from './request'
+import { encodedRepoPath, giteaRepoGet, giteaRepoWrite } from './request'
 import { getServerForHost } from './server-store'
 import {
   isGiteaPullRequest,
@@ -40,24 +40,15 @@ function issueContext(repo: GiteaRepoRef): GiteaIssueContext {
   }
 }
 
-// Maps a task-source filter to Gitea /issues query params. No `type` filter is
-// set so the endpoint returns both issues and pull requests as work items.
-function filterParams(filter: GiteaWorkItemFilter | undefined): GiteaSearchParams {
-  switch (filter) {
-    case 'assigned':
-      return { state: 'open', assigned: 'true' }
-    case 'created':
-      return { state: 'open', created: 'true' }
-    case 'closed':
-      return { state: 'closed' }
-    case 'all':
-    case undefined:
-      return { state: 'all' }
-  }
-}
-
 // Lists issues and pull requests together as unified work items, matching the
 // GitHub/GitLab Tasks model.
+//
+// "Assigned to me" / "Created by me" use the global /repos/issues/search
+// endpoint, whose `assigned`/`created` booleans filter by the token's user
+// server-side (the repo-level /issues endpoint only filters by an explicit
+// username, which needs the read:user scope). Search hits are scoped back to
+// the selected repo by owner + full_name. "Open"/"Closed" use the repo-level
+// endpoint, which is naturally scoped and cheaper.
 export async function listGiteaWorkItems(
   repoPath: string,
   filter?: GiteaWorkItemFilter,
@@ -68,13 +59,35 @@ export async function listGiteaWorkItems(
   if (!repo) {
     return []
   }
+  const context = issueContext(repo)
+  const max = clampLimit(limit)
+
+  if (filter === 'assigned' || filter === 'created') {
+    const raw = await giteaRepoGet<RawGiteaIssue[]>(repo, `/repos/issues/search`, {
+      searchParams: {
+        [filter]: 'true',
+        state: 'open',
+        owner: repo.owner,
+        limit: max,
+        page: 1
+      }
+    })
+    if (!Array.isArray(raw)) {
+      return []
+    }
+    const fullName = `${repo.owner}/${repo.repo}`.toLowerCase()
+    return raw
+      .filter((entry) => (entry.repository?.full_name ?? '').toLowerCase() === fullName)
+      .map((entry) => mapGiteaWorkItem(entry, context))
+      .filter((item): item is GiteaWorkItem => item !== null)
+  }
+
   const raw = await giteaRepoGet<RawGiteaIssue[]>(repo, `/repos/${encodedRepoPath(repo)}/issues`, {
-    searchParams: { ...filterParams(filter), limit: clampLimit(limit), page: 1 }
+    searchParams: { state: filter === 'closed' ? 'closed' : 'open', limit: max, page: 1 }
   })
   if (!Array.isArray(raw)) {
     return []
   }
-  const context = issueContext(repo)
   return raw
     .map((entry) => mapGiteaWorkItem(entry, context))
     .filter((item): item is GiteaWorkItem => item !== null)

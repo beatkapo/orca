@@ -29,6 +29,9 @@ export type RawGiteaIssue = {
   updated_at?: string | null
   // Present (non-null) when the /issues endpoint returns a pull request.
   pull_request?: { merged?: boolean | null; draft?: boolean | null } | null
+  // Present on /repos/issues/search results; used to scope cross-repo search
+  // hits back to the selected repository.
+  repository?: { full_name?: string | null } | null
 }
 
 export type RawGiteaComment = {

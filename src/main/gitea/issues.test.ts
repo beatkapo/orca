@@ -56,7 +56,7 @@ beforeEach(() => {
 })
 
 describe('gitea issues', () => {
-  it('lists issues and pull requests as unified work items, stamping the server', async () => {
+  it('lists open issues and pull requests as unified work items via the repo endpoint', async () => {
     getMock.mockResolvedValue([
       { id: 1, number: 1, title: 'Bug', state: 'open' },
       { id: 2, number: 2, title: 'A PR', state: 'closed', pull_request: { merged: true } }
@@ -69,18 +69,45 @@ describe('gitea issues', () => {
     expect(items[1]).toMatchObject({ number: 2, type: 'pull', state: 'merged' })
     const [, path, options] = getMock.mock.calls[0]
     expect(path).toBe('/repos/team/app/issues')
-    // No `type` filter so both issues and PRs come back.
-    expect(options?.searchParams).toMatchObject({ state: 'all', limit: 30 })
+    expect(options?.searchParams).toMatchObject({ state: 'open', limit: 30 })
     expect(options?.searchParams).not.toHaveProperty('type')
   })
 
-  it('maps assigned filter to the Gitea query params', async () => {
-    getMock.mockResolvedValue([])
-    await listGiteaWorkItems('/repo', 'assigned', 10, null)
-    expect(getMock.mock.calls[0][2]?.searchParams).toMatchObject({
+  it('uses the global search endpoint for "assigned to me", scoped to the repo', async () => {
+    getMock.mockResolvedValue([
+      { id: 1, number: 1, title: 'Mine', state: 'open', repository: { full_name: 'team/app' } },
+      { id: 9, number: 9, title: 'Other repo', state: 'open', repository: { full_name: 'team/x' } }
+    ])
+
+    const items = await listGiteaWorkItems('/repo', 'assigned', 10, null)
+
+    // Cross-repo search hits are filtered back to the selected repo.
+    expect(items).toHaveLength(1)
+    expect(items[0]).toMatchObject({ number: 1, title: 'Mine' })
+    const [, path, options] = getMock.mock.calls[0]
+    expect(path).toBe('/repos/issues/search')
+    expect(options?.searchParams).toMatchObject({
+      assigned: 'true',
       state: 'open',
-      assigned: 'true'
+      owner: 'team',
+      limit: 10
     })
+  })
+
+  it('uses the global search endpoint with the created flag for "created by me"', async () => {
+    getMock.mockResolvedValue([])
+    await listGiteaWorkItems('/repo', 'created', 10, null)
+    const [, path, options] = getMock.mock.calls[0]
+    expect(path).toBe('/repos/issues/search')
+    expect(options?.searchParams).toMatchObject({ created: 'true', owner: 'team' })
+  })
+
+  it('requests closed items from the repo endpoint for the closed filter', async () => {
+    getMock.mockResolvedValue([])
+    await listGiteaWorkItems('/repo', 'closed', 10, null)
+    const [, path, options] = getMock.mock.calls[0]
+    expect(path).toBe('/repos/team/app/issues')
+    expect(options?.searchParams).toMatchObject({ state: 'closed' })
   })
 
   it('returns null for a single issue that is actually a PR', async () => {
