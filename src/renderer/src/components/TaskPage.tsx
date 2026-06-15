@@ -207,6 +207,7 @@ import type {
   GitHubAssignableUser,
   GitHubPRMergeMethod,
   GitHubWorkItem,
+  GiteaWorkItem,
   GitLabTodo,
   GitLabWorkItem,
   JiraCreateField,
@@ -228,6 +229,8 @@ import type {
 } from '../../../shared/types'
 import type { PreflightStatus } from '../../../preload/api-types'
 import type { GitLabProjectRef } from '../../../shared/gitlab-types'
+import { GiteaTaskList } from './GiteaTaskList'
+import type { GiteaIssueScope } from '@/store/slices/gitea'
 import {
   LINEAR_ISSUE_LIST_MAX,
   clampLinearIssueListLimit
@@ -341,7 +344,7 @@ function getJiraIssueWorkspaceSeed(issue: JiraIssue): string {
 
 function getTaskPageRepoSourceContext(
   repo: Repo | null | undefined,
-  provider: 'github' | 'gitlab',
+  provider: 'github' | 'gitlab' | 'gitea',
   gitlabProjectRef?: GitLabProjectRef | null
 ): TaskSourceContext | null {
   if (!repo) {
@@ -6251,6 +6254,34 @@ export default function TaskPage(): React.JSX.Element {
     [openComposerForGitLabItem]
   )
 
+  const handleUseGiteaItem = useCallback(
+    (repo: Repo, item: GiteaWorkItem): void => {
+      const linkedWorkItem: LinkedWorkItemSummary = {
+        type: item.type === 'pull' ? 'pr' : 'issue',
+        number: item.number,
+        title: item.title,
+        url: item.url
+      }
+      openModal('new-workspace-composer', {
+        linkedWorkItem,
+        taskSourceContext: getTaskPageRepoSourceContext(repo, 'gitea'),
+        prefilledName: `${item.type === 'pull' ? 'pr' : 'issue'}-${item.number}`,
+        initialRepoId: repo.id,
+        telemetrySource: 'sidebar'
+      })
+    },
+    [openModal]
+  )
+
+  const makeGiteaScope = useCallback(
+    (repo: Repo): GiteaIssueScope => ({
+      repoPath: repo.path,
+      repoId: repo.id,
+      sourceContext: getTaskPageRepoSourceContext(repo, 'gitea')
+    }),
+    []
+  )
+
   const handleCreateNewIssue = useCallback(async (): Promise<void> => {
     if (!newIssueTargetRepo) {
       return
@@ -9646,6 +9677,12 @@ export default function TaskPage(): React.JSX.Element {
                 />
               </div>
             )
+          ) : taskSource === 'gitea' ? (
+            <GiteaTaskList
+              repos={selectedRepos}
+              makeScope={makeGiteaScope}
+              onUse={handleUseGiteaItem}
+            />
           ) : taskSource === 'linear' && selectedLinearIssue ? (
             <LinearIssueWorkspace
               issue={selectedLinearIssue}

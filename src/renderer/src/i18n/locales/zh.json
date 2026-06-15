@@ -10934,6 +10934,18 @@
             "connect": "Connect"
           }
         }
+      },
+      "GiteaTaskList": {
+        "stateMerged": "Merged",
+        "stateDraft": "Draft",
+        "stateClosed": "Closed",
+        "stateOpen": "Open",
+        "loadError": "Failed to load Gitea tasks.",
+        "heading": "Issues & pull requests",
+        "refresh": "Refresh Gitea tasks",
+        "noRepos": "Select a Gitea-hosted project to see its issues and pull requests.",
+        "loading": "Loading Gitea tasks…",
+        "empty": "No open issues or pull requests."
       }
     },
     "i18n": {
