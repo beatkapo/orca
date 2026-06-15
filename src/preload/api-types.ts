@@ -75,6 +75,14 @@ import type {
   MRListState,
   ListWorkItemsResult,
   IssueInfo,
+  GiteaComment,
+  GiteaConnectionStatus,
+  GiteaCreateIssueResult,
+  GiteaIssue,
+  GiteaIssueFilter,
+  GiteaIssueUpdate,
+  GiteaMutationResult,
+  GiteaViewer,
   JiraComment,
   JiraConnectionStatus,
   JiraCreateField,
@@ -1695,6 +1703,60 @@ export type PreloadApi = {
       siteId?: string
     }) => Promise<JiraUser[]>
     listTransitions: (args: { key: string; siteId?: string }) => Promise<JiraTransition[]>
+  }
+  gitea: {
+    connect: (args: {
+      baseUrl: string
+      token: string
+    }) => Promise<{ ok: true; viewer: GiteaViewer } | { ok: false; error: string }>
+    disconnect: (args?: { serverId?: string }) => Promise<void>
+    selectServer: (args: { serverId: string }) => Promise<GiteaConnectionStatus>
+    status: () => Promise<GiteaConnectionStatus>
+    testConnection: (args?: {
+      serverId?: string
+    }) => Promise<{ ok: true; viewer: GiteaViewer } | { ok: false; error: string }>
+    listIssues: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: TaskSourceContext | null
+      filter?: GiteaIssueFilter
+      limit?: number
+    }) => Promise<GiteaIssue[]>
+    issue: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: TaskSourceContext | null
+      number: number
+    }) => Promise<GiteaIssue | null>
+    issueComments: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: TaskSourceContext | null
+      number: number
+    }) => Promise<GiteaComment[]>
+    createIssue: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: TaskSourceContext | null
+      title: string
+      body?: string
+      assignees?: string[]
+      labelIds?: number[]
+    }) => Promise<GiteaCreateIssueResult>
+    updateIssue: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: TaskSourceContext | null
+      number: number
+      updates: GiteaIssueUpdate
+    }) => Promise<GiteaMutationResult>
+    addIssueComment: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: TaskSourceContext | null
+      number: number
+      body: string
+    }) => Promise<GiteaMutationResult>
   }
   starNag: {
     onShow: (callback: (payload?: { mode?: 'gh' | 'web' }) => void) => () => void

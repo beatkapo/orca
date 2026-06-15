@@ -1680,6 +1680,23 @@ export type {
   JiraViewer
 } from './jira-types'
 
+export type {
+  GiteaComment,
+  GiteaConnectArgs,
+  GiteaConnectionStatus,
+  GiteaCreateIssueArgs,
+  GiteaCreateIssueResult,
+  GiteaIssue,
+  GiteaIssueFilter,
+  GiteaIssueUpdate,
+  GiteaLabel,
+  GiteaMutationResult,
+  GiteaServer,
+  GiteaServerSelection,
+  GiteaUser,
+  GiteaViewer
+} from './gitea-types'
+
 /**
  * GitHub API rate-limit buckets surfaced in the TaskPage header so users can
  * see remaining budget before they hit the wall. `core` = REST (5000/hr),
