@@ -5910,7 +5910,9 @@
           "dd67a1b6e1": "Show GitLab in the Tasks source picker and sidebar shortcuts.",
           "7c5d7fdc20": "GitLab",
           "1db47236cd": "Show GitHub in the Tasks source picker and sidebar shortcuts.",
-          "e14063e727": "GitHub"
+          "e14063e727": "GitHub",
+          "gitea_label": "Gitea",
+          "gitea_description": "Show Gitea in the Tasks source picker and sidebar shortcuts."
         },
         "TerminalAppearanceSection": {
           "a14a427ae4": "Thickness of the pane divider line.",
