@@ -80,7 +80,9 @@ import type {
   GiteaCreateIssueResult,
   GiteaIssue,
   GiteaIssueUpdate,
+  GiteaLabel,
   GiteaMutationResult,
+  GiteaUser,
   GiteaViewer,
   GiteaWorkItem,
   GiteaWorkItemFilter,
@@ -1735,6 +1737,16 @@ export type PreloadApi = {
       sourceContext?: TaskSourceContext | null
       number: number
     }) => Promise<GiteaComment[]>
+    labels: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: TaskSourceContext | null
+    }) => Promise<GiteaLabel[]>
+    assignees: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: TaskSourceContext | null
+    }) => Promise<GiteaUser[]>
     createIssue: (args: {
       repoPath: string
       repoId?: string | null

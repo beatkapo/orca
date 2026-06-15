@@ -18,8 +18,17 @@ import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
-import type { GiteaComment, GiteaIssue, GiteaWorkItem, Repo } from '../../../shared/types'
+import type {
+  GiteaComment,
+  GiteaIssue,
+  GiteaLabel,
+  GiteaUser,
+  GiteaWorkItem,
+  Repo
+} from '../../../shared/types'
 import type { GiteaIssueScope } from '@/store/slices/gitea'
+import { GiteaIssueMetaControls } from './gitea-issue-meta-controls'
+import { GiteaIssueComments } from './gitea-issue-comments'
 import { translate } from '@/i18n/i18n'
 
 export type GiteaWorkspaceSelection = { repo: Repo; item: GiteaWorkItem; scope: GiteaIssueScope }
@@ -28,24 +37,6 @@ type GiteaIssueWorkspaceProps = {
   selection: GiteaWorkspaceSelection | null
   onUse: (repo: Repo, item: GiteaWorkItem) => void
   onClose: () => void
-}
-
-const relativeFormatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
-
-function formatRelativeTime(input: string): string {
-  const date = new Date(input)
-  if (Number.isNaN(date.getTime())) {
-    return 'recently'
-  }
-  const diffMinutes = Math.round((date.getTime() - Date.now()) / 60_000)
-  if (Math.abs(diffMinutes) < 60) {
-    return relativeFormatter.format(diffMinutes, 'minute')
-  }
-  const diffHours = Math.round(diffMinutes / 60)
-  if (Math.abs(diffHours) < 24) {
-    return relativeFormatter.format(diffHours, 'hour')
-  }
-  return relativeFormatter.format(Math.round(diffHours / 24), 'day')
 }
 
 async function copyText(text: string, label: string): Promise<void> {
@@ -73,6 +64,8 @@ export function GiteaIssueWorkspace({
   const [submitting, setSubmitting] = useState(false)
   const [statePending, setStatePending] = useState(false)
   const [closed, setClosed] = useState(false)
+  const [repoLabels, setRepoLabels] = useState<GiteaLabel[]>([])
+  const [repoAssignees, setRepoAssignees] = useState<GiteaUser[]>([])
   const requestRef = useRef(0)
 
   const item = selection?.item ?? null
@@ -91,16 +84,25 @@ export function GiteaIssueWorkspace({
       sourceContext: scope.sourceContext ?? null,
       number: item.number
     }
+    const listArgs = {
+      repoPath: scope.repoPath,
+      repoId: scope.repoId ?? null,
+      sourceContext: scope.sourceContext ?? null
+    }
     setDetail(null)
     setComments([])
     setCommentDraft('')
+    setRepoLabels([])
+    setRepoAssignees([])
     setClosed(item.state !== 'open')
     setLoading(true)
     void Promise.all([
       window.api.gitea.issue(args) as Promise<GiteaIssue | null>,
-      window.api.gitea.issueComments(args) as Promise<GiteaComment[]>
+      window.api.gitea.issueComments(args) as Promise<GiteaComment[]>,
+      window.api.gitea.labels(listArgs) as Promise<GiteaLabel[]>,
+      window.api.gitea.assignees(listArgs) as Promise<GiteaUser[]>
     ])
-      .then(([issue, fetchedComments]) => {
+      .then(([issue, fetchedComments, fetchedLabels, fetchedAssignees]) => {
         if (requestId !== requestRef.current) {
           return
         }
@@ -109,6 +111,8 @@ export function GiteaIssueWorkspace({
           setClosed(issue.state !== 'open')
         }
         setComments(fetchedComments)
+        setRepoLabels(fetchedLabels)
+        setRepoAssignees(fetchedAssignees)
       })
       .catch(() => {})
       .finally(() => {
@@ -117,6 +121,24 @@ export function GiteaIssueWorkspace({
         }
       })
   }, [selection, item, scope])
+
+  // Light refetch of just the issue detail after a metadata edit, so labels /
+  // assignees / title update without resetting comments or the comment draft.
+  const refreshDetail = useCallback(async (): Promise<void> => {
+    if (!scope || !item) {
+      return
+    }
+    const issue = (await window.api.gitea.issue({
+      repoPath: scope.repoPath,
+      repoId: scope.repoId ?? null,
+      sourceContext: scope.sourceContext ?? null,
+      number: item.number
+    })) as GiteaIssue | null
+    if (issue) {
+      setDetail(issue)
+      setClosed(issue.state !== 'open')
+    }
+  }, [scope, item])
 
   const handleToggleState = useCallback(async (): Promise<void> => {
     if (!scope || !item || statePending) {
@@ -307,6 +329,19 @@ export function GiteaIssueWorkspace({
               </div>
             </div>
 
+            {item.type === 'issue' ? (
+              <GiteaIssueMetaControls
+                scope={selection.scope}
+                issueNumber={item.number}
+                title={title}
+                labelNames={labels}
+                assigneeLogins={(detail?.assignees ?? []).map((user) => user.login)}
+                repoLabels={repoLabels}
+                repoAssignees={repoAssignees}
+                onChanged={() => void refreshDetail()}
+              />
+            ) : null}
+
             <div className="min-h-0 flex-1 overflow-y-auto scrollbar-sleek">
               <section className="border-b border-border/40 px-4 py-4">
                 {body ? (
@@ -320,49 +355,7 @@ export function GiteaIssueWorkspace({
                   </p>
                 )}
               </section>
-              <section className="px-4 py-4">
-                <div className="mb-3 text-[13px] font-medium text-foreground">
-                  {translate('auto.components.GiteaIssueWorkspace.comments', 'Comments')}
-                  {comments.length > 0 ? (
-                    <span className="ml-2 text-[12px] text-muted-foreground">
-                      {comments.length}
-                    </span>
-                  ) : null}
-                </div>
-                {comments.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    {translate(
-                      'auto.components.GiteaIssueWorkspace.noComments',
-                      'No comments yet.'
-                    )}
-                  </p>
-                ) : (
-                  <div className="flex flex-col gap-3">
-                    {comments.map((comment) => (
-                      <div
-                        key={comment.id}
-                        className="rounded-md border border-border/50 bg-muted/20"
-                      >
-                        <div className="flex min-w-0 items-center gap-2 border-b border-border/40 px-3 py-2">
-                          <span className="truncate text-[13px] font-semibold text-foreground">
-                            {comment.user?.login ??
-                              translate('auto.components.GiteaIssueWorkspace.unknown', 'Unknown')}
-                          </span>
-                          <span className="shrink-0 text-[12px] text-muted-foreground">
-                            {formatRelativeTime(comment.createdAt)}
-                          </span>
-                        </div>
-                        <div className="px-3 py-2">
-                          <CommentMarkdown
-                            content={comment.body}
-                            className="text-[13px] leading-relaxed"
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
+              <GiteaIssueComments comments={comments} />
             </div>
 
             <div className="flex-none border-t border-border/50 bg-background px-3 py-3">

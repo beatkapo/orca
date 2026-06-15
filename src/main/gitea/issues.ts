@@ -3,7 +3,9 @@ import type {
   GiteaCreateIssueResult,
   GiteaIssue,
   GiteaIssueUpdate,
+  GiteaLabel,
   GiteaMutationResult,
+  GiteaUser,
   GiteaWorkItem,
   GiteaWorkItemFilter
 } from '../../shared/gitea-types'
@@ -14,10 +16,14 @@ import {
   isGiteaPullRequest,
   mapGiteaComment,
   mapGiteaIssue,
+  mapGiteaLabel,
+  mapGiteaUser,
   mapGiteaWorkItem,
   type GiteaIssueContext,
   type RawGiteaComment,
-  type RawGiteaIssue
+  type RawGiteaIssue,
+  type RawGiteaLabel,
+  type RawGiteaUser
 } from './mappers'
 
 const DEFAULT_LIMIT = 30
@@ -91,6 +97,42 @@ export async function listGiteaWorkItems(
   return raw
     .map((entry) => mapGiteaWorkItem(entry, context))
     .filter((item): item is GiteaWorkItem => item !== null)
+}
+
+export async function listGiteaLabels(
+  repoPath: string,
+  connectionId?: string | null
+): Promise<GiteaLabel[]> {
+  const repo = await getGiteaRepoRef(repoPath, connectionId)
+  if (!repo) {
+    return []
+  }
+  const raw = await giteaRepoGet<RawGiteaLabel[]>(repo, `/repos/${encodedRepoPath(repo)}/labels`, {
+    searchParams: { limit: 100, page: 1 }
+  })
+  if (!Array.isArray(raw)) {
+    return []
+  }
+  return raw
+    .map((entry) => mapGiteaLabel(entry))
+    .filter((label): label is GiteaLabel => label !== null)
+}
+
+export async function listGiteaAssignees(
+  repoPath: string,
+  connectionId?: string | null
+): Promise<GiteaUser[]> {
+  const repo = await getGiteaRepoRef(repoPath, connectionId)
+  if (!repo) {
+    return []
+  }
+  const raw = await giteaRepoGet<RawGiteaUser[]>(repo, `/repos/${encodedRepoPath(repo)}/assignees`)
+  if (!Array.isArray(raw)) {
+    return []
+  }
+  return raw
+    .map((entry) => mapGiteaUser(entry))
+    .filter((user): user is GiteaUser => user !== undefined)
 }
 
 export async function getGiteaIssue(

@@ -14,7 +14,9 @@ import {
   addGiteaIssueComment,
   createGiteaIssue,
   getGiteaIssue,
+  listGiteaAssignees,
   listGiteaIssueComments,
+  listGiteaLabels,
   listGiteaWorkItems,
   updateGiteaIssue
 } from '../gitea/issues'
@@ -181,6 +183,16 @@ export function registerGiteaHandlers(store: Store): void {
       return listGiteaIssueComments(repo.path, args.number, repoConnectionId(repo))
     }
   )
+
+  ipcMain.handle('gitea:labels', async (_event, args: GiteaRepoSelectorArgs) => {
+    const repo = assertRegisteredRepo(args, store)
+    return listGiteaLabels(repo.path, repoConnectionId(repo))
+  })
+
+  ipcMain.handle('gitea:assignees', async (_event, args: GiteaRepoSelectorArgs) => {
+    const repo = assertRegisteredRepo(args, store)
+    return listGiteaAssignees(repo.path, repoConnectionId(repo))
+  })
 
   ipcMain.handle(
     'gitea:createIssue',

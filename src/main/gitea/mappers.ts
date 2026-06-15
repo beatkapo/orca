@@ -1,4 +1,10 @@
-import type { GiteaComment, GiteaIssue, GiteaUser, GiteaWorkItem } from '../../shared/gitea-types'
+import type {
+  GiteaComment,
+  GiteaIssue,
+  GiteaLabel,
+  GiteaUser,
+  GiteaWorkItem
+} from '../../shared/gitea-types'
 
 export type RawGiteaUser = {
   id?: number
@@ -139,6 +145,17 @@ export function mapGiteaWorkItem(
     ...(isPull && raw.pull_request?.draft ? { draft: true } : {}),
     updatedAt: raw.updated_at ?? '',
     createdAt: raw.created_at ?? ''
+  }
+}
+
+export function mapGiteaLabel(raw: RawGiteaLabel): GiteaLabel | null {
+  if (typeof raw.id !== 'number' || !raw.name?.trim()) {
+    return null
+  }
+  return {
+    id: raw.id,
+    name: raw.name.trim(),
+    color: raw.color?.trim() || undefined
   }
 }
 

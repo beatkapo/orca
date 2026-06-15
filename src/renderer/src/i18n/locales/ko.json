@@ -10975,6 +10975,19 @@
         "unknown": "Unknown",
         "addComment": "Add a comment...",
         "comment": "Comment"
+      },
+      "giteaIssueMetaControls": {
+        "failed": "Failed to update issue.",
+        "title": "Title",
+        "labels": "Labels",
+        "noLabels": "No labels in this repo.",
+        "assignees": "Assignees",
+        "noAssignees": "No assignable users."
+      },
+      "giteaIssueComments": {
+        "heading": "Comments",
+        "empty": "No comments yet.",
+        "unknown": "Unknown"
       }
     },
     "i18n": {

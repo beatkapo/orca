@@ -1547,6 +1547,18 @@ const api = {
       number: number
     }): Promise<unknown[]> => ipcRenderer.invoke('gitea:issueComments', args),
 
+    labels: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+    }): Promise<unknown[]> => ipcRenderer.invoke('gitea:labels', args),
+
+    assignees: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+    }): Promise<unknown[]> => ipcRenderer.invoke('gitea:assignees', args),
+
     createIssue: (args: {
       repoPath: string
       repoId?: string | null
