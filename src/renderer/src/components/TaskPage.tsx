@@ -2750,6 +2750,9 @@ export default function TaskPage(): React.JSX.Element {
   )
   const jiraStatus = useAppStore((s) => s.jiraStatus)
   const jiraStatusChecked = useAppStore((s) => s.jiraStatusChecked)
+  const giteaStatus = useAppStore((s) => s.giteaStatus)
+  const giteaStatusLoaded = useAppStore((s) => s.giteaStatusLoaded)
+  const refreshGiteaStatus = useAppStore((s) => s.refreshGiteaStatus)
   const jiraStatusContextKey = useAppStore((s) => s.jiraStatusContextKey)
   const connectJira = useAppStore((s) => s.connectJira)
   const selectJiraSite = useAppStore((s) => s.selectJiraSite)
@@ -2766,6 +2769,9 @@ export default function TaskPage(): React.JSX.Element {
   const jiraStatusReady = jiraStatusCurrent && jiraStatusChecked
   const linearConnected = linearStatusCurrent && linearStatus.connected
   const jiraConnected = jiraStatusCurrent && jiraStatus.connected
+  // Gitea credentials live on the local machine, so connection state is not
+  // gated by the runtime provider-context key like Linear/Jira.
+  const giteaConnected = giteaStatus?.connected === true
   const submitShortcutLabel = getScreenSubmitShortcutLabel()
   const eligibleRepos = useMemo(() => repos.filter((repo) => isGitRepoKind(repo)), [repos])
 
@@ -2871,13 +2877,15 @@ export default function TaskPage(): React.JSX.Element {
         preferredVisibleTaskProviders,
         {
           gitlabInstalled: preflightStatusCurrent && preflightStatus?.glab?.installed === true,
-          linearConnected: linearConnected === true
+          linearConnected: linearConnected === true,
+          giteaConfigured: giteaConnected
         },
         defaultTaskSource
       ),
     [
       defaultTaskSource,
       linearConnected,
+      giteaConnected,
       preferredVisibleTaskProviders,
       preflightStatusCurrent,
       preflightStatus?.glab?.installed
@@ -6723,9 +6731,14 @@ export default function TaskPage(): React.JSX.Element {
     if (!jiraStatusReady) {
       void checkJiraConnection()
     }
+    if (!giteaStatusLoaded) {
+      void refreshGiteaStatus()
+    }
   }, [
     checkJiraConnection,
     checkLinearConnection,
+    giteaStatusLoaded,
+    refreshGiteaStatus,
     expectedPreflightContextKey,
     jiraStatusContextKey,
     jiraStatusReady,
