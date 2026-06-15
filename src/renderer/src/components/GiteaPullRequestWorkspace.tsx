@@ -25,6 +25,10 @@ import type { GiteaIssueScope } from '@/store/slices/gitea'
 import type { GiteaWorkspaceSelection } from './GiteaIssueWorkspace'
 import { translate } from '@/i18n/i18n'
 
+// On Windows the custom window controls (minimize/close) float over the
+// top-right corner, so the header action buttons must clear that strip.
+const isWindows = !navigator.userAgent.includes('Mac') && navigator.userAgent.includes('Windows')
+
 type Tab = 'conversation' | 'files' | 'checks'
 
 type GiteaPullRequestWorkspaceProps = {
@@ -272,7 +276,7 @@ export function GiteaPullRequestWorkspace({
         {selection && item && repo && scope ? (
           <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
             <div className="flex-none border-b border-border/50 bg-muted/30 px-4 py-3">
-              <div className="flex items-start gap-3">
+              <div className={cn('flex items-start gap-3', isWindows && 'pr-[140px]')}>
                 <GitPullRequest className="mt-1 size-4 shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">

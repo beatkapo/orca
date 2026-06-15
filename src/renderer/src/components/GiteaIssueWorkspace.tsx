@@ -52,6 +52,10 @@ async function copyText(text: string, label: string): Promise<void> {
   }
 }
 
+// On Windows the custom window controls float over the top-right corner, so the
+// header action buttons must clear that strip.
+const isWindows = !navigator.userAgent.includes('Mac') && navigator.userAgent.includes('Windows')
+
 export function GiteaIssueWorkspace({
   selection,
   onUse,
@@ -234,7 +238,7 @@ export function GiteaIssueWorkspace({
         {selection && item && repo ? (
           <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
             <div className="flex-none border-b border-border/50 bg-muted/30 px-4 py-3">
-              <div className="flex items-start gap-3">
+              <div className={cn('flex items-start gap-3', isWindows && 'pr-[140px]')}>
                 <span className="mt-1 shrink-0 text-muted-foreground">
                   {item.type === 'pull' ? (
                     <GitPullRequest className="size-4" />
