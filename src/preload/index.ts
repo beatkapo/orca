@@ -1600,6 +1600,24 @@ const api = {
     }): Promise<{ ok: true } | { ok: false; error: string }> =>
       ipcRenderer.invoke('gitea:prMerge', args),
 
+    prReviewComments: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+      number: number
+    }): Promise<unknown[]> => ipcRenderer.invoke('gitea:prReviewComments', args),
+
+    prAddReviewComment: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+      number: number
+      path: string
+      line: number
+      body: string
+    }): Promise<{ ok: true } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('gitea:prAddReviewComment', args),
+
     createIssue: (args: {
       repoPath: string
       repoId?: string | null

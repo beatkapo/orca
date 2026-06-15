@@ -11015,7 +11015,27 @@
         "sideBySide": "Side by side",
         "noFiles": "No changed files.",
         "addComment": "Add a comment...",
-        "comment": "Comment"
+        "comment": "Comment",
+        "reviewCommentFailed": "Failed to add review comment."
+      },
+      "giteaPrLineComments": {
+        "line": "Line {{value0}}",
+        "unknown": "Unknown",
+        "linePlaceholder": "Line #",
+        "lineHint": "New-file line number from the diff",
+        "bodyPlaceholder": "Review comment…",
+        "add": "Comment",
+        "addOnLine": "Comment on a line"
+      },
+      "giteaPrTabBody": {
+        "noDescription": "No description provided.",
+        "inline": "Inline",
+        "sideBySide": "Side by side",
+        "noFiles": "No changed files."
+      },
+      "giteaPrMergeButton": {
+        "conflicts": "Conflicts",
+        "merge": "Merge"
       }
     },
     "i18n": {

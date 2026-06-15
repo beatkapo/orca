@@ -1,15 +1,9 @@
 import { ipcMain } from 'electron'
-import { resolve } from 'path'
-import { getRepoExecutionHostId } from '../../shared/execution-host'
-import type { TaskSourceContext } from '../../shared/task-source-context'
 import type {
   GiteaConnectArgs,
   GiteaIssueUpdate,
-  GiteaMergeMethod,
-  GiteaPRFileStatus,
   GiteaServerSelection,
-  GiteaWorkItemFilter,
-  Repo
+  GiteaWorkItemFilter
 } from '../../shared/types'
 import { connect, disconnect, getStatus, selectServer, testConnection } from '../gitea/connect'
 import {
@@ -22,59 +16,16 @@ import {
   listGiteaWorkItems,
   updateGiteaIssue
 } from '../gitea/issues'
-import {
-  getGiteaPullRequestChecks,
-  getGiteaPullRequestDetail,
-  getGiteaPullRequestFileContents,
-  listGiteaPullRequestFiles,
-  mergeGiteaPullRequest
-} from '../gitea/pull-requests'
 import type { Store } from '../persistence'
 import { _resetPreflightCache } from './preflight'
+import { registerGiteaPullRequestHandlers } from './gitea-pr'
+import {
+  assertRegisteredRepo,
+  repoConnectionId,
+  type GiteaRepoSelectorArgs
+} from './gitea-repo-access'
 
 const VALID_FILTERS = new Set<GiteaWorkItemFilter>(['assigned', 'created', 'all', 'closed'])
-
-type GiteaRepoSelectorArgs = {
-  repoPath: string
-  repoId?: string | null
-  sourceContext?: TaskSourceContext | null
-}
-
-function findRegisteredGiteaRepo(args: GiteaRepoSelectorArgs, store: Store): Repo | undefined {
-  const sourceRepoId =
-    args.sourceContext?.provider === 'gitea' ? args.sourceContext.repoId?.trim() : null
-  const repoId = args.repoId?.trim() || sourceRepoId || null
-  if (repoId) {
-    const repo = store.getRepo(repoId)
-    if (repo) {
-      return repo
-    }
-  }
-  const resolvedRepoPath = resolve(args.repoPath)
-  return store.getRepos().find((r) => resolve(r.path) === resolvedRepoPath)
-}
-
-// Why: mirror gitlab.ts assertRegisteredRepo — handlers must never operate on a
-// path the user hasn't registered as a repo (filesystem-auth boundary). The
-// source-context host check stops a task fetched on one machine from mutating a
-// same-path repo on another.
-function assertRegisteredRepo(args: GiteaRepoSelectorArgs, store: Store): Repo {
-  const repo = findRegisteredGiteaRepo(args, store)
-  if (!repo) {
-    throw new Error('Access denied: unknown repository path')
-  }
-  if (
-    args.sourceContext?.provider === 'gitea' &&
-    args.sourceContext.hostId !== getRepoExecutionHostId(repo)
-  ) {
-    throw new Error('Access denied: Gitea source host does not match repository host')
-  }
-  return repo
-}
-
-function repoConnectionId(repo: Repo): string | null {
-  return repo.connectionId ?? null
-}
 
 function normalizeServerId(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined
@@ -260,79 +211,5 @@ export function registerGiteaHandlers(store: Store): void {
     }
   )
 
-  ipcMain.handle(
-    'gitea:prDetail',
-    async (_event, args: GiteaRepoSelectorArgs & { number: number }) => {
-      const repo = assertRegisteredRepo(args, store)
-      if (typeof args.number !== 'number') {
-        return null
-      }
-      return getGiteaPullRequestDetail(repo.path, args.number, repoConnectionId(repo))
-    }
-  )
-
-  ipcMain.handle(
-    'gitea:prFiles',
-    async (_event, args: GiteaRepoSelectorArgs & { number: number }) => {
-      const repo = assertRegisteredRepo(args, store)
-      if (typeof args.number !== 'number') {
-        return []
-      }
-      return listGiteaPullRequestFiles(repo.path, args.number, repoConnectionId(repo))
-    }
-  )
-
-  ipcMain.handle(
-    'gitea:prFileContents',
-    async (
-      _event,
-      args: GiteaRepoSelectorArgs & {
-        path: string
-        oldPath?: string
-        status: GiteaPRFileStatus
-        baseSha: string
-        headSha: string
-      }
-    ) => {
-      const repo = assertRegisteredRepo(args, store)
-      if (typeof args.path !== 'string' || !args.path) {
-        return { original: '', modified: '', originalIsBinary: false, modifiedIsBinary: false }
-      }
-      return getGiteaPullRequestFileContents(
-        repo.path,
-        {
-          path: args.path,
-          oldPath: typeof args.oldPath === 'string' ? args.oldPath : undefined,
-          status: args.status,
-          baseSha: typeof args.baseSha === 'string' ? args.baseSha : '',
-          headSha: typeof args.headSha === 'string' ? args.headSha : ''
-        },
-        repoConnectionId(repo)
-      )
-    }
-  )
-
-  ipcMain.handle(
-    'gitea:prChecks',
-    async (_event, args: GiteaRepoSelectorArgs & { headSha: string }) => {
-      const repo = assertRegisteredRepo(args, store)
-      if (typeof args.headSha !== 'string' || !args.headSha) {
-        return []
-      }
-      return getGiteaPullRequestChecks(repo.path, args.headSha, repoConnectionId(repo))
-    }
-  )
-
-  ipcMain.handle(
-    'gitea:prMerge',
-    async (_event, args: GiteaRepoSelectorArgs & { number: number; method?: GiteaMergeMethod }) => {
-      const repo = assertRegisteredRepo(args, store)
-      if (typeof args.number !== 'number') {
-        return { ok: false, error: 'Pull request number is required.' }
-      }
-      const method: GiteaMergeMethod =
-        args.method === 'rebase' || args.method === 'squash' ? args.method : 'merge'
-      return mergeGiteaPullRequest(repo.path, args.number, method, repoConnectionId(repo))
-    }
-  )
+  registerGiteaPullRequestHandlers(store)
 }

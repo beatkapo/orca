@@ -6,7 +6,8 @@ import { DiffEditor } from '@monaco-editor/react'
 import { LoaderCircle } from 'lucide-react'
 import { detectLanguage } from '@/lib/language-detect'
 import { cn } from '@/lib/utils'
-import type { GiteaPRFile, GiteaPRFileContents } from '../../../shared/types'
+import { GiteaPrLineComments } from '@/components/gitea-pr-line-comments'
+import type { GiteaPRFile, GiteaPRFileContents, GiteaPRReviewComment } from '../../../shared/types'
 import type { GiteaIssueScope } from '@/store/slices/gitea'
 import { translate } from '@/i18n/i18n'
 
@@ -17,6 +18,8 @@ type GiteaPrFileDiffProps = {
   headSha: string
   isDark: boolean
   sideBySide: boolean
+  reviewComments: GiteaPRReviewComment[]
+  onAddReviewComment: (path: string, line: number, body: string) => Promise<boolean>
 }
 
 const STATUS_LABELS: Record<GiteaPRFile['status'], string> = {
@@ -34,7 +37,9 @@ export function GiteaPrFileDiff({
   baseSha,
   headSha,
   isDark,
-  sideBySide
+  sideBySide,
+  reviewComments,
+  onAddReviewComment
 }: GiteaPrFileDiffProps): React.JSX.Element {
   const [contents, setContents] = useState<GiteaPRFileContents | null>(null)
   const [loading, setLoading] = useState(true)
@@ -120,6 +125,10 @@ export function GiteaPrFileDiff({
           />
         )}
       </div>
+      <GiteaPrLineComments
+        comments={reviewComments}
+        onAdd={(line, body) => onAddReviewComment(file.path, line, body)}
+      />
     </div>
   )
 }

@@ -2,23 +2,12 @@
    files, checks, and comments are loaded from Gitea IPC for the selected pull
    request, so local state resets when the selection prop changes. */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  ArrowRight,
-  ChevronDown,
-  ExternalLink,
-  GitPullRequest,
-  LoaderCircle,
-  Send,
-  X
-} from 'lucide-react'
+import { ArrowRight, ExternalLink, GitPullRequest, LoaderCircle, Send, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { VisuallyHidden } from 'radix-ui'
-import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
-import { GiteaIssueComments } from '@/components/gitea-issue-comments'
-import { GiteaPrChecks } from '@/components/gitea-pr-checks'
-import { GiteaPrFileDiff } from '@/components/gitea-pr-file-diff'
+import { GiteaPrMergeButton } from '@/components/gitea-pr-merge-button'
+import { GiteaPrTabBody } from '@/components/gitea-pr-tab-body'
 import { Button } from '@/components/ui/button'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
@@ -27,6 +16,7 @@ import type {
   GiteaMergeMethod,
   GiteaPRCheck,
   GiteaPRFile,
+  GiteaPRReviewComment,
   GiteaPullRequestDetail,
   GiteaWorkItem,
   Repo
@@ -42,8 +32,6 @@ type GiteaPullRequestWorkspaceProps = {
   onUse: (repo: Repo, item: GiteaWorkItem) => void
   onClose: () => void
 }
-
-const MERGE_METHODS: GiteaMergeMethod[] = ['merge', 'squash', 'rebase']
 
 function scoped<T extends Record<string, unknown>>(
   scope: GiteaIssueScope,
@@ -76,6 +64,7 @@ export function GiteaPullRequestWorkspace({
   const [files, setFiles] = useState<GiteaPRFile[]>([])
   const [checks, setChecks] = useState<GiteaPRCheck[]>([])
   const [comments, setComments] = useState<GiteaComment[]>([])
+  const [reviewComments, setReviewComments] = useState<GiteaPRReviewComment[]>([])
   const [loading, setLoading] = useState(false)
   const [sideBySide, setSideBySide] = useState(true)
   const [commentDraft, setCommentDraft] = useState('')
@@ -98,6 +87,7 @@ export function GiteaPullRequestWorkspace({
     setFiles([])
     setChecks([])
     setComments([])
+    setReviewComments([])
     setCommentDraft('')
     setLoading(true)
     void Promise.all([
@@ -107,15 +97,19 @@ export function GiteaPullRequestWorkspace({
       window.api.gitea.prFiles(scoped(scope, { number: item.number })) as Promise<GiteaPRFile[]>,
       window.api.gitea.issueComments(scoped(scope, { number: item.number })) as Promise<
         GiteaComment[]
+      >,
+      window.api.gitea.prReviewComments(scoped(scope, { number: item.number })) as Promise<
+        GiteaPRReviewComment[]
       >
     ])
-      .then(([prDetail, prFiles, prComments]) => {
+      .then(([prDetail, prFiles, prComments, prReviewComments]) => {
         if (requestId !== requestRef.current) {
           return
         }
         setDetail(prDetail)
         setFiles(prFiles)
         setComments(prComments)
+        setReviewComments(prReviewComments)
         if (prDetail?.headSha) {
           void (
             window.api.gitea.prChecks(scoped(scope, { headSha: prDetail.headSha })) as Promise<
@@ -199,6 +193,38 @@ export function GiteaPullRequestWorkspace({
       }
     },
     [item, merging, scope]
+  )
+
+  const handleAddReviewComment = useCallback(
+    async (path: string, line: number, body: string): Promise<boolean> => {
+      if (!scope || !item) {
+        return false
+      }
+      try {
+        const result = await window.api.gitea.prAddReviewComment(
+          scoped(scope, { number: item.number, path, line, body })
+        )
+        if (!result.ok) {
+          throw new Error(result.error)
+        }
+        const refreshed = (await window.api.gitea.prReviewComments(
+          scoped(scope, { number: item.number })
+        )) as GiteaPRReviewComment[]
+        setReviewComments(refreshed)
+        return true
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : translate(
+                'auto.components.GiteaPullRequestWorkspace.reviewCommentFailed',
+                'Failed to add review comment.'
+              )
+        )
+        return false
+      }
+    },
+    [item, scope]
   )
 
   const state = detail?.state ?? (item?.state === 'merged' ? 'merged' : item?.state) ?? 'open'
@@ -320,99 +346,31 @@ export function GiteaPullRequestWorkspace({
                   </button>
                 ))}
                 {state === 'open' ? (
-                  <div className="ml-auto">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          size="sm"
-                          disabled={merging || !detail?.mergeable}
-                          className="gap-1"
-                        >
-                          {merging ? <LoaderCircle className="size-3.5 animate-spin" /> : null}
-                          {detail?.mergeable === false
-                            ? translate(
-                                'auto.components.GiteaPullRequestWorkspace.conflicts',
-                                'Conflicts'
-                              )
-                            : translate('auto.components.GiteaPullRequestWorkspace.merge', 'Merge')}
-                          <ChevronDown className="size-3.5" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent align="end" className="w-40 p-1">
-                        {MERGE_METHODS.map((method) => (
-                          <button
-                            key={method}
-                            type="button"
-                            onClick={() => void handleMerge(method)}
-                            className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-[12px] capitalize hover:bg-accent"
-                          >
-                            {method}
-                          </button>
-                        ))}
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+                  <GiteaPrMergeButton
+                    mergeable={detail?.mergeable}
+                    merging={merging}
+                    onMerge={(method) => void handleMerge(method)}
+                  />
                 ) : null}
               </div>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto scrollbar-sleek">
-              {tab === 'conversation' ? (
-                <>
-                  <section className="border-b border-border/40 px-4 py-4">
-                    {body ? (
-                      <CommentMarkdown content={body} className="text-[14px] leading-relaxed" />
-                    ) : (
-                      <p className="text-sm italic text-muted-foreground">
-                        {translate(
-                          'auto.components.GiteaPullRequestWorkspace.noDescription',
-                          'No description provided.'
-                        )}
-                      </p>
-                    )}
-                  </section>
-                  <GiteaIssueComments comments={comments} />
-                </>
-              ) : tab === 'files' ? (
-                <div className="flex flex-col gap-3 p-3">
-                  <div className="flex items-center justify-end">
-                    <Button
-                      variant="outline"
-                      size="xs"
-                      onClick={() => setSideBySide((value) => !value)}
-                    >
-                      {sideBySide
-                        ? translate('auto.components.GiteaPullRequestWorkspace.inline', 'Inline')
-                        : translate(
-                            'auto.components.GiteaPullRequestWorkspace.sideBySide',
-                            'Side by side'
-                          )}
-                    </Button>
-                  </div>
-                  {files.length === 0 ? (
-                    <p className="px-1 py-6 text-sm text-muted-foreground">
-                      {translate(
-                        'auto.components.GiteaPullRequestWorkspace.noFiles',
-                        'No changed files.'
-                      )}
-                    </p>
-                  ) : (
-                    files.map((file) => (
-                      <GiteaPrFileDiff
-                        key={file.path}
-                        file={file}
-                        scope={scope}
-                        baseSha={detail?.baseSha ?? ''}
-                        headSha={detail?.headSha ?? ''}
-                        isDark={Boolean(isDark)}
-                        sideBySide={sideBySide}
-                      />
-                    ))
-                  )}
-                </div>
-              ) : (
-                <GiteaPrChecks checks={checks} />
-              )}
+              <GiteaPrTabBody
+                tab={tab}
+                body={body}
+                comments={comments}
+                files={files}
+                checks={checks}
+                scope={scope}
+                baseSha={detail?.baseSha ?? ''}
+                headSha={detail?.headSha ?? ''}
+                isDark={Boolean(isDark)}
+                sideBySide={sideBySide}
+                onToggleSideBySide={() => setSideBySide((value) => !value)}
+                reviewComments={reviewComments}
+                onAddReviewComment={handleAddReviewComment}
+              />
             </div>
 
             {tab === 'conversation' ? (

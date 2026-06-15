@@ -87,6 +87,7 @@ import type {
   GiteaPRFile,
   GiteaPRFileContents,
   GiteaPRFileStatus,
+  GiteaPRReviewComment,
   GiteaPullRequestDetail,
   GiteaUser,
   GiteaViewer,
@@ -1787,6 +1788,21 @@ export type PreloadApi = {
       sourceContext?: TaskSourceContext | null
       number: number
       method?: GiteaMergeMethod
+    }) => Promise<GiteaMutationResult>
+    prReviewComments: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: TaskSourceContext | null
+      number: number
+    }) => Promise<GiteaPRReviewComment[]>
+    prAddReviewComment: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: TaskSourceContext | null
+      number: number
+      path: string
+      line: number
+      body: string
     }) => Promise<GiteaMutationResult>
     createIssue: (args: {
       repoPath: string
