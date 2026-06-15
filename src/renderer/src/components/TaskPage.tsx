@@ -9682,6 +9682,38 @@ export default function TaskPage(): React.JSX.Element {
               repos={selectedRepos}
               makeScope={makeGiteaScope}
               onUse={handleUseGiteaItem}
+              projectPicker={
+                <TaskProjectSourceCombobox
+                  groups={taskPickerGroups}
+                  selected={repoSelection}
+                  getRepoHostLabel={getTaskPickerRepoHostLabel}
+                  onChange={(next) => {
+                    const normalized = normalizeTaskRepoSelection(eligibleRepos, next)
+                    setRepoSelection(normalized)
+                    void updateSettings({ defaultRepoSelection: [...normalized] }).catch(() => {
+                      toast.error(
+                        translate(
+                          'auto.components.TaskPage.dfd72673e7',
+                          'Failed to save project selection.'
+                        )
+                      )
+                    })
+                  }}
+                  onSelectAll={() => {
+                    const allIds = new Set(taskPickerRepos.map((r) => r.id))
+                    setRepoSelection(allIds)
+                    void updateSettings({ defaultRepoSelection: null }).catch(() => {
+                      toast.error(
+                        translate(
+                          'auto.components.TaskPage.dfd72673e7',
+                          'Failed to save project selection.'
+                        )
+                      )
+                    })
+                  }}
+                  triggerClassName="h-8 w-full rounded-md border border-border/50 bg-muted/50 px-2 text-xs font-medium shadow-sm transition hover:bg-muted/50 focus:ring-2 focus:ring-ring/20 focus:outline-none"
+                />
+              }
             />
           ) : taskSource === 'linear' && selectedLinearIssue ? (
             <LinearIssueWorkspace

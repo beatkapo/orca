@@ -10945,7 +10945,14 @@
         "refresh": "Refresh Gitea tasks",
         "noRepos": "Select a Gitea-hosted project to see its issues and pull requests.",
         "loading": "Loading Gitea tasks…",
-        "empty": "No open issues or pull requests."
+        "empty": "No open issues or pull requests.",
+        "filterAll": "All open",
+        "filterAssigned": "Assigned to me",
+        "filterCreated": "Created",
+        "filterClosed": "Closed",
+        "typeAll": "All",
+        "typeIssues": "Issues",
+        "typePulls": "PRs"
       }
     },
     "i18n": {
