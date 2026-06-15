@@ -7868,6 +7868,24 @@
           "workspaceDirectory": "The client default is inherited until a host needs its own worktree directory.",
           "providerHost": "Provider host",
           "providerAccounts": "Credentials and account checks belong to the local client or selected remote server that owns the provider integration."
+        },
+        "gitea": {
+          "integration": {
+            "card": {
+              "connected": "{{value0}} server{{value1}} connected",
+              "checking": "Checking Gitea access before showing setup actions.",
+              "idle": "Browse, create, and start work from Gitea issues.",
+              "addServer": "Add server",
+              "connect": "Connect Gitea",
+              "verified": "Verified",
+              "testing": "Testing...",
+              "test": "Test",
+              "disconnectServer": "Disconnect {{value0}}",
+              "tokenNote": "Each connected Gitea server stores one token, encrypted locally.",
+              "credentialCopy": "Connect a self-hosted Gitea server with its URL and a personal access token. Credentials are stored locally and encrypted when local runtime storage supports it.",
+              "recheck": "Re-check"
+            }
+          }
         }
       },
       "right": {
@@ -10896,6 +10914,23 @@
         "sourceUnavailable": "{{value0}} source unavailable: {{value1}}",
         "someSourceHostsUnavailable": "Some {{value0}} source hosts unavailable: {{value1}}",
         "reconnectOrUpdateTitle": "Reconnect or update {{value0}} to load this source."
+      },
+      "gitea": {
+        "connect": {
+          "dialog": {
+            "title": "Connect Gitea server",
+            "description": "Use a Gitea server URL and a personal access token to browse and manage issues.",
+            "serverUrl": "Gitea server URL",
+            "serverUrlPlaceholder": "https://gitea.example.com",
+            "token": "Access token",
+            "tokenPlaceholder": "Gitea personal access token",
+            "tokenHint": "Create a token under your Gitea user settings → Applications, with read/write access to issues.",
+            "storage": "Your token is stored locally and encrypted when local runtime storage supports it.",
+            "cancel": "Cancel",
+            "verifying": "Verifying…",
+            "connect": "Connect"
+          }
+        }
       }
     },
     "i18n": {
