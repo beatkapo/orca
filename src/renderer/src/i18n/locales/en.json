@@ -10953,6 +10953,28 @@
         "typeAll": "All",
         "typeIssues": "Issues",
         "typePulls": "PRs"
+      },
+      "GiteaIssueWorkspace": {
+        "copied": "{{value0}} copied",
+        "copyFailed": "Failed to copy.",
+        "updateFailed": "Failed to update issue.",
+        "commentFailed": "Failed to add comment.",
+        "title": "Gitea item",
+        "description": "Preview and start work from the selected Gitea item.",
+        "start": "Start workspace",
+        "close": "Close",
+        "closed": "Closed",
+        "open": "Open",
+        "reopen": "Reopen",
+        "markClosed": "Close issue",
+        "openInGitea": "Open in Gitea",
+        "copyUrl": "Copy URL",
+        "noDescription": "No description provided.",
+        "comments": "Comments",
+        "noComments": "No comments yet.",
+        "unknown": "Unknown",
+        "addComment": "Add a comment...",
+        "comment": "Comment"
       }
     },
     "i18n": {

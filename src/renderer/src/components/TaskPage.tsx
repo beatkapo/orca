@@ -230,6 +230,7 @@ import type {
 import type { PreflightStatus } from '../../../preload/api-types'
 import type { GitLabProjectRef } from '../../../shared/gitlab-types'
 import { GiteaTaskList } from './GiteaTaskList'
+import { GiteaIssueWorkspace, type GiteaWorkspaceSelection } from './GiteaIssueWorkspace'
 import type { GiteaIssueScope } from '@/store/slices/gitea'
 import {
   LINEAR_ISSUE_LIST_MAX,
@@ -6254,6 +6255,8 @@ export default function TaskPage(): React.JSX.Element {
     [openComposerForGitLabItem]
   )
 
+  const [selectedGiteaItem, setSelectedGiteaItem] = useState<GiteaWorkspaceSelection | null>(null)
+
   const handleUseGiteaItem = useCallback(
     (repo: Repo, item: GiteaWorkItem): void => {
       const linkedWorkItem: LinkedWorkItemSummary = {
@@ -6280,6 +6283,19 @@ export default function TaskPage(): React.JSX.Element {
       sourceContext: getTaskPageRepoSourceContext(repo, 'gitea')
     }),
     []
+  )
+
+  // Issues open the inline detail panel; PRs start a workspace directly (Gitea
+  // has no in-app PR review surface yet).
+  const handleOpenGiteaItem = useCallback(
+    (repo: Repo, item: GiteaWorkItem): void => {
+      if (item.type === 'issue') {
+        setSelectedGiteaItem({ repo, item, scope: makeGiteaScope(repo) })
+        return
+      }
+      handleUseGiteaItem(repo, item)
+    },
+    [handleUseGiteaItem, makeGiteaScope]
   )
 
   const handleCreateNewIssue = useCallback(async (): Promise<void> => {
@@ -9678,43 +9694,53 @@ export default function TaskPage(): React.JSX.Element {
               </div>
             )
           ) : taskSource === 'gitea' ? (
-            <GiteaTaskList
-              repos={selectedRepos}
-              makeScope={makeGiteaScope}
-              onUse={handleUseGiteaItem}
-              projectPicker={
-                <TaskProjectSourceCombobox
-                  groups={taskPickerGroups}
-                  selected={repoSelection}
-                  getRepoHostLabel={getTaskPickerRepoHostLabel}
-                  onChange={(next) => {
-                    const normalized = normalizeTaskRepoSelection(eligibleRepos, next)
-                    setRepoSelection(normalized)
-                    void updateSettings({ defaultRepoSelection: [...normalized] }).catch(() => {
-                      toast.error(
-                        translate(
-                          'auto.components.TaskPage.dfd72673e7',
-                          'Failed to save project selection.'
+            <>
+              <GiteaTaskList
+                repos={selectedRepos}
+                makeScope={makeGiteaScope}
+                onOpen={handleOpenGiteaItem}
+                projectPicker={
+                  <TaskProjectSourceCombobox
+                    groups={taskPickerGroups}
+                    selected={repoSelection}
+                    getRepoHostLabel={getTaskPickerRepoHostLabel}
+                    onChange={(next) => {
+                      const normalized = normalizeTaskRepoSelection(eligibleRepos, next)
+                      setRepoSelection(normalized)
+                      void updateSettings({ defaultRepoSelection: [...normalized] }).catch(() => {
+                        toast.error(
+                          translate(
+                            'auto.components.TaskPage.dfd72673e7',
+                            'Failed to save project selection.'
+                          )
                         )
-                      )
-                    })
-                  }}
-                  onSelectAll={() => {
-                    const allIds = new Set(taskPickerRepos.map((r) => r.id))
-                    setRepoSelection(allIds)
-                    void updateSettings({ defaultRepoSelection: null }).catch(() => {
-                      toast.error(
-                        translate(
-                          'auto.components.TaskPage.dfd72673e7',
-                          'Failed to save project selection.'
+                      })
+                    }}
+                    onSelectAll={() => {
+                      const allIds = new Set(taskPickerRepos.map((r) => r.id))
+                      setRepoSelection(allIds)
+                      void updateSettings({ defaultRepoSelection: null }).catch(() => {
+                        toast.error(
+                          translate(
+                            'auto.components.TaskPage.dfd72673e7',
+                            'Failed to save project selection.'
+                          )
                         )
-                      )
-                    })
-                  }}
-                  triggerClassName="h-8 w-full rounded-md border border-border/50 bg-muted/50 px-2 text-xs font-medium shadow-sm transition hover:bg-muted/50 focus:ring-2 focus:ring-ring/20 focus:outline-none"
-                />
-              }
-            />
+                      })
+                    }}
+                    triggerClassName="h-8 w-full rounded-md border border-border/50 bg-muted/50 px-2 text-xs font-medium shadow-sm transition hover:bg-muted/50 focus:ring-2 focus:ring-ring/20 focus:outline-none"
+                  />
+                }
+              />
+              <GiteaIssueWorkspace
+                selection={selectedGiteaItem}
+                onUse={(repo, item) => {
+                  setSelectedGiteaItem(null)
+                  handleUseGiteaItem(repo, item)
+                }}
+                onClose={() => setSelectedGiteaItem(null)}
+              />
+            </>
           ) : taskSource === 'linear' && selectedLinearIssue ? (
             <LinearIssueWorkspace
               issue={selectedLinearIssue}

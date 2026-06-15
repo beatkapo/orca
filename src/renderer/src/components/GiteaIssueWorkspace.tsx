@@ -1,0 +1,400 @@
+/* oxlint-disable react-doctor/no-adjust-state-on-prop-change -- Why: the detail
+   and comments are loaded from Gitea IPC for the selected work item, so local
+   state must reset when the selection prop changes (mirrors JiraIssueWorkspace). */
+import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  ArrowRight,
+  CircleDot,
+  Clipboard,
+  ExternalLink,
+  GitPullRequest,
+  LoaderCircle,
+  Send,
+  X
+} from 'lucide-react'
+import { toast } from 'sonner'
+import { VisuallyHidden } from 'radix-ui'
+import CommentMarkdown from '@/components/sidebar/CommentMarkdown'
+import { Button } from '@/components/ui/button'
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
+import { cn } from '@/lib/utils'
+import type { GiteaComment, GiteaIssue, GiteaWorkItem, Repo } from '../../../shared/types'
+import type { GiteaIssueScope } from '@/store/slices/gitea'
+import { translate } from '@/i18n/i18n'
+
+export type GiteaWorkspaceSelection = { repo: Repo; item: GiteaWorkItem; scope: GiteaIssueScope }
+
+type GiteaIssueWorkspaceProps = {
+  selection: GiteaWorkspaceSelection | null
+  onUse: (repo: Repo, item: GiteaWorkItem) => void
+  onClose: () => void
+}
+
+const relativeFormatter = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' })
+
+function formatRelativeTime(input: string): string {
+  const date = new Date(input)
+  if (Number.isNaN(date.getTime())) {
+    return 'recently'
+  }
+  const diffMinutes = Math.round((date.getTime() - Date.now()) / 60_000)
+  if (Math.abs(diffMinutes) < 60) {
+    return relativeFormatter.format(diffMinutes, 'minute')
+  }
+  const diffHours = Math.round(diffMinutes / 60)
+  if (Math.abs(diffHours) < 24) {
+    return relativeFormatter.format(diffHours, 'hour')
+  }
+  return relativeFormatter.format(Math.round(diffHours / 24), 'day')
+}
+
+async function copyText(text: string, label: string): Promise<void> {
+  try {
+    await window.api.ui.writeClipboardText(text)
+    toast.success(
+      translate('auto.components.GiteaIssueWorkspace.copied', '{{value0}} copied', {
+        value0: label
+      })
+    )
+  } catch {
+    toast.error(translate('auto.components.GiteaIssueWorkspace.copyFailed', 'Failed to copy.'))
+  }
+}
+
+export function GiteaIssueWorkspace({
+  selection,
+  onUse,
+  onClose
+}: GiteaIssueWorkspaceProps): React.JSX.Element {
+  const [detail, setDetail] = useState<GiteaIssue | null>(null)
+  const [comments, setComments] = useState<GiteaComment[]>([])
+  const [loading, setLoading] = useState(false)
+  const [commentDraft, setCommentDraft] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [statePending, setStatePending] = useState(false)
+  const [closed, setClosed] = useState(false)
+  const requestRef = useRef(0)
+
+  const item = selection?.item ?? null
+  const repo = selection?.repo ?? null
+  const scope = selection?.scope ?? null
+
+  useEffect(() => {
+    if (!selection || !item || !scope) {
+      return
+    }
+    requestRef.current += 1
+    const requestId = requestRef.current
+    const args = {
+      repoPath: scope.repoPath,
+      repoId: scope.repoId ?? null,
+      sourceContext: scope.sourceContext ?? null,
+      number: item.number
+    }
+    setDetail(null)
+    setComments([])
+    setCommentDraft('')
+    setClosed(item.state !== 'open')
+    setLoading(true)
+    void Promise.all([
+      window.api.gitea.issue(args) as Promise<GiteaIssue | null>,
+      window.api.gitea.issueComments(args) as Promise<GiteaComment[]>
+    ])
+      .then(([issue, fetchedComments]) => {
+        if (requestId !== requestRef.current) {
+          return
+        }
+        setDetail(issue)
+        if (issue) {
+          setClosed(issue.state !== 'open')
+        }
+        setComments(fetchedComments)
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (requestId === requestRef.current) {
+          setLoading(false)
+        }
+      })
+  }, [selection, item, scope])
+
+  const handleToggleState = useCallback(async (): Promise<void> => {
+    if (!scope || !item || statePending) {
+      return
+    }
+    const nextState = closed ? 'open' : 'closed'
+    setStatePending(true)
+    try {
+      const result = await window.api.gitea.updateIssue({
+        repoPath: scope.repoPath,
+        repoId: scope.repoId ?? null,
+        sourceContext: scope.sourceContext ?? null,
+        number: item.number,
+        updates: { state: nextState }
+      })
+      if (!result.ok) {
+        throw new Error(result.error)
+      }
+      setClosed(nextState === 'closed')
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : translate('auto.components.GiteaIssueWorkspace.updateFailed', 'Failed to update issue.')
+      )
+    } finally {
+      setStatePending(false)
+    }
+  }, [closed, item, scope, statePending])
+
+  const handleSubmitComment = useCallback(async (): Promise<void> => {
+    if (!scope || !item || submitting) {
+      return
+    }
+    const body = commentDraft.trim()
+    if (!body) {
+      return
+    }
+    setSubmitting(true)
+    try {
+      const result = await window.api.gitea.addIssueComment({
+        repoPath: scope.repoPath,
+        repoId: scope.repoId ?? null,
+        sourceContext: scope.sourceContext ?? null,
+        number: item.number,
+        body
+      })
+      if (!result.ok) {
+        throw new Error(result.error)
+      }
+      setComments((prev) => [
+        ...prev,
+        { id: Date.now(), body, createdAt: new Date().toISOString() }
+      ])
+      setCommentDraft('')
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : translate('auto.components.GiteaIssueWorkspace.commentFailed', 'Failed to add comment.')
+      )
+    } finally {
+      setSubmitting(false)
+    }
+  }, [commentDraft, item, scope, submitting])
+
+  const title = detail?.title ?? item?.title ?? ''
+  const body = detail?.body?.trim()
+  const labels = detail?.labels ?? item?.labels ?? []
+
+  return (
+    <Sheet open={selection !== null} onOpenChange={(open) => !open && onClose()}>
+      <SheetContent
+        side="right"
+        showCloseButton={false}
+        className="w-[min(92vw,780px)] p-0 sm:max-w-[780px]"
+        onOpenAutoFocus={(event) => event.preventDefault()}
+      >
+        <VisuallyHidden.Root asChild>
+          <SheetTitle>
+            {title || translate('auto.components.GiteaIssueWorkspace.title', 'Gitea item')}
+          </SheetTitle>
+        </VisuallyHidden.Root>
+        <VisuallyHidden.Root asChild>
+          <SheetDescription>
+            {translate(
+              'auto.components.GiteaIssueWorkspace.description',
+              'Preview and start work from the selected Gitea item.'
+            )}
+          </SheetDescription>
+        </VisuallyHidden.Root>
+
+        {selection && item && repo ? (
+          <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+            <div className="flex-none border-b border-border/50 bg-muted/30 px-4 py-3">
+              <div className="flex items-start gap-3">
+                <span className="mt-1 shrink-0 text-muted-foreground">
+                  {item.type === 'pull' ? (
+                    <GitPullRequest className="size-4" />
+                  ) : (
+                    <CircleDot className="size-4" />
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                    <span className="font-mono">#{item.number}</span>
+                    {item.serverName ? <span>{item.serverName}</span> : null}
+                    <span>{repo.displayName}</span>
+                    {loading ? <LoaderCircle className="size-3 animate-spin" /> : null}
+                  </div>
+                  <h2 className="mt-1 text-[20px] font-semibold leading-tight text-foreground">
+                    {title}
+                  </h2>
+                </div>
+                <Button onClick={() => onUse(repo, item)} className="shrink-0 gap-2" size="sm">
+                  {translate('auto.components.GiteaIssueWorkspace.start', 'Start workspace')}
+                  <ArrowRight className="size-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="shrink-0"
+                  onClick={onClose}
+                  aria-label={translate('auto.components.GiteaIssueWorkspace.close', 'Close')}
+                >
+                  <X className="size-4" />
+                </Button>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span
+                  className={cn(
+                    'rounded-full px-2 py-0.5 text-[11px] font-medium',
+                    closed
+                      ? 'bg-muted text-muted-foreground'
+                      : 'bg-status-success/15 text-status-success'
+                  )}
+                >
+                  {closed
+                    ? translate('auto.components.GiteaIssueWorkspace.closed', 'Closed')
+                    : translate('auto.components.GiteaIssueWorkspace.open', 'Open')}
+                </span>
+                {item.type === 'issue' ? (
+                  <Button
+                    variant="outline"
+                    size="xs"
+                    onClick={() => void handleToggleState()}
+                    disabled={statePending}
+                    className="gap-1"
+                  >
+                    {statePending ? <LoaderCircle className="size-3 animate-spin" /> : null}
+                    {closed
+                      ? translate('auto.components.GiteaIssueWorkspace.reopen', 'Reopen')
+                      : translate('auto.components.GiteaIssueWorkspace.markClosed', 'Close issue')}
+                  </Button>
+                ) : null}
+                {labels.map((label) => (
+                  <span
+                    key={label}
+                    className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
+                  >
+                    {label}
+                  </span>
+                ))}
+                <div className="ml-auto flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => window.api.shell.openUrl(item.url)}
+                    aria-label={translate(
+                      'auto.components.GiteaIssueWorkspace.openInGitea',
+                      'Open in Gitea'
+                    )}
+                  >
+                    <ExternalLink className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => void copyText(item.url, 'URL')}
+                    aria-label={translate(
+                      'auto.components.GiteaIssueWorkspace.copyUrl',
+                      'Copy URL'
+                    )}
+                  >
+                    <Clipboard className="size-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto scrollbar-sleek">
+              <section className="border-b border-border/40 px-4 py-4">
+                {body ? (
+                  <CommentMarkdown content={body} className="text-[14px] leading-relaxed" />
+                ) : (
+                  <p className="text-sm italic text-muted-foreground">
+                    {translate(
+                      'auto.components.GiteaIssueWorkspace.noDescription',
+                      'No description provided.'
+                    )}
+                  </p>
+                )}
+              </section>
+              <section className="px-4 py-4">
+                <div className="mb-3 text-[13px] font-medium text-foreground">
+                  {translate('auto.components.GiteaIssueWorkspace.comments', 'Comments')}
+                  {comments.length > 0 ? (
+                    <span className="ml-2 text-[12px] text-muted-foreground">
+                      {comments.length}
+                    </span>
+                  ) : null}
+                </div>
+                {comments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {translate(
+                      'auto.components.GiteaIssueWorkspace.noComments',
+                      'No comments yet.'
+                    )}
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {comments.map((comment) => (
+                      <div
+                        key={comment.id}
+                        className="rounded-md border border-border/50 bg-muted/20"
+                      >
+                        <div className="flex min-w-0 items-center gap-2 border-b border-border/40 px-3 py-2">
+                          <span className="truncate text-[13px] font-semibold text-foreground">
+                            {comment.user?.login ??
+                              translate('auto.components.GiteaIssueWorkspace.unknown', 'Unknown')}
+                          </span>
+                          <span className="shrink-0 text-[12px] text-muted-foreground">
+                            {formatRelativeTime(comment.createdAt)}
+                          </span>
+                        </div>
+                        <div className="px-3 py-2">
+                          <CommentMarkdown
+                            content={comment.body}
+                            className="text-[13px] leading-relaxed"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
+
+            <div className="flex-none border-t border-border/50 bg-background px-3 py-3">
+              <div className="flex gap-2">
+                <textarea
+                  value={commentDraft}
+                  onChange={(event) => setCommentDraft(event.target.value)}
+                  placeholder={translate(
+                    'auto.components.GiteaIssueWorkspace.addComment',
+                    'Add a comment...'
+                  )}
+                  rows={2}
+                  disabled={submitting}
+                  className="min-h-10 flex-1 resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                />
+                <Button
+                  onClick={() => void handleSubmitComment()}
+                  disabled={!commentDraft.trim() || submitting}
+                  className="self-end gap-2"
+                >
+                  {submitting ? (
+                    <LoaderCircle className="size-4 animate-spin" />
+                  ) : (
+                    <Send className="size-4" />
+                  )}
+                  {translate('auto.components.GiteaIssueWorkspace.comment', 'Comment')}
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </SheetContent>
+    </Sheet>
+  )
+}

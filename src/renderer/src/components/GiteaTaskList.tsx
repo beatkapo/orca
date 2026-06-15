@@ -12,7 +12,7 @@ type GiteaTypeFilter = 'all' | 'issue' | 'pull'
 type GiteaTaskListProps = {
   repos: Repo[]
   makeScope: (repo: Repo) => GiteaIssueScope
-  onUse: (repo: Repo, item: GiteaWorkItem) => void
+  onOpen: (repo: Repo, item: GiteaWorkItem) => void
   projectPicker?: React.ReactNode
 }
 
@@ -59,7 +59,7 @@ function stateLabel(item: GiteaWorkItem): string {
 export function GiteaTaskList({
   repos,
   makeScope,
-  onUse,
+  onOpen,
   projectPicker
 }: GiteaTaskListProps): React.JSX.Element {
   const fetchGiteaWorkItems = useAppStore((s) => s.fetchGiteaWorkItems)
@@ -189,7 +189,7 @@ export function GiteaTaskList({
               <button
                 key={`${repo.id}:${item.type}:${item.number}`}
                 type="button"
-                onClick={() => onUse(repo, item)}
+                onClick={() => onOpen(repo, item)}
                 className="flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/60"
               >
                 <span className="mt-0.5 shrink-0 text-muted-foreground">
