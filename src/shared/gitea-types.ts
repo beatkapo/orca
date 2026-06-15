@@ -127,3 +127,62 @@ export type GiteaCreateIssueResult =
   | { ok: false; error: string }
 
 export type GiteaMutationResult = { ok: true } | { ok: false; error: string }
+
+// ─── Pull request review ───────────────────────────────────────────────
+
+export type GiteaMergeMethod = 'merge' | 'rebase' | 'squash'
+
+export type GiteaPullRequestDetail = {
+  number: number
+  title: string
+  body?: string
+  state: 'open' | 'closed' | 'merged' | 'draft'
+  url: string
+  author?: GiteaUser
+  headBranch: string
+  baseBranch: string
+  headSha: string
+  baseSha: string
+  mergeable: boolean
+  merged: boolean
+  additions?: number
+  deletions?: number
+  changedFiles?: number
+  comments: number
+  updatedAt: string
+  createdAt: string
+}
+
+export type GiteaPRFileStatus = 'added' | 'modified' | 'deleted' | 'renamed' | 'copied' | 'changed'
+
+export type GiteaPRFile = {
+  path: string
+  oldPath?: string
+  status: GiteaPRFileStatus
+  additions: number
+  deletions: number
+}
+
+export type GiteaPRFileContents = {
+  original: string
+  modified: string
+  originalIsBinary: boolean
+  modifiedIsBinary: boolean
+}
+
+export type GiteaPRCheck = {
+  context: string
+  state: 'success' | 'failure' | 'pending' | 'error' | 'warning'
+  targetUrl?: string
+  description?: string
+}
+
+// A pull-request review thread comment anchored to a diff line.
+export type GiteaPRReviewComment = {
+  id: number
+  body: string
+  path: string
+  line: number
+  createdAt: string
+  user?: GiteaUser
+}

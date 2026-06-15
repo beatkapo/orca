@@ -81,7 +81,13 @@ import type {
   GiteaIssue,
   GiteaIssueUpdate,
   GiteaLabel,
+  GiteaMergeMethod,
   GiteaMutationResult,
+  GiteaPRCheck,
+  GiteaPRFile,
+  GiteaPRFileContents,
+  GiteaPRFileStatus,
+  GiteaPullRequestDetail,
   GiteaUser,
   GiteaViewer,
   GiteaWorkItem,
@@ -1747,6 +1753,41 @@ export type PreloadApi = {
       repoId?: string | null
       sourceContext?: TaskSourceContext | null
     }) => Promise<GiteaUser[]>
+    prDetail: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: TaskSourceContext | null
+      number: number
+    }) => Promise<GiteaPullRequestDetail | null>
+    prFiles: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: TaskSourceContext | null
+      number: number
+    }) => Promise<GiteaPRFile[]>
+    prFileContents: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: TaskSourceContext | null
+      path: string
+      oldPath?: string
+      status: GiteaPRFileStatus
+      baseSha: string
+      headSha: string
+    }) => Promise<GiteaPRFileContents>
+    prChecks: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: TaskSourceContext | null
+      headSha: string
+    }) => Promise<GiteaPRCheck[]>
+    prMerge: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: TaskSourceContext | null
+      number: number
+      method?: GiteaMergeMethod
+    }) => Promise<GiteaMutationResult>
     createIssue: (args: {
       repoPath: string
       repoId?: string | null

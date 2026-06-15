@@ -1559,6 +1559,47 @@ const api = {
       sourceContext?: unknown
     }): Promise<unknown[]> => ipcRenderer.invoke('gitea:assignees', args),
 
+    prDetail: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+      number: number
+    }): Promise<unknown> => ipcRenderer.invoke('gitea:prDetail', args),
+
+    prFiles: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+      number: number
+    }): Promise<unknown[]> => ipcRenderer.invoke('gitea:prFiles', args),
+
+    prFileContents: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+      path: string
+      oldPath?: string
+      status: string
+      baseSha: string
+      headSha: string
+    }): Promise<unknown> => ipcRenderer.invoke('gitea:prFileContents', args),
+
+    prChecks: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+      headSha: string
+    }): Promise<unknown[]> => ipcRenderer.invoke('gitea:prChecks', args),
+
+    prMerge: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+      number: number
+      method?: string
+    }): Promise<{ ok: true } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('gitea:prMerge', args),
+
     createIssue: (args: {
       repoPath: string
       repoId?: string | null

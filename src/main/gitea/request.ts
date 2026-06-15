@@ -103,6 +103,32 @@ export function giteaRepoGet<T>(
   return giteaGetJsonAtBase<T>(auth.apiBaseUrl, path, { ...options, token: auth.token })
 }
 
+// Repo-scoped authenticated GET that returns the raw response text (e.g. the
+// raw file content endpoint used to build PR diffs). Returns null on non-2xx.
+export async function giteaRepoGetText(
+  repo: GiteaRepoRef,
+  path: string,
+  options: Omit<GiteaReadOptions, 'token'> = {}
+): Promise<string | null> {
+  const auth = resolveGiteaAuth(repo)
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+  try {
+    const response = await fetch(giteaApiUrl(auth.apiBaseUrl, path, options.searchParams), {
+      headers: auth.token ? { Authorization: `token ${auth.token}` } : {},
+      signal: controller.signal
+    })
+    if (!response.ok) {
+      return null
+    }
+    return await response.text()
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 async function readGiteaError(response: Response): Promise<string> {
   try {
     const data = (await response.json()) as { message?: string; errors?: string[] }
