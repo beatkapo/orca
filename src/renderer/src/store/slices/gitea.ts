@@ -4,10 +4,11 @@ import type { CacheEntry } from './github'
 import type {
   GiteaConnectionStatus,
   GiteaIssue,
-  GiteaIssueFilter,
   GiteaIssueUpdate,
   GiteaMutationResult,
-  GiteaServerSelection
+  GiteaServerSelection,
+  GiteaWorkItem,
+  GiteaWorkItemFilter
 } from '../../../../shared/types'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
 
@@ -28,7 +29,7 @@ export type GiteaIssueScope = {
 export type GiteaSlice = {
   giteaStatus: GiteaConnectionStatus | null
   giteaStatusLoaded: boolean
-  giteaIssues: Record<string, CacheEntry<GiteaIssue[]>>
+  giteaWorkItems: Record<string, CacheEntry<GiteaWorkItem[]>>
   giteaIssueDetail: Record<string, CacheEntry<GiteaIssue | null>>
   refreshGiteaStatus: () => Promise<GiteaConnectionStatus | null>
   giteaConnect: (args: {
@@ -38,11 +39,11 @@ export type GiteaSlice = {
   giteaDisconnect: (serverId?: string) => Promise<void>
   giteaSelectServer: (serverId: GiteaServerSelection) => Promise<GiteaConnectionStatus | null>
   giteaTestConnection: (serverId?: string) => Promise<{ ok: boolean; error?: string }>
-  fetchGiteaIssues: (
+  fetchGiteaWorkItems: (
     scope: GiteaIssueScope,
-    filter?: GiteaIssueFilter,
+    filter?: GiteaWorkItemFilter,
     limit?: number
-  ) => Promise<GiteaIssue[]>
+  ) => Promise<GiteaWorkItem[]>
   fetchGiteaIssue: (scope: GiteaIssueScope, issueNumber: number) => Promise<GiteaIssue | null>
   createGiteaIssue: (
     scope: GiteaIssueScope,
@@ -96,7 +97,7 @@ function requestArgs(scope: GiteaIssueScope): {
 export const createGiteaSlice: StateCreator<AppState, [], [], GiteaSlice> = (set, get) => ({
   giteaStatus: null,
   giteaStatusLoaded: false,
-  giteaIssues: {},
+  giteaWorkItems: {},
   giteaIssueDetail: {},
 
   refreshGiteaStatus: async () => {
@@ -136,24 +137,24 @@ export const createGiteaSlice: StateCreator<AppState, [], [], GiteaSlice> = (set
     return result.ok ? { ok: true } : { ok: false, error: result.error }
   },
 
-  fetchGiteaIssues: async (scope, filter, limit) => {
+  fetchGiteaWorkItems: async (scope, filter, limit) => {
     const key = `${scopeKey(scope)}:${filter ?? 'all'}`
-    const cached = get().giteaIssues[key]
+    const cached = get().giteaWorkItems[key]
     if (isFresh(cached) && cached.data) {
       return cached.data
     }
-    const issues = (await window.api.gitea.listIssues({
+    const items = (await window.api.gitea.listWorkItems({
       ...requestArgs(scope),
       filter,
       limit
-    })) as GiteaIssue[]
+    })) as GiteaWorkItem[]
     set((state) => ({
-      giteaIssues: evictStale({
-        ...state.giteaIssues,
-        [key]: { data: issues, fetchedAt: Date.now() }
+      giteaWorkItems: evictStale({
+        ...state.giteaWorkItems,
+        [key]: { data: items, fetchedAt: Date.now() }
       })
     }))
-    return issues
+    return items
   },
 
   fetchGiteaIssue: async (scope, issueNumber) => {
@@ -180,8 +181,8 @@ export const createGiteaSlice: StateCreator<AppState, [], [], GiteaSlice> = (set
     if (result.ok) {
       // Invalidate cached lists for this repo so the new issue appears.
       set((state) => ({
-        giteaIssues: Object.fromEntries(
-          Object.entries(state.giteaIssues).filter(
+        giteaWorkItems: Object.fromEntries(
+          Object.entries(state.giteaWorkItems).filter(
             ([key]) => !key.startsWith(`${scopeKey(scope)}:`)
           )
         )

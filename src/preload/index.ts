@@ -1525,13 +1525,13 @@ const api = {
     }): Promise<{ ok: true; viewer: unknown } | { ok: false; error: string }> =>
       ipcRenderer.invoke('gitea:testConnection', args),
 
-    listIssues: (args: {
+    listWorkItems: (args: {
       repoPath: string
       repoId?: string | null
       sourceContext?: unknown
       filter?: 'assigned' | 'created' | 'all' | 'closed'
       limit?: number
-    }): Promise<unknown[]> => ipcRenderer.invoke('gitea:listIssues', args),
+    }): Promise<unknown[]> => ipcRenderer.invoke('gitea:listWorkItems', args),
 
     issue: (args: {
       repoPath: string

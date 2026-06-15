@@ -70,6 +70,30 @@ export type GiteaIssue = {
   createdAt: string
 }
 
+// Unified Tasks-page row covering both issues and pull requests, mirroring
+// GitHubWorkItem so the Gitea source lists issues and PRs together.
+export type GiteaWorkItem = {
+  id: number
+  type: 'issue' | 'pull'
+  number: number
+  serverId?: string
+  serverName?: string
+  repoOwner: string
+  repoName: string
+  title: string
+  state: 'open' | 'closed' | 'merged'
+  url: string
+  labels: string[]
+  author?: GiteaUser
+  comments: number
+  // Pull-request only: set when the PR is a draft.
+  draft?: boolean
+  updatedAt: string
+  createdAt: string
+}
+
+export type GiteaWorkItemFilter = 'assigned' | 'created' | 'all' | 'closed'
+
 export type GiteaComment = {
   id: number
   body: string

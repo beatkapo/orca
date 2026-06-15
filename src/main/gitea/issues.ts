@@ -2,9 +2,10 @@ import type {
   GiteaComment,
   GiteaCreateIssueResult,
   GiteaIssue,
-  GiteaIssueFilter,
   GiteaIssueUpdate,
-  GiteaMutationResult
+  GiteaMutationResult,
+  GiteaWorkItem,
+  GiteaWorkItemFilter
 } from '../../shared/gitea-types'
 import { getGiteaRepoRef, type GiteaRepoRef } from './repository-ref'
 import { encodedRepoPath, giteaRepoGet, giteaRepoWrite, type GiteaSearchParams } from './request'
@@ -13,6 +14,7 @@ import {
   isGiteaPullRequest,
   mapGiteaComment,
   mapGiteaIssue,
+  mapGiteaWorkItem,
   type GiteaIssueContext,
   type RawGiteaComment,
   type RawGiteaIssue
@@ -38,28 +40,30 @@ function issueContext(repo: GiteaRepoRef): GiteaIssueContext {
   }
 }
 
-// Maps a task-source filter to Gitea issue query params. `type=issues` excludes
-// pull requests server-side; the mapper still drops any that slip through.
-function filterParams(filter: GiteaIssueFilter | undefined): GiteaSearchParams {
+// Maps a task-source filter to Gitea /issues query params. No `type` filter is
+// set so the endpoint returns both issues and pull requests as work items.
+function filterParams(filter: GiteaWorkItemFilter | undefined): GiteaSearchParams {
   switch (filter) {
     case 'assigned':
-      return { type: 'issues', state: 'open', assigned: 'true' }
+      return { state: 'open', assigned: 'true' }
     case 'created':
-      return { type: 'issues', state: 'open', created: 'true' }
+      return { state: 'open', created: 'true' }
     case 'closed':
-      return { type: 'issues', state: 'closed' }
+      return { state: 'closed' }
     case 'all':
     case undefined:
-      return { type: 'issues', state: 'all' }
+      return { state: 'all' }
   }
 }
 
-export async function listGiteaIssues(
+// Lists issues and pull requests together as unified work items, matching the
+// GitHub/GitLab Tasks model.
+export async function listGiteaWorkItems(
   repoPath: string,
-  filter?: GiteaIssueFilter,
+  filter?: GiteaWorkItemFilter,
   limit?: number,
   connectionId?: string | null
-): Promise<GiteaIssue[]> {
+): Promise<GiteaWorkItem[]> {
   const repo = await getGiteaRepoRef(repoPath, connectionId)
   if (!repo) {
     return []
@@ -72,9 +76,8 @@ export async function listGiteaIssues(
   }
   const context = issueContext(repo)
   return raw
-    .filter((entry) => !isGiteaPullRequest(entry))
-    .map((entry) => mapGiteaIssue(entry, context))
-    .filter((issue): issue is GiteaIssue => issue !== null)
+    .map((entry) => mapGiteaWorkItem(entry, context))
+    .filter((item): item is GiteaWorkItem => item !== null)
 }
 
 export async function getGiteaIssue(

@@ -35,7 +35,7 @@ import {
   addGiteaIssueComment,
   createGiteaIssue,
   getGiteaIssue,
-  listGiteaIssues,
+  listGiteaWorkItems,
   updateGiteaIssue
 } from './issues'
 
@@ -56,26 +56,28 @@ beforeEach(() => {
 })
 
 describe('gitea issues', () => {
-  it('lists issues, dropping pull requests and stamping the server', async () => {
+  it('lists issues and pull requests as unified work items, stamping the server', async () => {
     getMock.mockResolvedValue([
       { id: 1, number: 1, title: 'Bug', state: 'open' },
-      { id: 2, number: 2, title: 'A PR', state: 'open', pull_request: { merged: false } }
+      { id: 2, number: 2, title: 'A PR', state: 'closed', pull_request: { merged: true } }
     ])
 
-    const issues = await listGiteaIssues('/repo', 'all', 30, null)
+    const items = await listGiteaWorkItems('/repo', 'all', 30, null)
 
-    expect(issues).toHaveLength(1)
-    expect(issues[0]).toMatchObject({ number: 1, title: 'Bug', serverId: 'srv1' })
+    expect(items).toHaveLength(2)
+    expect(items[0]).toMatchObject({ number: 1, type: 'issue', state: 'open', serverId: 'srv1' })
+    expect(items[1]).toMatchObject({ number: 2, type: 'pull', state: 'merged' })
     const [, path, options] = getMock.mock.calls[0]
     expect(path).toBe('/repos/team/app/issues')
-    expect(options?.searchParams).toMatchObject({ type: 'issues', state: 'all', limit: 30 })
+    // No `type` filter so both issues and PRs come back.
+    expect(options?.searchParams).toMatchObject({ state: 'all', limit: 30 })
+    expect(options?.searchParams).not.toHaveProperty('type')
   })
 
   it('maps assigned filter to the Gitea query params', async () => {
     getMock.mockResolvedValue([])
-    await listGiteaIssues('/repo', 'assigned', 10, null)
+    await listGiteaWorkItems('/repo', 'assigned', 10, null)
     expect(getMock.mock.calls[0][2]?.searchParams).toMatchObject({
-      type: 'issues',
       state: 'open',
       assigned: 'true'
     })

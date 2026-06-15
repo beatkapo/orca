@@ -79,10 +79,11 @@ import type {
   GiteaConnectionStatus,
   GiteaCreateIssueResult,
   GiteaIssue,
-  GiteaIssueFilter,
   GiteaIssueUpdate,
   GiteaMutationResult,
   GiteaViewer,
+  GiteaWorkItem,
+  GiteaWorkItemFilter,
   JiraComment,
   JiraConnectionStatus,
   JiraCreateField,
@@ -1715,13 +1716,13 @@ export type PreloadApi = {
     testConnection: (args?: {
       serverId?: string
     }) => Promise<{ ok: true; viewer: GiteaViewer } | { ok: false; error: string }>
-    listIssues: (args: {
+    listWorkItems: (args: {
       repoPath: string
       repoId?: string | null
       sourceContext?: TaskSourceContext | null
-      filter?: GiteaIssueFilter
+      filter?: GiteaWorkItemFilter
       limit?: number
-    }) => Promise<GiteaIssue[]>
+    }) => Promise<GiteaWorkItem[]>
     issue: (args: {
       repoPath: string
       repoId?: string | null

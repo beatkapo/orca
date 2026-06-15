@@ -1,4 +1,4 @@
-import type { GiteaComment, GiteaIssue, GiteaUser } from '../../shared/gitea-types'
+import type { GiteaComment, GiteaIssue, GiteaUser, GiteaWorkItem } from '../../shared/gitea-types'
 
 export type RawGiteaUser = {
   id?: number
@@ -28,7 +28,7 @@ export type RawGiteaIssue = {
   created_at?: string | null
   updated_at?: string | null
   // Present (non-null) when the /issues endpoint returns a pull request.
-  pull_request?: unknown | null
+  pull_request?: { merged?: boolean | null; draft?: boolean | null } | null
 }
 
 export type RawGiteaComment = {
@@ -101,6 +101,39 @@ export function mapGiteaIssue(raw: RawGiteaIssue, context: GiteaIssueContext): G
     author: mapGiteaUser(raw.user),
     milestone: raw.milestone?.title?.trim() || undefined,
     comments: typeof raw.comments === 'number' ? raw.comments : 0,
+    updatedAt: raw.updated_at ?? '',
+    createdAt: raw.created_at ?? ''
+  }
+}
+
+// Maps a raw /issues entry (which may be an issue or a pull request) to a
+// unified work item, tagging the type and merged/draft state from pull_request.
+export function mapGiteaWorkItem(
+  raw: RawGiteaIssue,
+  context: GiteaIssueContext
+): GiteaWorkItem | null {
+  if (typeof raw.id !== 'number' || typeof raw.number !== 'number') {
+    return null
+  }
+  const isPull = isGiteaPullRequest(raw)
+  const closed = raw.state === 'closed'
+  const state: GiteaWorkItem['state'] =
+    isPull && closed && raw.pull_request?.merged ? 'merged' : closed ? 'closed' : 'open'
+  return {
+    id: raw.id,
+    type: isPull ? 'pull' : 'issue',
+    number: raw.number,
+    serverId: context.serverId,
+    serverName: context.serverName,
+    repoOwner: context.owner,
+    repoName: context.repo,
+    title: raw.title?.trim() ?? '',
+    state,
+    url: raw.html_url ?? '',
+    labels: mapLabelNames(raw.labels),
+    author: mapGiteaUser(raw.user),
+    comments: typeof raw.comments === 'number' ? raw.comments : 0,
+    ...(isPull && raw.pull_request?.draft ? { draft: true } : {}),
     updatedAt: raw.updated_at ?? '',
     createdAt: raw.created_at ?? ''
   }

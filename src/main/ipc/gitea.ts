@@ -4,9 +4,9 @@ import { getRepoExecutionHostId } from '../../shared/execution-host'
 import type { TaskSourceContext } from '../../shared/task-source-context'
 import type {
   GiteaConnectArgs,
-  GiteaIssueFilter,
   GiteaIssueUpdate,
   GiteaServerSelection,
+  GiteaWorkItemFilter,
   Repo
 } from '../../shared/types'
 import { connect, disconnect, getStatus, selectServer, testConnection } from '../gitea/connect'
@@ -15,13 +15,13 @@ import {
   createGiteaIssue,
   getGiteaIssue,
   listGiteaIssueComments,
-  listGiteaIssues,
+  listGiteaWorkItems,
   updateGiteaIssue
 } from '../gitea/issues'
 import type { Store } from '../persistence'
 import { _resetPreflightCache } from './preflight'
 
-const VALID_FILTERS = new Set<GiteaIssueFilter>(['assigned', 'created', 'all', 'closed'])
+const VALID_FILTERS = new Set<GiteaWorkItemFilter>(['assigned', 'created', 'all', 'closed'])
 
 type GiteaRepoSelectorArgs = {
   repoPath: string
@@ -147,13 +147,16 @@ export function registerGiteaHandlers(store: Store): void {
   })
 
   ipcMain.handle(
-    'gitea:listIssues',
-    async (_event, args: GiteaRepoSelectorArgs & { filter?: GiteaIssueFilter; limit?: number }) => {
+    'gitea:listWorkItems',
+    async (
+      _event,
+      args: GiteaRepoSelectorArgs & { filter?: GiteaWorkItemFilter; limit?: number }
+    ) => {
       const repo = assertRegisteredRepo(args, store)
-      const filter = VALID_FILTERS.has(args?.filter as GiteaIssueFilter)
-        ? (args.filter as GiteaIssueFilter)
+      const filter = VALID_FILTERS.has(args?.filter as GiteaWorkItemFilter)
+        ? (args.filter as GiteaWorkItemFilter)
         : undefined
-      return listGiteaIssues(repo.path, filter, clampLimit(args.limit), repoConnectionId(repo))
+      return listGiteaWorkItems(repo.path, filter, clampLimit(args.limit), repoConnectionId(repo))
     }
   )
 

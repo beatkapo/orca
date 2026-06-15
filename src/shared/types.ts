@@ -1694,7 +1694,9 @@ export type {
   GiteaServer,
   GiteaServerSelection,
   GiteaUser,
-  GiteaViewer
+  GiteaViewer,
+  GiteaWorkItem,
+  GiteaWorkItemFilter
 } from './gitea-types'
 
 /**
