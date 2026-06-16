@@ -82,8 +82,8 @@ export function GlpiTaskIntegrationCard(): React.JSX.Element {
         connected
           ? translate(
               'auto.components.settings.glpi.integration.card.9639e2d7f3',
-              '{{value0}} server{{value1}} connected',
-              { value0: serverCount, value1: serverCount === 1 ? '' : 's' }
+              '{{value0}} server(s) connected',
+              { value0: serverCount }
             )
           : checking
             ? translate(

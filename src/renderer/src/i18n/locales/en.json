@@ -7891,7 +7891,7 @@
               "3907210261": "Verified",
               "e65c56123e": "Connect a GLPI server with an application token and your user API token. Credentials are sent to the selected remote runtime and stored there with runtime-supported encryption.",
               "4464e319b9": "Connect a GLPI server with an application token and your user API token. Credentials are stored locally and encrypted when local runtime storage supports it.",
-              "9639e2d7f3": "{{value0}} server{{value1}} connected",
+              "9639e2d7f3": "{{value0}} server(s) connected",
               "55adcb030c": "Checking GLPI access before showing setup actions.",
               "de87f5c922": "Browse, create, and start work from GLPI tickets.",
               "30dcdc6acc": "Add server",
