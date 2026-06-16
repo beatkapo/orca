@@ -21,7 +21,8 @@ describe('task providers', () => {
       'gitlab',
       'linear',
       'jira',
-      'gitea'
+      'gitea',
+      'glpi'
     ])
   })
 

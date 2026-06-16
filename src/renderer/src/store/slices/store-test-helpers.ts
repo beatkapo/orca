@@ -22,6 +22,7 @@ import { createLinearSlice } from './linear'
 import { createPreflightSlice } from './preflight'
 import { createJiraSlice } from './jira'
 import { createGiteaSlice } from './gitea'
+import { createGlpiSlice } from './glpi'
 import { createEditorSlice } from './editor'
 import { createStatsSlice } from './stats'
 import { createMemorySlice } from './memory'
@@ -67,6 +68,7 @@ export function createTestStore() {
     ...createPreflightSlice(...a),
     ...createJiraSlice(...a),
     ...createGiteaSlice(...a),
+    ...createGlpiSlice(...a),
     ...createEditorSlice(...a),
     ...createStatsSlice(...a),
     ...createMemorySlice(...a),

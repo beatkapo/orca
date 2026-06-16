@@ -46,12 +46,19 @@ export type GiteaTaskProviderIdentity = {
   repo?: string | null
 }
 
+export type GlpiTaskProviderIdentity = {
+  provider: 'glpi'
+  serverId?: string | null
+  serverUrl?: string | null
+}
+
 export type TaskProviderIdentity =
   | GitHubTaskProviderIdentity
   | GitLabTaskProviderIdentity
   | LinearTaskProviderIdentity
   | JiraTaskProviderIdentity
   | GiteaTaskProviderIdentity
+  | GlpiTaskProviderIdentity
 
 export type TaskSourceContext = {
   kind: 'task-source'
@@ -193,6 +200,7 @@ function normalizeTaskProvider(value: string): TaskProvider | null {
     case 'linear':
     case 'jira':
     case 'gitea':
+    case 'glpi':
       return value
     default:
       return null
@@ -231,6 +239,8 @@ function providerIdentityCachePart(identity: TaskProviderIdentity | null | undef
       return [identity.serverId ?? identity.baseUrl, identity.owner, identity.repo]
         .filter(Boolean)
         .join('/')
+    case 'glpi':
+      return identity.serverId ?? identity.serverUrl ?? ''
   }
 }
 

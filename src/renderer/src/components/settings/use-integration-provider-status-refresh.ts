@@ -11,9 +11,12 @@ export function useIntegrationProviderStatusRefresh(): void {
   const linearStatusContextKey = useAppStore((s) => s.linearStatusContextKey)
   const jiraStatusChecked = useAppStore((s) => s.jiraStatusChecked)
   const jiraStatusContextKey = useAppStore((s) => s.jiraStatusContextKey)
+  const glpiStatusChecked = useAppStore((s) => s.glpiStatusChecked)
+  const glpiStatusContextKey = useAppStore((s) => s.glpiStatusContextKey)
   const giteaStatusLoaded = useAppStore((s) => s.giteaStatusLoaded)
   const checkLinearConnection = useAppStore((s) => s.checkLinearConnection)
   const checkJiraConnection = useAppStore((s) => s.checkJiraConnection)
+  const checkGlpiConnection = useAppStore((s) => s.checkGlpiConnection)
   const refreshGiteaStatus = useAppStore((s) => s.refreshGiteaStatus)
   const refreshPreflightStatus = useAppStore((s) => s.refreshPreflightStatus)
   const expectedPreflightContextKey = useAppStore((s) =>
@@ -23,6 +26,7 @@ export function useIntegrationProviderStatusRefresh(): void {
   const preflightStatusCurrent = preflightStatusContextKey === expectedPreflightContextKey
   const linearStatusCurrent = linearStatusContextKey === providerRuntimeContextKey
   const jiraStatusCurrent = jiraStatusContextKey === providerRuntimeContextKey
+  const glpiStatusCurrent = glpiStatusContextKey === providerRuntimeContextKey
 
   useEffect(() => {
     if (!linearStatusCurrent || !linearStatusChecked) {
@@ -30,6 +34,9 @@ export function useIntegrationProviderStatusRefresh(): void {
     }
     if (!jiraStatusCurrent || !jiraStatusChecked) {
       void checkJiraConnection()
+    }
+    if (!glpiStatusCurrent || !glpiStatusChecked) {
+      void checkGlpiConnection()
     }
     if (!preflightStatusCurrent || !preflightStatusChecked) {
       void refreshPreflightStatus()
@@ -40,8 +47,12 @@ export function useIntegrationProviderStatusRefresh(): void {
       void refreshGiteaStatus()
     }
   }, [
+    checkGlpiConnection,
     checkJiraConnection,
     checkLinearConnection,
+    glpiStatusChecked,
+    glpiStatusCurrent,
+    glpiStatusContextKey,
     giteaStatusLoaded,
     refreshGiteaStatus,
     jiraStatusChecked,

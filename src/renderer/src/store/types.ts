@@ -12,6 +12,7 @@ import type { LinearSlice } from './slices/linear'
 import type { PreflightSlice } from './slices/preflight'
 import type { JiraSlice } from './slices/jira'
 import type { GiteaSlice } from './slices/gitea'
+import type { GlpiSlice } from './slices/glpi'
 import type { EditorSlice } from './slices/editor'
 import type { StatsSlice } from './slices/stats'
 import type { MemorySlice } from './slices/memory'
@@ -46,6 +47,7 @@ export type AppState = RepoSlice &
   PreflightSlice &
   JiraSlice &
   GiteaSlice &
+  GlpiSlice &
   EditorSlice &
   StatsSlice &
   MemorySlice &

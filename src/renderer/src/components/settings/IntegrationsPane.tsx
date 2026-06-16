@@ -7,6 +7,7 @@ import {
 } from './source-control-integration-cards'
 import {
   GiteaTaskIntegrationCard,
+  GlpiTaskIntegrationCard,
   JiraIntegrationCard,
   LinearIntegrationCard
 } from './task-tracker-integration-cards'
@@ -56,6 +57,7 @@ export function IntegrationsPane(): React.JSX.Element {
           <LinearIntegrationCard />
           <JiraIntegrationCard />
           <GiteaTaskIntegrationCard />
+          <GlpiTaskIntegrationCard />
         </div>
       </section>
     </div>

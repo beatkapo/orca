@@ -221,6 +221,8 @@ function getAutomationSourceProviderLabel(provider: TaskSourceContext['provider'
       return 'Jira'
     case 'gitea':
       return 'Gitea'
+    case 'glpi':
+      return 'GLPI'
   }
 }
 

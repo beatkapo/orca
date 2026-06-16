@@ -43,6 +43,8 @@ function getProviderLabel(provider: TaskSourceContext['provider']): string {
       return 'Jira'
     case 'gitea':
       return 'Gitea'
+    case 'glpi':
+      return 'GLPI'
   }
 }
 
@@ -64,6 +66,8 @@ function getSourceIdentityLabel(sourceContext: TaskSourceContext): string | null
         return identity.owner && identity.repo
           ? `${identity.owner}/${identity.repo}`
           : (identity.baseUrl ?? null)
+      case 'glpi':
+        return identity.serverUrl ?? identity.serverId ?? null
     }
   }
   return sourceContext.accountLabel ?? sourceContext.repoId ?? null
