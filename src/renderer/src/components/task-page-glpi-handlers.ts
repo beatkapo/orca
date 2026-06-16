@@ -2,43 +2,23 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 
 import { useAppStore } from '@/store'
-import { getLinkedWorkItemSuggestedName } from '../../../shared/workspace-name'
 import {
   normalizeTaskSourceContext,
   type TaskSourceContext
 } from '../../../shared/task-source-context'
 import type { ExecutionHostScope } from '../../../shared/execution-host'
-import type { GlpiServer, GlpiTicket, GlpiTicketFilter, TaskProvider } from '../../../shared/types'
+import type { GlpiServer, GlpiTicket, TaskProvider } from '../../../shared/types'
 import type { LinkedWorkItemSummary } from '@/lib/new-workspace'
 import { findTaskPageGlpiTicket } from '@/components/task-page-glpi-cache-selectors'
+import { getGlpiTicketWorkspaceSeed } from '@/components/task-page-glpi-presentation'
 import type { GlpiPresetId } from '@/components/task-page-localized-options'
+import {
+  useGlpiWorkItemFilters,
+  type GlpiAdvancedFilters,
+  type GlpiTypeFilter
+} from '@/components/task-page-glpi-filters'
 
 const GLPI_ITEM_LIMIT = 50
-
-// Why: GLPI tickets carry no git-repo identity, so the workspace seed is built
-// from the numeric ticket id plus its title — mirroring getJiraIssueWorkspaceSeed
-// but keyed on the GLPI `glpi-<id>` identifier instead of a string issue key.
-export function getGlpiTicketWorkspaceSeed(ticket: GlpiTicket): string {
-  const seed = getLinkedWorkItemSuggestedName({ title: ticket.title })
-  return seed || `glpi-${ticket.id}`
-}
-
-// Why: GLPI's closed/solved lifecycle reads "done", in-progress states read
-// "active", everything else stays neutral — matching getJiraStatusTone tiers.
-export function getGlpiStatusTone(status: GlpiTicket['status']): string {
-  if (status === 'closed' || status === 'solved') {
-    return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
-  }
-  if (status === 'assigned' || status === 'planned' || status === 'pending') {
-    return 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-200'
-  }
-  return 'border-border/50 bg-muted/40 text-muted-foreground'
-}
-
-// GlpiPresetId maps directly onto the runtime GlpiTicketFilter values.
-function glpiPresetToFilter(preset: GlpiPresetId): GlpiTicketFilter {
-  return preset
-}
 
 export type UseTaskPageGlpiArgs = {
   taskSource: TaskProvider
@@ -67,6 +47,11 @@ export type UseTaskPageGlpiResult = {
   glpiError: string | null
   activeGlpiPreset: GlpiPresetId
   setActiveGlpiPreset: (preset: GlpiPresetId) => void
+  glpiTypeFilter: GlpiTypeFilter
+  setGlpiTypeFilter: (type: GlpiTypeFilter) => void
+  glpiAdvancedFilters: GlpiAdvancedFilters
+  setGlpiAdvancedFilters: (filters: GlpiAdvancedFilters) => void
+  glpiHasActiveFilters: boolean
   glpiRefreshNonce: number
   refreshGlpiTickets: () => void
   selectedGlpiTicket: GlpiTicket | null
@@ -151,6 +136,14 @@ export function useTaskPageGlpi(args: UseTaskPageGlpiArgs): UseTaskPageGlpiResul
   // GLPI preset/selection are local-only: the shared TaskResumeState type has no
   // GLPI fields, so unlike Jira we don't persist them across sessions here.
   const [activeGlpiPreset, setActiveGlpiPreset] = useState<GlpiPresetId>('assigned')
+  const {
+    glpiTypeFilter,
+    setGlpiTypeFilter,
+    glpiAdvancedFilters,
+    setGlpiAdvancedFilters,
+    glpiHasActiveFilters,
+    derivedGlpiFilters
+  } = useGlpiWorkItemFilters()
   const [glpiRefreshNonce, setGlpiRefreshNonce] = useState(0)
   const [selectedGlpiTicketId, setSelectedGlpiTicketId] = useState<number | null>(null)
   const [selectedGlpiTicketFallback, setSelectedGlpiTicketFallback] = useState<GlpiTicket | null>(
@@ -243,7 +236,8 @@ export function useTaskPageGlpi(args: UseTaskPageGlpiArgs): UseTaskPageGlpiResul
     let cancelled = false
     setGlpiLoading(true)
     setGlpiError(null)
-    void listGlpiWorkItems(glpiPresetToFilter(activeGlpiPreset), GLPI_ITEM_LIMIT, {
+    // GlpiPresetId is structurally the runtime GlpiTicketFilter union.
+    void listGlpiWorkItems(activeGlpiPreset, GLPI_ITEM_LIMIT, derivedGlpiFilters, {
       sourceContext: glpiTaskSourceContext
     })
       .then((tickets) => {
@@ -269,6 +263,7 @@ export function useTaskPageGlpi(args: UseTaskPageGlpiArgs): UseTaskPageGlpiResul
     glpiConnected,
     selectedGlpiServerId,
     activeGlpiPreset,
+    derivedGlpiFilters,
     glpiRefreshNonce,
     taskResumeApplied,
     glpiTaskSourceContext
@@ -315,6 +310,11 @@ export function useTaskPageGlpi(args: UseTaskPageGlpiArgs): UseTaskPageGlpiResul
     glpiError,
     activeGlpiPreset,
     setActiveGlpiPreset,
+    glpiTypeFilter,
+    setGlpiTypeFilter,
+    glpiAdvancedFilters,
+    setGlpiAdvancedFilters,
+    glpiHasActiveFilters,
     glpiRefreshNonce,
     refreshGlpiTickets,
     selectedGlpiTicket,

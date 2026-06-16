@@ -235,27 +235,10 @@ export default function GlpiTicketWorkspace({
 
         <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
           <div className="flex-none border-b border-border/50 bg-muted/30 px-4 py-3">
-            <div className="flex items-start gap-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
-                  <span className="font-mono">#{displayed.id}</span>
-                  {displayed.serverName ? <span>{displayed.serverName}</span> : null}
-                  <span>{getGlpiTypeLabel(displayed.type)}</span>
-                  <span>{formatGlpiRelativeTime(displayed.updatedAt)}</span>
-                  {ticketLoading ? <LoaderCircle className="size-3 animate-spin" /> : null}
-                </div>
-                <h2 className="mt-1 text-[20px] font-semibold leading-tight text-foreground">
-                  {displayed.title}
-                </h2>
-              </div>
-              <Button
-                onClick={() => onUse(displayed)}
-                className="hidden shrink-0 gap-2 sm:inline-flex"
-                size="sm"
-              >
-                {translate('auto.components.GlpiTicketWorkspace.656b9da353', 'Start workspace')}
-                <ArrowRight className="size-4" />
-              </Button>
+            {/* Why: the drawer docks right, where Orca's window controls live on
+                Windows. Keep the action buttons on the left (clear of those, and
+                of macOS traffic lights which sit outside the drawer). */}
+            <div className="mb-2 flex items-center gap-2">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -275,6 +258,26 @@ export default function GlpiTicketWorkspace({
                   {translate('auto.components.GlpiTicketWorkspace.2bcf18562f', 'Close')}
                 </TooltipContent>
               </Tooltip>
+              <Button
+                onClick={() => onUse(displayed)}
+                className="hidden gap-2 sm:inline-flex"
+                size="sm"
+              >
+                {translate('auto.components.GlpiTicketWorkspace.656b9da353', 'Start workspace')}
+                <ArrowRight className="size-4" />
+              </Button>
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                <span className="font-mono">#{displayed.id}</span>
+                {displayed.serverName ? <span>{displayed.serverName}</span> : null}
+                <span>{getGlpiTypeLabel(displayed.type)}</span>
+                <span>{formatGlpiRelativeTime(displayed.updatedAt)}</span>
+                {ticketLoading ? <LoaderCircle className="size-3 animate-spin" /> : null}
+              </div>
+              <h2 className="mt-1 text-[20px] font-semibold leading-tight text-foreground">
+                {displayed.title}
+              </h2>
             </div>
           </div>
 

@@ -90,6 +90,7 @@ import type {
   GlpiTicketFilter,
   GlpiTicketUpdate,
   GlpiViewer,
+  GlpiWorkItemFilters,
   LinearIssueUpdate,
   LinearWorkspaceSelection,
   NestedRepoScanResult,
@@ -17138,9 +17139,10 @@ export class OrcaRuntimeService {
   glpiListWorkItems(
     serverId: GlpiServerSelection | null | undefined,
     filter: GlpiTicketFilter,
-    limit: number
+    limit: number,
+    filters?: GlpiWorkItemFilters
   ): Promise<GlpiTicket[]> {
-    return listGlpiWorkItems(serverId, filter, limit)
+    return listGlpiWorkItems(serverId, filter, limit, filters)
   }
 
   glpiTicket(serverId: string | null | undefined, id: number): Promise<GlpiTicket | null> {

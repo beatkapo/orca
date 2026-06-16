@@ -1695,7 +1695,8 @@ export type {
   GlpiTicketType,
   GlpiTicketUpdate,
   GlpiUser,
-  GlpiViewer
+  GlpiViewer,
+  GlpiWorkItemFilters
 } from './glpi-types'
 
 /**

@@ -10920,7 +10920,10 @@
             "options": {
               "13db236c75": "GLPI",
               "a998fc39b1": "Created by me",
-              "81c1ca89fd": "All open"
+              "81c1ca89fd": "All open",
+              "b8436633d8": "All",
+              "e2b9c8c892": "Incidents",
+              "b8609b0793": "Requests"
             }
           }
         }
@@ -11009,6 +11012,21 @@
               "96564a25b0": "Request",
               "0c1c2fd027": "Change status"
             }
+          }
+        },
+        "filter": {
+          "popover": {
+            "cb0205b0fc": "Very low",
+            "12d0381544": "Low",
+            "c63c887091": "Medium",
+            "3691c5f710": "High",
+            "5e0ef451f0": "Very high",
+            "01f20435c6": "Filters",
+            "a63bf42a12": "Title contains",
+            "2c76dbbb28": "Category",
+            "d5148b45bf": "Priority",
+            "1c19ea34de": "Any",
+            "58b7bc144d": "Clear filters"
           }
         }
       },

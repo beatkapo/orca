@@ -156,6 +156,20 @@ export const getGlpiPresets = createLocalizedCatalog((): GlpiPreset[] => [
   { id: 'closed', label: translate('auto.components.TaskPage.d09bf34db7', 'Closed') }
 ])
 
+export type GlpiTypeFilterOption = { id: 'all' | 'incident' | 'request'; label: string }
+
+export const getGlpiTypeFilters = createLocalizedCatalog((): GlpiTypeFilterOption[] => [
+  { id: 'all', label: translate('auto.components.task.page.localized.options.b8436633d8', 'All') },
+  {
+    id: 'incident',
+    label: translate('auto.components.task.page.localized.options.e2b9c8c892', 'Incidents')
+  },
+  {
+    id: 'request',
+    label: translate('auto.components.task.page.localized.options.b8609b0793', 'Requests')
+  }
+])
+
 export const getGitHubModeButtons = createLocalizedCatalog((): GitHubModeButton[] => [
   { id: 'issues', label: translate('auto.components.TaskPage.dfc0c79bd8', 'Issues') },
   { id: 'prs', label: translate('auto.components.TaskPage.137e2a8a01', 'PRs') },

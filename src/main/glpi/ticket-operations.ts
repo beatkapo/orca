@@ -7,7 +7,8 @@ import type {
   GlpiServerSelection,
   GlpiTicket,
   GlpiTicketFilter,
-  GlpiTicketUpdate
+  GlpiTicketUpdate,
+  GlpiWorkItemFilters
 } from '../../shared/types'
 import { getSelectedServers, getServerFile } from './server-store'
 import {
@@ -34,13 +35,14 @@ function resolveServer(serverId?: string | null): GlpiServer | null {
 export async function listGlpiWorkItems(
   selection: GlpiServerSelection | null | undefined,
   filter: GlpiTicketFilter,
-  limit: number
+  limit: number,
+  filters?: GlpiWorkItemFilters
 ): Promise<GlpiTicket[]> {
   const servers = getSelectedServers(selection)
   const groups = await Promise.all(
     servers.map(async (server) => {
       try {
-        return await listGlpiTickets(server, filter, limit)
+        return await listGlpiTickets(server, filter, limit, filters)
       } catch {
         // Why: one unreachable/un-decryptable server must not collapse reads
         // for the healthy ones under an 'all' selection.

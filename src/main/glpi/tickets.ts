@@ -7,7 +7,8 @@ import type {
   GlpiTicket,
   GlpiTicketFilter,
   GlpiTicketUpdate,
-  GlpiUser
+  GlpiUser,
+  GlpiWorkItemFilters
 } from '../../shared/types'
 import { acquire, glpiServerRequest, release, type GlpiFullSession } from './session'
 import {
@@ -22,57 +23,7 @@ import {
   type RawGlpiTicket,
   type RawGlpiUser
 } from './mappers'
-
-// Search-option field ids for Ticket (verified against the live GLPI schema).
-const FIELD = {
-  title: 1,
-  id: 2,
-  priority: 3,
-  requester: 4,
-  technician: 5,
-  urgency: 10,
-  status: 12,
-  type: 14,
-  openDate: 15,
-  updateDate: 19,
-  followupCount: 27
-} as const
-
-const FORCE_DISPLAY = [
-  FIELD.id,
-  FIELD.title,
-  FIELD.priority,
-  FIELD.urgency,
-  FIELD.status,
-  FIELD.type,
-  FIELD.openDate,
-  FIELD.updateDate,
-  FIELD.followupCount
-]
-
-type SearchCriterion = { link?: 'AND' | 'OR'; field: number; searchtype: string; value: string }
-
-function buildSearchQuery(criteria: SearchCriterion[], limit: number): string {
-  const parts: string[] = []
-  criteria.forEach((criterion, index) => {
-    if (criterion.link) {
-      parts.push(`criteria[${index}][link]=${criterion.link}`)
-    }
-    parts.push(`criteria[${index}][field]=${criterion.field}`)
-    parts.push(`criteria[${index}][searchtype]=${criterion.searchtype}`)
-    parts.push(`criteria[${index}][value]=${encodeURIComponent(criterion.value)}`)
-  })
-  FORCE_DISPLAY.forEach((field, index) => {
-    parts.push(`forcedisplay[${index}]=${field}`)
-  })
-  // Why: raw values keep status/type numeric (expand would localize them and
-  // break the int→key mapping). Sort by last update, newest first.
-  parts.push('expand_dropdowns=0')
-  parts.push(`sort=${FIELD.updateDate}`)
-  parts.push('order=DESC')
-  parts.push(`range=0-${Math.max(0, limit - 1)}`)
-  return parts.join('&')
-}
+import { buildSearchQuery, filterCriteria, workItemFilterCriteria } from './ticket-search-query'
 
 async function resolveViewerId(server: GlpiServer): Promise<number> {
   const data = await glpiServerRequest<{ session?: Partial<GlpiFullSession> }>(
@@ -83,40 +34,21 @@ async function resolveViewerId(server: GlpiServer): Promise<number> {
   return typeof id === 'number' ? id : 0
 }
 
-function filterCriteria(filter: GlpiTicketFilter, viewerId: number): SearchCriterion[] {
-  // GLPI status pseudo-values: `notold` = open (new..pending), `old` = solved+closed.
-  const statusValue = filter === 'closed' ? 'old' : 'notold'
-  const criteria: SearchCriterion[] = [
-    { field: FIELD.status, searchtype: 'equals', value: statusValue }
-  ]
-  if (filter === 'assigned') {
-    criteria.push({
-      link: 'AND',
-      field: FIELD.technician,
-      searchtype: 'equals',
-      value: String(viewerId)
-    })
-  } else if (filter === 'created') {
-    criteria.push({
-      link: 'AND',
-      field: FIELD.requester,
-      searchtype: 'equals',
-      value: String(viewerId)
-    })
-  }
-  return criteria
-}
-
 export async function listGlpiTickets(
   server: GlpiServer,
   filter: GlpiTicketFilter,
-  limit: number
+  limit: number,
+  filters?: GlpiWorkItemFilters
 ): Promise<GlpiTicket[]> {
   await acquire()
   try {
     const viewerId =
       filter === 'assigned' || filter === 'created' ? await resolveViewerId(server) : 0
-    const query = buildSearchQuery(filterCriteria(filter, viewerId), limit)
+    const criteria = filterCriteria(filter, viewerId)
+    if (filters) {
+      criteria.push(...workItemFilterCriteria(filters))
+    }
+    const query = buildSearchQuery(criteria, limit)
     const result = await glpiServerRequest<{ data?: Record<string, unknown>[] }>(
       server,
       `/search/Ticket?${query}`

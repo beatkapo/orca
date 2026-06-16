@@ -178,16 +178,22 @@ describe('createGlpiSlice list caching', () => {
     const sourceResult = deferred<GlpiTicket[]>()
     glpiListWorkItems.mockReturnValueOnce(sourceResult.promise)
 
-    const request = store.getState().listGlpiWorkItems('assigned', 30, { sourceContext })
+    const request = store.getState().listGlpiWorkItems('assigned', 30, undefined, { sourceContext })
     store.setState({ settings: { activeRuntimeEnvironmentId: 'focused-runtime' } as never })
 
     sourceResult.resolve([ticket(1, { title: 'Source ticket' })])
     await expect(request).resolves.toMatchObject([{ title: 'Source ticket' }])
-    expect(glpiListWorkItems).toHaveBeenCalledWith(sourceContext, 'srv-1', 'assigned', 30)
+    expect(glpiListWorkItems).toHaveBeenCalledWith(
+      sourceContext,
+      'srv-1',
+      'assigned',
+      30,
+      undefined
+    )
 
     const scope = getTaskSourceCacheScope(sourceContext)
     expect(
-      store.getState().glpiListCache[`${scope}::srv-1::list::assigned::30`]?.data?.[0]?.title
+      store.getState().glpiListCache[`${scope}::srv-1::list::assigned::30::{}`]?.data?.[0]?.title
     ).toBe('Source ticket')
     expect(store.getState().glpiListCache['srv-1::list::assigned::30']).toBeUndefined()
   })

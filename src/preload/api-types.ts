@@ -100,6 +100,7 @@ import type {
   GlpiTicketFilter,
   GlpiTicketUpdate,
   GlpiViewer,
+  GlpiWorkItemFilters,
   LinearViewer,
   LinearCollectionResult,
   LinearConnectionStatus,
@@ -1721,6 +1722,7 @@ export type PreloadApi = {
       serverId?: GlpiServerSelection
       filter?: GlpiTicketFilter
       limit?: number
+      filters?: GlpiWorkItemFilters
     }) => Promise<GlpiTicket[]>
     ticket: (args: { serverId?: string; id: number }) => Promise<GlpiTicket | null>
     followups: (args: { serverId?: string; id: number }) => Promise<GlpiFollowup[]>

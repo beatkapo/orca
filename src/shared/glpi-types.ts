@@ -84,6 +84,15 @@ export type GlpiFollowup = {
 
 export type GlpiTicketFilter = 'assigned' | 'created' | 'all' | 'closed'
 
+// Server-side narrowing applied on top of the GlpiTicketFilter scope. Each set
+// field appends an AND-linked search criterion against the GLPI Ticket schema.
+export type GlpiWorkItemFilters = {
+  type?: GlpiTicketType // 'incident' | 'request'
+  text?: string // free-text in ticket title
+  category?: string // category name contains
+  priority?: number // GLPI 1..5
+}
+
 export type GlpiTicketUpdate = {
   title?: string
   content?: string

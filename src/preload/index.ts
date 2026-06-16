@@ -1530,6 +1530,7 @@ const api = {
       serverId?: string
       filter?: unknown
       limit?: number
+      filters?: unknown
     }): Promise<unknown[]> => ipcRenderer.invoke('glpi:listWorkItems', args),
 
     ticket: (args: { serverId?: string; id: number }): Promise<unknown> =>

@@ -8,7 +8,8 @@ import type {
   GlpiServerSelection,
   GlpiTicket,
   GlpiTicketFilter,
-  GlpiTicketUpdate
+  GlpiTicketUpdate,
+  GlpiWorkItemFilters
 } from '../../../../shared/types'
 import type { CacheEntry } from './github'
 import type { TaskSourceContext } from '../../../../shared/task-source-context'
@@ -34,6 +35,7 @@ export type GlpiSlice = {
   listGlpiWorkItems: (
     filter: GlpiTicketFilter,
     limit: number,
+    filters?: GlpiWorkItemFilters,
     options?: GlpiOptions
   ) => Promise<GlpiTicket[]>
   fetchGlpiTicket: (

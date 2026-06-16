@@ -1,6 +1,6 @@
 import type { StateCreator } from 'zustand'
 import type { AppState } from '../types'
-import type { GlpiFollowup, GlpiTicket } from '../../../../shared/types'
+import type { GlpiFollowup, GlpiTicket, GlpiWorkItemFilters } from '../../../../shared/types'
 import {
   glpiAddFollowup,
   glpiConnect,
@@ -52,6 +52,18 @@ function isCurrentGlpiMutation(generation: number): boolean {
 
 function isCurrentGlpiRuntimeContext(contextKey: string, settings: AppState['settings']): boolean {
   return getProviderRuntimeContextKey(settings) === contextKey
+}
+
+// Stable cache-key fragment for work-item filters: drop undefined fields and
+// sort entries so equivalent filter sets always serialize identically.
+function serializeGlpiWorkItemFilters(filters?: GlpiWorkItemFilters): string {
+  if (!filters) {
+    return '{}'
+  }
+  const entries = Object.entries(filters)
+    .filter(([, value]) => value !== undefined)
+    .sort(([a], [b]) => a.localeCompare(b))
+  return JSON.stringify(Object.fromEntries(entries))
 }
 
 export const createGlpiSlice: StateCreator<AppState, [], [], GlpiSlice> = (set, get) => {
@@ -215,20 +227,26 @@ export const createGlpiSlice: StateCreator<AppState, [], [], GlpiSlice> = (set, 
       })
     },
 
-    listGlpiWorkItems: async (filter, limit, options) => {
+    listGlpiWorkItems: async (filter, limit, filters, options) => {
       const scope = getGlpiReadScope(get().settings, options?.sourceContext)
       const serverId = options?.serverId ?? getSelectedServerId(get().glpiStatus)
+      // Why: distinct filters must not share a cache slot; serialize them
+      // deterministically so equivalent filter sets resolve to the same key.
+      const filtersKey = serializeGlpiWorkItemFilters(filters)
       return runGlpiCachedRead<GlpiTicket[]>({
         store,
         scope,
-        cacheKey: scopedGlpiCacheKey(scope, `${serverId ?? 'default'}::list::${filter}::${limit}`),
+        cacheKey: scopedGlpiCacheKey(
+          scope,
+          `${serverId ?? 'default'}::list::${filter}::${limit}::${filtersKey}`
+        ),
         cacheField: 'glpiListCache',
         inflight: inflightListRequests,
         serverId,
         mutationGeneration: glpiMutationGeneration,
         isCurrentMutation: isCurrentGlpiMutation,
         fallback: [],
-        fetch: () => glpiListWorkItems(scope.settings, serverId, filter, limit),
+        fetch: () => glpiListWorkItems(scope.settings, serverId, filter, limit, filters),
         operation: 'listGlpiWorkItems'
       })
     },

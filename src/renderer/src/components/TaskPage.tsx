@@ -149,7 +149,10 @@ import { JiraIcon } from '@/components/icons/JiraIcon'
 import { GlpiIcon } from '@/components/icons/GlpiIcon'
 import { GlpiConnectDialog } from '@/components/glpi-connect-dialog'
 import { GlpiNewTicketDialog } from '@/components/glpi-new-ticket-dialog'
-import { getGlpiStatusTone, useTaskPageGlpi } from '@/components/task-page-glpi-handlers'
+import { useTaskPageGlpi } from '@/components/task-page-glpi-handlers'
+import { getGlpiStatusTone } from '@/components/task-page-glpi-presentation'
+import { GlpiFilterPopover } from '@/components/glpi-filter-popover'
+import type { GlpiTypeFilter } from '@/components/task-page-glpi-filters'
 import { cn } from '@/lib/utils'
 import {
   getLinkedWorkItemSuggestedName,
@@ -275,6 +278,7 @@ import {
   getGitLabIssueFilters,
   getGitLabMRFilters,
   getGlpiPresets,
+  getGlpiTypeFilters,
   getJiraPresets,
   getLinearDisplayProperties,
   getLinearGroupOptions,
@@ -2895,6 +2899,7 @@ export default function TaskPage(): React.JSX.Element {
   const linearModeOptions = getLinearModeOptions()
   const jiraPresets = getJiraPresets()
   const glpiPresets = getGlpiPresets()
+  const glpiTypeFilters = getGlpiTypeFilters()
   const gitLabIssueFilters = getGitLabIssueFilters()
   const gitLabMRFilters = getGitLabMRFilters()
   const linearViewOptions = getLinearViewOptions()
@@ -8517,7 +8522,7 @@ export default function TaskPage(): React.JSX.Element {
                 ) : taskSource === 'glpi' && glpi.glpiConnected ? (
                   <div className="rounded-md rounded-b-none border border-border/50 bg-muted/50 p-3 shadow-sm">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         {glpiPresets.map((preset) => {
                           const active = glpi.activeGlpiPreset === preset.id
                           return (
@@ -8539,8 +8544,37 @@ export default function TaskPage(): React.JSX.Element {
                             </button>
                           )
                         })}
+                        <span className="mx-1 h-4 w-px shrink-0 bg-border/50" aria-hidden />
+                        <div className="flex items-center gap-1 rounded-md border border-border/50 p-0.5">
+                          {glpiTypeFilters.map((option) => {
+                            const active = glpi.glpiTypeFilter === option.id
+                            return (
+                              <button
+                                key={option.id}
+                                type="button"
+                                onClick={() => {
+                                  glpi.setGlpiTypeFilter(option.id as GlpiTypeFilter)
+                                  glpi.refreshGlpiTickets()
+                                }}
+                                className={cn(
+                                  'rounded-sm px-2 py-0.5 text-xs transition',
+                                  active
+                                    ? 'bg-foreground/90 text-background backdrop-blur-md'
+                                    : 'bg-transparent text-foreground hover:bg-muted/50'
+                                )}
+                              >
+                                {option.label}
+                              </button>
+                            )
+                          })}
+                        </div>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
+                        <GlpiFilterPopover
+                          value={glpi.glpiAdvancedFilters}
+                          onChange={glpi.setGlpiAdvancedFilters}
+                          onClear={() => glpi.setGlpiAdvancedFilters({})}
+                        />
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button

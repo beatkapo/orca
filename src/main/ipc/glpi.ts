@@ -16,7 +16,8 @@ import type {
   GlpiTicketFilter,
   GlpiTicketStatus,
   GlpiTicketType,
-  GlpiTicketUpdate
+  GlpiTicketUpdate,
+  GlpiWorkItemFilters
 } from '../../shared/types'
 
 const VALID_FILTERS = new Set<GlpiTicketFilter>(['assigned', 'created', 'all', 'closed'])
@@ -53,6 +54,36 @@ function normalizeUrgency(value: unknown): number | undefined {
     return undefined
   }
   return Math.min(Math.max(1, Math.round(value)), 5)
+}
+
+function normalizeNonEmptyText(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
+
+// Drops any invalid field rather than rejecting the whole object, and returns
+// undefined when nothing valid remains so callers skip the filter entirely.
+function normalizeWorkItemFilters(value: unknown): GlpiWorkItemFilters | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined
+  }
+  const input = value as Partial<GlpiWorkItemFilters>
+  const filters: GlpiWorkItemFilters = {}
+  if (input.type === 'incident' || input.type === 'request') {
+    filters.type = input.type
+  }
+  const text = normalizeNonEmptyText(input.text)
+  if (text) {
+    filters.text = text
+  }
+  const category = normalizeNonEmptyText(input.category)
+  if (category) {
+    filters.category = category
+  }
+  // GLPI priority is a 1 (very low) .. 5 (very high) scale.
+  if (typeof input.priority === 'number' && Number.isInteger(input.priority)) {
+    filters.priority = Math.min(Math.max(1, input.priority), 5)
+  }
+  return Object.keys(filters).length > 0 ? filters : undefined
 }
 
 function normalizeUpdate(value: unknown): GlpiTicketUpdate | null {
@@ -117,7 +148,12 @@ export function registerGlpiHandlers(): void {
     'glpi:listWorkItems',
     async (
       _event,
-      args?: { serverId?: GlpiServerSelection; filter?: GlpiTicketFilter; limit?: number }
+      args?: {
+        serverId?: GlpiServerSelection
+        filter?: GlpiTicketFilter
+        limit?: number
+        filters?: GlpiWorkItemFilters
+      }
     ) => {
       const filter = VALID_FILTERS.has(args?.filter as GlpiTicketFilter)
         ? (args!.filter as GlpiTicketFilter)
@@ -125,7 +161,8 @@ export function registerGlpiHandlers(): void {
       return listGlpiWorkItems(
         normalizeServerSelection(args?.serverId) ?? null,
         filter,
-        clampLimit(args?.limit)
+        clampLimit(args?.limit),
+        normalizeWorkItemFilters(args?.filters)
       )
     }
   )

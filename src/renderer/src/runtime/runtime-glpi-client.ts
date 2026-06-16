@@ -10,7 +10,8 @@ import type {
   GlpiTicket,
   GlpiTicketFilter,
   GlpiTicketUpdate,
-  GlpiViewer
+  GlpiViewer,
+  GlpiWorkItemFilters
 } from '../../../shared/types'
 import { callRuntimeRpc, getActiveRuntimeTarget } from './runtime-rpc-client'
 import {
@@ -108,10 +109,11 @@ export async function glpiListWorkItems(
   settings: RuntimeGlpiSettings,
   serverId: GlpiServerSelection | null | undefined,
   filter: GlpiTicketFilter,
-  limit: number
+  limit: number,
+  filters?: GlpiWorkItemFilters
 ): Promise<GlpiTicket[]> {
   const target = getGlpiRuntimeTarget(settings)
-  const args = { serverId: serverId ?? undefined, filter, limit }
+  const args = { serverId: serverId ?? undefined, filter, limit, filters }
   return target.kind === 'environment'
     ? callRuntimeRpc<GlpiTicket[]>(target, 'glpi.listWorkItems', args, { timeoutMs: 30_000 })
     : window.api.glpi.listWorkItems(args)

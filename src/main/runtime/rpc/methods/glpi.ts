@@ -32,7 +32,15 @@ const ListWorkItems = z
   .object({
     serverId: OptionalString,
     filter: z.enum(VALID_FILTERS).optional().default('all'),
-    limit: OptionalFiniteNumber.default(30)
+    limit: OptionalFiniteNumber.default(30),
+    filters: z
+      .object({
+        type: z.enum(['incident', 'request']).optional(),
+        text: z.string().optional(),
+        category: z.string().optional(),
+        priority: z.number().optional()
+      })
+      .optional()
   })
   .optional()
 
@@ -103,7 +111,8 @@ export const GLPI_METHODS: RpcMethod[] = [
       runtime.glpiListWorkItems(
         params?.serverId ?? null,
         params?.filter ?? 'all',
-        params?.limit ?? 30
+        params?.limit ?? 30,
+        params?.filters
       )
   }),
   defineMethod({
