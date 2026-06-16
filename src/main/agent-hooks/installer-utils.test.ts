@@ -18,6 +18,7 @@ import {
   createManagedCommandMatcher,
   getSharedManagedScriptPath,
   hookDefinitionHasManagedCommand,
+  quoteWindowsHookCommandPath,
   removeManagedCommands,
   wrapPosixHookCommand,
   writeManagedScript,
@@ -330,6 +331,25 @@ describe('wrapPosixHookCommand', () => {
       expect(result.status).toBe(7)
     }
   )
+})
+
+describe('quoteWindowsHookCommandPath', () => {
+  it('double-quotes a path containing a space (e.g. C:\\Users\\Jose manuel)', () => {
+    // Why: a space in the user profile makes cmd.exe/Git Bash split a bare path
+    // and run only its first segment. Quoting keeps it a single argument.
+    const path = 'C:/Users/Jose manuel/.orca/agent-hooks/claude-hook.cmd'
+    expect(quoteWindowsHookCommandPath(path)).toBe(`"${path}"`)
+  })
+
+  it('returns a space-free path unchanged so existing installs are untouched', () => {
+    const path = 'C:/Users/jose/.orca/agent-hooks/claude-hook.cmd'
+    expect(quoteWindowsHookCommandPath(path)).toBe(path)
+  })
+
+  it('keeps the agent-hooks/<file> substring so the managed-command matcher still finds it', () => {
+    const path = 'C:/Users/Jose manuel/.orca/agent-hooks/codex-hook.cmd'
+    expect(quoteWindowsHookCommandPath(path)).toContain('agent-hooks/codex-hook.cmd')
+  })
 })
 
 describe('buildWindowsAgentHookPostCommand', () => {

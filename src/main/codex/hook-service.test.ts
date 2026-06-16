@@ -66,6 +66,18 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
+function withPlatform<T>(platform: NodeJS.Platform, run: () => T): T {
+  const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
+  Object.defineProperty(process, 'platform', { configurable: true, value: platform })
+  try {
+    return run()
+  } finally {
+    if (originalPlatform) {
+      Object.defineProperty(process, 'platform', originalPlatform)
+    }
+  }
+}
+
 function escapeTomlBasicString(value: string): string {
   return value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')
 }
@@ -125,6 +137,28 @@ describe('CodexHookService', () => {
     expect(trustConfig).toContain('model = "gpt-5.2-codex"')
     expect(trustConfig).toContain('approval_policy = "on-request"')
     expect(trustConfig).toContain(':permission_request:0:0')
+  })
+
+  it('double-quotes the win32 managed command when the home profile has a space', () => {
+    // Why: regression for C:\Users\Jose manuel — a bare path makes cmd.exe split
+    // at the space and run only "C:\Users\Jose", so the hook never launches. The
+    // managed-command matcher still keys off the agent-hooks/<file> substring.
+    const spacedHome = join(tmpHome, 'Jose manuel')
+    mkdirSync(spacedHome, { recursive: true })
+    homedirMock.mockReturnValue(spacedHome)
+
+    const status = withPlatform('win32', () => new CodexHookService().install())
+    expect(status.state).toBe('installed')
+
+    const managedCodexHome = join(userDataDir, 'codex-runtime-home', 'home')
+    const hooksConfig = JSON.parse(readFileSync(join(managedCodexHome, 'hooks.json'), 'utf-8')) as {
+      hooks: Record<string, { hooks?: { command?: string }[] }[]>
+    }
+    const command = hooksConfig.hooks.Stop?.[0]?.hooks?.[0]?.command ?? ''
+    expect(command.startsWith('"')).toBe(true)
+    expect(command.endsWith('"')).toBe(true)
+    expect(command).toContain('Jose manuel')
+    expect(command.replaceAll('\\', '/')).toContain('agent-hooks/codex-hook.cmd')
   })
 
   it('keeps hooks isolated by Orca userData instead of mutating system ~/.codex', () => {

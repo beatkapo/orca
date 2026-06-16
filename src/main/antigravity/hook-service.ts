@@ -9,6 +9,7 @@ import {
   createManagedCommandMatcher,
   getSharedManagedScriptPath,
   hookDefinitionHasManagedCommand,
+  quoteWindowsHookCommandPath,
   readHooksJson,
   removeManagedCommands,
   wrapPosixHookCommand,
@@ -74,7 +75,7 @@ function getWindowsWrapperScriptPath(event: AntigravityEvent): string {
 
 function getManagedCommand(scriptPath: string, event: AntigravityEvent): string {
   if (process.platform === 'win32') {
-    return getWindowsWrapperScriptPath(event)
+    return quoteWindowsHookCommandPath(getWindowsWrapperScriptPath(event))
   }
   return wrapPosixHookCommand(scriptPath, { ORCA_ANTIGRAVITY_EVENT: event.eventName })
 }

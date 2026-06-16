@@ -3,6 +3,7 @@ import { join } from 'path'
 import {
   createManagedCommandMatcher,
   getSharedManagedScriptPath,
+  quoteWindowsHookCommandPath,
   removeManagedCommands,
   wrapPosixHookCommand,
   type HookDefinition,
@@ -76,7 +77,7 @@ export function getManagedCommand(scriptPath: string): string {
   if (process.platform === 'win32') {
     // Why: Claude Code runs hooks through Git Bash on Windows; forward slashes
     // survive that shell layer while native Windows APIs still accept them.
-    return scriptPath.replaceAll('\\', '/')
+    return quoteWindowsHookCommandPath(scriptPath.replaceAll('\\', '/'))
   }
   return wrapPosixHookCommand(scriptPath)
 }

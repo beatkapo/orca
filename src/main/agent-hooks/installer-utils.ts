@@ -98,6 +98,16 @@ export function wrapPosixHookCommand(scriptPath: string, env: Record<string, str
   return `if [ -x ${quoted} ]; then ${invocation}; fi`
 }
 
+// Why: when the hook `command` is a bare Windows path, a space in the user
+// profile (e.g. C:\Users\Jose manuel) makes cmd.exe/Git Bash split the path and
+// run only its first segment ("C:\Users\Jose" is not recognized ...). Wrap the
+// path in double quotes when it contains whitespace so it stays a single
+// argument. The managed-command matcher still finds the `agent-hooks/<file>`
+// substring, and quote-free paths are left untouched to preserve current behavior.
+export function quoteWindowsHookCommandPath(scriptPath: string): string {
+  return /\s/.test(scriptPath) ? `"${scriptPath}"` : scriptPath
+}
+
 export function buildWindowsAgentHookPostCommand(source: AgentHookSource): string {
   // Why: Windows PowerShell 5.1 defaults redirected stdin/request bodies to the
   // active code page. Hook payloads are UTF-8 JSON, so force UTF-8 on both read
