@@ -21,7 +21,7 @@ export function GiteaPrMergeButton({
     <div className="ml-auto">
       <Popover>
         <PopoverTrigger asChild>
-          <Button size="sm" disabled={merging || !mergeable} className="gap-1">
+          <Button size="sm" disabled={merging || mergeable === false} className="gap-1">
             {merging ? <LoaderCircle className="size-3.5 animate-spin" /> : null}
             {mergeable === false
               ? translate('auto.components.gitea.pr.merge.button.2378ab4908', 'Conflicts')

@@ -78,12 +78,18 @@ export function getStatus(): GiteaConnectionStatus {
   const servers = file.servers.filter((server) => hasStoredToken(server.id))
   const activeServer =
     servers.find((server) => server.id === file.activeServerId) ?? servers[0] ?? null
+  // Why: keep the reported selection valid — 'all' is always allowed, otherwise
+  // it must point at a still-connected server (fall back to the active one).
+  const selectedServerId =
+    file.selectedServerId === 'all' || servers.some((server) => server.id === file.selectedServerId)
+      ? file.selectedServerId
+      : (activeServer?.id ?? null)
   const credentialError = getCredentialError(servers.map((server) => server.id))
   return {
     connected: servers.length > 0,
     servers,
     activeServerId: activeServer?.id ?? null,
-    selectedServerId: file.selectedServerId ?? activeServer?.id ?? null,
+    selectedServerId: selectedServerId ?? activeServer?.id ?? null,
     ...(credentialError ? { credentialError } : {})
   }
 }
@@ -136,11 +142,19 @@ export function disconnect(serverId?: string): void {
   for (const id of ids) {
     deleteToken(id)
   }
+  const servers = file.servers.filter((server) => !ids.includes(server.id))
+  // Why: don't leave active/selected pointing at a removed server.
+  const activeServerId =
+    servers.find((server) => server.id === file.activeServerId)?.id ?? servers[0]?.id ?? null
+  const selectedServerId =
+    file.selectedServerId === 'all' || servers.some((server) => server.id === file.selectedServerId)
+      ? file.selectedServerId
+      : activeServerId
   writeServerFile({
     version: 1,
-    activeServerId: file.activeServerId,
-    selectedServerId: file.selectedServerId,
-    servers: file.servers.filter((server) => !ids.includes(server.id))
+    activeServerId,
+    selectedServerId,
+    servers
   })
 }
 

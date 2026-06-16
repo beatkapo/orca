@@ -78,8 +78,15 @@ function evictStale<T>(cache: Record<string, CacheEntry<T>>): Record<string, Cac
   return pruned
 }
 
-function scopeKey(scope: GiteaIssueScope): string {
-  return scope.repoId?.trim() || scope.repoPath
+// Why: namespace cache keys by server context so reads don't bleed across
+// server selections. An explicit sourceContext pins the server; otherwise the
+// currently selected server (or 'all') scopes the key.
+function scopeKey(scope: GiteaIssueScope, selectedServerId?: GiteaServerSelection | null): string {
+  const repoKey = scope.repoId?.trim() || scope.repoPath
+  const serverKey = scope.sourceContext
+    ? JSON.stringify(scope.sourceContext)
+    : `selected:${selectedServerId ?? 'all'}`
+  return `${repoKey}@${serverKey}`
 }
 
 function requestArgs(scope: GiteaIssueScope): {
@@ -126,7 +133,14 @@ export const createGiteaSlice: StateCreator<AppState, [], [], GiteaSlice> = (set
 
   giteaSelectServer: async (serverId) => {
     const status = (await window.api.gitea.selectServer({ serverId })) as GiteaConnectionStatus
-    set({ giteaStatus: status, giteaStatusLoaded: true })
+    // Why: drop caches keyed by the previous selection so a server switch can't
+    // serve stale data until TTL expiry.
+    set({
+      giteaStatus: status,
+      giteaStatusLoaded: true,
+      giteaWorkItems: {},
+      giteaIssueDetail: {}
+    })
     return status
   },
 
@@ -138,7 +152,8 @@ export const createGiteaSlice: StateCreator<AppState, [], [], GiteaSlice> = (set
   },
 
   fetchGiteaWorkItems: async (scope, filter, limit) => {
-    const key = `${scopeKey(scope)}:${filter ?? 'all'}`
+    const limitKey = typeof limit === 'number' ? String(limit) : 'default'
+    const key = `${scopeKey(scope, get().giteaStatus?.selectedServerId)}:${filter ?? 'all'}:${limitKey}`
     const cached = get().giteaWorkItems[key]
     if (isFresh(cached) && cached.data) {
       return cached.data
@@ -158,7 +173,7 @@ export const createGiteaSlice: StateCreator<AppState, [], [], GiteaSlice> = (set
   },
 
   fetchGiteaIssue: async (scope, issueNumber) => {
-    const key = `${scopeKey(scope)}#${issueNumber}`
+    const key = `${scopeKey(scope, get().giteaStatus?.selectedServerId)}#${issueNumber}`
     const cached = get().giteaIssueDetail[key]
     if (isFresh(cached)) {
       return cached.data
@@ -180,11 +195,10 @@ export const createGiteaSlice: StateCreator<AppState, [], [], GiteaSlice> = (set
     const result = await window.api.gitea.createIssue({ ...requestArgs(scope), ...input })
     if (result.ok) {
       // Invalidate cached lists for this repo so the new issue appears.
+      const prefix = `${scopeKey(scope, get().giteaStatus?.selectedServerId)}:`
       set((state) => ({
         giteaWorkItems: Object.fromEntries(
-          Object.entries(state.giteaWorkItems).filter(
-            ([key]) => !key.startsWith(`${scopeKey(scope)}:`)
-          )
+          Object.entries(state.giteaWorkItems).filter(([key]) => !key.startsWith(prefix))
         )
       }))
       return { ok: true, number: result.number, url: result.url }
@@ -199,11 +213,10 @@ export const createGiteaSlice: StateCreator<AppState, [], [], GiteaSlice> = (set
       updates
     })
     if (result.ok) {
+      const detailKey = `${scopeKey(scope, get().giteaStatus?.selectedServerId)}#${issueNumber}`
       set((state) => ({
         giteaIssueDetail: Object.fromEntries(
-          Object.entries(state.giteaIssueDetail).filter(
-            ([key]) => key !== `${scopeKey(scope)}#${issueNumber}`
-          )
+          Object.entries(state.giteaIssueDetail).filter(([key]) => key !== detailKey)
         )
       }))
     }

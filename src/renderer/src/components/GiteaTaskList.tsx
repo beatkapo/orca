@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CircleDot, GitPullRequest, LoaderCircle, Plus, RefreshCw } from 'lucide-react'
 import type { GiteaWorkItem, GiteaWorkItemFilter, Repo } from '../../../shared/types'
 import type { GiteaIssueScope } from '@/store/slices/gitea'
@@ -72,13 +72,18 @@ export function GiteaTaskList({
   const [typeFilter, setTypeFilter] = useState<GiteaTypeFilter>('all')
   const [nonce, setNonce] = useState(0)
   const [newIssueOpen, setNewIssueOpen] = useState(false)
+  const loadSeqRef = useRef(0)
 
   // New issues target the first selected project (narrow the picker to choose).
   const newIssueRepo = repos[0] ?? null
 
   const load = useCallback(async () => {
+    // Why: ignore stale responses so an older load can't overwrite newer state.
+    const seq = ++loadSeqRef.current
     if (repos.length === 0) {
       setRows([])
+      setError(null)
+      setLoading(false)
       return
     }
     setLoading(true)
@@ -90,11 +95,19 @@ export function GiteaTaskList({
           return items.map((item) => ({ repo, item }))
         })
       )
+      if (seq !== loadSeqRef.current) {
+        return
+      }
       setRows(results.flat())
     } catch {
+      if (seq !== loadSeqRef.current) {
+        return
+      }
       setError(translate('auto.components.GiteaTaskList.0285721e62', 'Failed to load Gitea tasks.'))
     } finally {
-      setLoading(false)
+      if (seq === loadSeqRef.current) {
+        setLoading(false)
+      }
     }
   }, [repos, makeScope, fetchGiteaWorkItems, filter])
 

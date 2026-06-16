@@ -38,10 +38,20 @@ export function getEnvGiteaAuth(): { apiBaseUrl: string | null; token: string | 
   }
 }
 
+function sameHost(apiBaseUrl: string, repoHost: string): boolean {
+  try {
+    return new URL(apiBaseUrl).host.toLowerCase() === repoHost.toLowerCase()
+  } catch {
+    return false
+  }
+}
+
 export function resolveGiteaAuth(repo: GiteaRepoRef): GiteaResolvedAuth {
   const env = getEnvGiteaAuth()
-  if (env.token) {
-    return { apiBaseUrl: env.apiBaseUrl ?? repo.apiBaseUrl, token: env.token }
+  // Why: only apply the env token to its explicitly configured host — never to an
+  // arbitrary repo-derived host, which would leak a global token to other servers.
+  if (env.token && env.apiBaseUrl && sameHost(env.apiBaseUrl, repo.host)) {
+    return { apiBaseUrl: env.apiBaseUrl, token: env.token }
   }
   const stored = getServerForHost(repo.host)
   if (stored) {

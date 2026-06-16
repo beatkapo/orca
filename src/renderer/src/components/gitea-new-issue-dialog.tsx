@@ -38,12 +38,16 @@ export function GiteaNewIssueDialog({
       return
     }
     setCreating(true)
-    const ok = await onCreate(trimmed, body.trim())
-    setCreating(false)
-    if (ok) {
-      setTitle('')
-      setBody('')
-      onOpenChange(false)
+    try {
+      const ok = await onCreate(trimmed, body.trim())
+      if (ok) {
+        setTitle('')
+        setBody('')
+        onOpenChange(false)
+      }
+    } finally {
+      // Why: always release the lock so a thrown/rejected create can't freeze the dialog.
+      setCreating(false)
     }
   }
 

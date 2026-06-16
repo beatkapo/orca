@@ -36,6 +36,49 @@ function clampLimit(limit: number | undefined): number {
   return Math.min(Math.max(1, Math.floor(limit)), MAX_LIMIT)
 }
 
+const MAX_SEARCH_PAGES = 10
+
+// The global /repos/issues/search endpoint returns hits across every repo under
+// the owner. Filtering a single capped page down to the selected repo can drop
+// valid matches when other repos dominate earlier pages, so page through results
+// (filtering server-side hits by full_name) until we collect `max` matches or
+// exhaust the available pages.
+async function collectAssignedOrCreated(
+  repo: GiteaRepoRef,
+  filter: 'assigned' | 'created',
+  max: number
+): Promise<RawGiteaIssue[]> {
+  const fullName = `${repo.owner}/${repo.repo}`.toLowerCase()
+  const matches: RawGiteaIssue[] = []
+  for (let page = 1; page <= MAX_SEARCH_PAGES && matches.length < max; page += 1) {
+    const raw = await giteaRepoGet<RawGiteaIssue[]>(repo, `/repos/issues/search`, {
+      searchParams: {
+        [filter]: 'true',
+        state: 'open',
+        owner: repo.owner,
+        limit: max,
+        page
+      }
+    })
+    if (!Array.isArray(raw) || raw.length === 0) {
+      break
+    }
+    for (const entry of raw) {
+      if ((entry.repository?.full_name ?? '').toLowerCase() === fullName) {
+        matches.push(entry)
+        if (matches.length >= max) {
+          break
+        }
+      }
+    }
+    // A short page means there are no further results to page through.
+    if (raw.length < max) {
+      break
+    }
+  }
+  return matches.slice(0, max)
+}
+
 function issueContext(repo: GiteaRepoRef): GiteaIssueContext {
   const stored = getServerForHost(repo.host)
   return {
@@ -69,21 +112,8 @@ export async function listGiteaWorkItems(
   const max = clampLimit(limit)
 
   if (filter === 'assigned' || filter === 'created') {
-    const raw = await giteaRepoGet<RawGiteaIssue[]>(repo, `/repos/issues/search`, {
-      searchParams: {
-        [filter]: 'true',
-        state: 'open',
-        owner: repo.owner,
-        limit: max,
-        page: 1
-      }
-    })
-    if (!Array.isArray(raw)) {
-      return []
-    }
-    const fullName = `${repo.owner}/${repo.repo}`.toLowerCase()
-    return raw
-      .filter((entry) => (entry.repository?.full_name ?? '').toLowerCase() === fullName)
+    const matches = await collectAssignedOrCreated(repo, filter, max)
+    return matches
       .map((entry) => mapGiteaWorkItem(entry, context))
       .filter((item): item is GiteaWorkItem => item !== null)
   }
@@ -231,9 +261,13 @@ export async function updateGiteaIssue(
     body.assignees = updates.assignees
   }
   const path = `/repos/${encodedRepoPath(repo)}/issues/${encodeURIComponent(String(issueNumber))}`
-  const result = await giteaRepoWrite<RawGiteaIssue>(repo, path, { method: 'PATCH', body })
-  if (!result.ok) {
-    return { ok: false, error: result.error }
+  // Why: skip the issue PATCH when only labels changed — labels use a dedicated
+  // endpoint, so an empty PATCH is a wasted call and avoidable failure point.
+  if (Object.keys(body).length > 0) {
+    const result = await giteaRepoWrite<RawGiteaIssue>(repo, path, { method: 'PATCH', body })
+    if (!result.ok) {
+      return { ok: false, error: result.error }
+    }
   }
   // Label edits use a dedicated endpoint in the Gitea API.
   if (updates.labelIds !== undefined) {

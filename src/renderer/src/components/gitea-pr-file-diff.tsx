@@ -1,9 +1,11 @@
 /* oxlint-disable react-doctor/no-adjust-state-on-prop-change -- Why: the file's
    diff content is loaded from Gitea IPC, so local state resets when the file or
    commit shas change. */
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { DiffEditor } from '@monaco-editor/react'
 import { LoaderCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { detectLanguage } from '@/lib/language-detect'
 import { cn } from '@/lib/utils'
 import { GiteaPrLineComments } from '@/components/gitea-pr-line-comments'
@@ -43,12 +45,14 @@ export function GiteaPrFileDiff({
 }: GiteaPrFileDiffProps): React.JSX.Element {
   const [contents, setContents] = useState<GiteaPRFileContents | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const requestRef = useRef(0)
 
-  useEffect(() => {
+  const load = useCallback(() => {
     requestRef.current += 1
     const requestId = requestRef.current
     setLoading(true)
+    setError(false)
     void (
       window.api.gitea.prFileContents({
         repoPath: scope.repoPath,
@@ -66,13 +70,26 @@ export function GiteaPrFileDiff({
           setContents(result)
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        // Why: surface the failure instead of silently leaving an empty diff.
+        if (requestId === requestRef.current) {
+          setContents(null)
+          setError(true)
+          toast.error(
+            translate('auto.components.gitea.pr.file.diff.f1a2b3c4d5', 'Failed to load file diff.')
+          )
+        }
+      })
       .finally(() => {
         if (requestId === requestRef.current) {
           setLoading(false)
         }
       })
   }, [file.path, file.oldPath, file.status, scope, baseSha, headSha])
+
+  useEffect(() => {
+    load()
+  }, [load])
 
   const isBinary = Boolean(contents?.originalIsBinary || contents?.modifiedIsBinary)
 
@@ -97,6 +114,18 @@ export function GiteaPrFileDiff({
         {loading ? (
           <div className="flex h-[420px] items-center justify-center text-muted-foreground">
             <LoaderCircle className="size-4 animate-spin" />
+          </div>
+        ) : error ? (
+          <div className="flex h-[420px] flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+            <span>
+              {translate(
+                'auto.components.gitea.pr.file.diff.f1a2b3c4d5',
+                'Failed to load file diff.'
+              )}
+            </span>
+            <Button size="sm" variant="outline" onClick={load}>
+              {translate('auto.components.gitea.pr.file.diff.e6f7a8b9c0', 'Retry')}
+            </Button>
           </div>
         ) : isBinary ? (
           <p className="px-3 py-4 text-sm text-muted-foreground">

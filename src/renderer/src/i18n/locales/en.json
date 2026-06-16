@@ -7955,6 +7955,7 @@
               "069f07af1c": "{{value0}} server{{value1}} connected",
               "31b7f980fb": "Checking Gitea access before showing setup actions.",
               "5a8cd33300": "Browse, create, and start work from Gitea issues.",
+              "d4e5f6a7b8": "Connection failed.",
               "bdcb1e773f": "Add server",
               "9ce5f12a0d": "Connect Gitea",
               "3852b1fd6f": "Verified",
@@ -11199,7 +11200,9 @@
         "pr": {
           "file": {
             "diff": {
-              "81e07de6a5": "Binary file not shown."
+              "81e07de6a5": "Binary file not shown.",
+              "f1a2b3c4d5": "Failed to load file diff.",
+              "e6f7a8b9c0": "Retry"
             }
           },
           "checks": {
@@ -11271,6 +11274,7 @@
         "47b064c003": "{{value0}} copied",
         "927222e135": "Failed to copy.",
         "2d2e69fe70": "Failed to update issue.",
+        "b7c8d9e0f1": "Failed to load issue.",
         "565680a39b": "Failed to add comment.",
         "a792c22414": "Gitea item",
         "01b6ea43ca": "Preview and start work from the selected Gitea item.",
@@ -11294,6 +11298,7 @@
         "sideBySide": "Side by side",
         "noFiles": "No changed files.",
         "f5cf34ed40": "Failed to add comment.",
+        "c2d3e4f5a6": "Failed to load PR checks.",
         "22f9c29c9b": "Pull request merged.",
         "d93415a77d": "Failed to merge.",
         "c7c84081fc": "Failed to add review comment.",

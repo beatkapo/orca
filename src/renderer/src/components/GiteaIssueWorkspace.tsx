@@ -100,25 +100,43 @@ export function GiteaIssueWorkspace({
     setRepoAssignees([])
     setClosed(item.state !== 'open')
     setLoading(true)
-    void Promise.all([
+    // Why: load each resource independently so the issue body/comments still
+    // render when only labels/assignees fail, and surface at least one error.
+    void Promise.allSettled([
       window.api.gitea.issue(args) as Promise<GiteaIssue | null>,
       window.api.gitea.issueComments(args) as Promise<GiteaComment[]>,
       window.api.gitea.labels(listArgs) as Promise<GiteaLabel[]>,
       window.api.gitea.assignees(listArgs) as Promise<GiteaUser[]>
     ])
-      .then(([issue, fetchedComments, fetchedLabels, fetchedAssignees]) => {
+      .then(([issueResult, commentsResult, labelsResult, assigneesResult]) => {
         if (requestId !== requestRef.current) {
           return
         }
-        setDetail(issue)
-        if (issue) {
-          setClosed(issue.state !== 'open')
+        if (issueResult.status === 'fulfilled') {
+          setDetail(issueResult.value)
+          if (issueResult.value) {
+            setClosed(issueResult.value.state !== 'open')
+          }
         }
-        setComments(fetchedComments)
-        setRepoLabels(fetchedLabels)
-        setRepoAssignees(fetchedAssignees)
+        if (commentsResult.status === 'fulfilled') {
+          setComments(commentsResult.value)
+        }
+        if (labelsResult.status === 'fulfilled') {
+          setRepoLabels(labelsResult.value)
+        }
+        if (assigneesResult.status === 'fulfilled') {
+          setRepoAssignees(assigneesResult.value)
+        }
+        if (
+          [issueResult, commentsResult, labelsResult, assigneesResult].some(
+            (result) => result.status === 'rejected'
+          )
+        ) {
+          toast.error(
+            translate('auto.components.GiteaIssueWorkspace.b7c8d9e0f1', 'Failed to load issue.')
+          )
+        }
       })
-      .catch(() => {})
       .finally(() => {
         if (requestId === requestRef.current) {
           setLoading(false)

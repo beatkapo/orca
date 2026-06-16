@@ -103,11 +103,24 @@ export function GiteaPullRequestWorkspace({
             window.api.gitea.prChecks(scoped(scope, { headSha: prDetail.headSha })) as Promise<
               GiteaPRCheck[]
             >
-          ).then((result) => {
-            if (requestId === requestRef.current) {
-              setChecks(result)
-            }
-          })
+          )
+            .then((result) => {
+              if (requestId === requestRef.current) {
+                setChecks(result)
+              }
+            })
+            .catch(() => {
+              // Why: keep checks state consistent and surface the failure.
+              if (requestId === requestRef.current) {
+                setChecks([])
+                toast.error(
+                  translate(
+                    'auto.components.GiteaPullRequestWorkspace.c2d3e4f5a6',
+                    'Failed to load PR checks.'
+                  )
+                )
+              }
+            })
         }
       })
       .catch(() => {})
@@ -308,7 +321,7 @@ export function GiteaPullRequestWorkspace({
                       className={cn(
                         'rounded-full px-2 py-0.5 text-[10px] font-medium capitalize',
                         state === 'merged'
-                          ? 'bg-purple-500/15 text-purple-500'
+                          ? 'bg-ai-action-accent/15 text-ai-action-accent'
                           : state === 'open'
                             ? 'bg-status-success/15 text-status-success'
                             : 'bg-muted text-muted-foreground'

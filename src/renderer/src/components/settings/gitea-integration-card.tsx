@@ -30,9 +30,13 @@ export function GiteaTaskIntegrationCard(): React.JSX.Element {
   const serverCount = servers.length || (connected ? 1 : 0)
 
   const handleDisconnect = async (serverId?: string): Promise<void> => {
-    await giteaDisconnect(serverId)
-    if (mountedRef.current) {
-      setTestResultByServer({})
+    try {
+      await giteaDisconnect(serverId)
+    } finally {
+      // Why: clear results even if disconnect rejects, so the UI isn't left stale.
+      if (mountedRef.current) {
+        setTestResultByServer({})
+      }
     }
   }
 
@@ -43,15 +47,38 @@ export function GiteaTaskIntegrationCard(): React.JSX.Element {
       delete next[serverId]
       return next
     })
-    const result = await giteaTestConnection(serverId)
-    if (!mountedRef.current) {
-      return
+    try {
+      const result = await giteaTestConnection(serverId)
+      if (!mountedRef.current) {
+        return
+      }
+      setTestResultByServer((prev) => ({
+        ...prev,
+        [serverId]: result.ok ? { state: 'ok' } : { state: 'error', error: result.error }
+      }))
+    } catch (error) {
+      if (!mountedRef.current) {
+        return
+      }
+      setTestResultByServer((prev) => ({
+        ...prev,
+        [serverId]: {
+          state: 'error',
+          error:
+            error instanceof Error
+              ? error.message
+              : translate(
+                  'auto.components.settings.gitea.integration.card.d4e5f6a7b8',
+                  'Connection failed.'
+                )
+        }
+      }))
+    } finally {
+      // Why: always clear the per-server spinner, even on rejection.
+      if (mountedRef.current) {
+        setTestingServerId(null)
+      }
     }
-    setTestResultByServer((prev) => ({
-      ...prev,
-      [serverId]: result.ok ? { state: 'ok' } : { state: 'error', error: result.error }
-    }))
-    setTestingServerId(null)
   }
 
   return (

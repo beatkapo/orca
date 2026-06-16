@@ -11,7 +11,7 @@ function stateIcon(state: GiteaPRCheck['state']): React.JSX.Element {
     case 'error':
       return <CircleX className="size-4 text-destructive" />
     case 'warning':
-      return <CircleAlert className="size-4 text-amber-500" />
+      return <CircleAlert className="size-4 text-status-warning" />
     case 'pending':
       return <CircleDot className="size-4 text-muted-foreground" />
   }
