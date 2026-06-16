@@ -71,7 +71,10 @@ import {
   getSmartWorkspaceNameModes,
   type MrStateFilter
 } from './smart-workspace-localized-options'
-import { buildTaskSourceContextFromRepo } from '../../../../shared/task-source-context'
+import {
+  buildTaskSourceContextFromRepo,
+  type TaskSourceContext
+} from '../../../../shared/task-source-context'
 
 type RepoOption = ReturnType<typeof useAppStore.getState>['repos'][number]
 
@@ -89,6 +92,7 @@ type SmartWorkspaceNameFieldProps = {
   onLinearIssueSelect: (issue: LinearIssue) => void
   selectedSource: SmartWorkspaceNameSelection | null
   onClearSelectedSource: () => void
+  githubSourceContext?: TaskSourceContext | null
   inputRef?: React.RefObject<HTMLInputElement | null>
   onPlainEnter?: () => void
   disabled?: boolean
@@ -108,6 +112,19 @@ const RESULT_LIMIT = 12
 
 type RowEntry = SmartWorkspaceSourceRow
 
+const ROW_ITEM_CLASS_NAME = 'gap-2 px-3 py-2 text-xs'
+
+function isTypedTextSourceRow(row: RowEntry): boolean {
+  return row.kind === 'use-name' || row.kind === 'create-branch'
+}
+
+function getRowItemClassName(row: RowEntry, options?: { pinnedAction?: boolean }): string {
+  return cn(
+    ROW_ITEM_CLASS_NAME,
+    options?.pinnedAction && isTypedTextSourceRow(row) && 'bg-muted/35'
+  )
+}
+
 export default function SmartWorkspaceNameField({
   repos,
   repoId,
@@ -120,6 +137,7 @@ export default function SmartWorkspaceNameField({
   onLinearIssueSelect,
   selectedSource,
   onClearSelectedSource,
+  githubSourceContext: githubSourceContextOverride,
   inputRef,
   onPlainEnter,
   disabled = false,
@@ -171,17 +189,18 @@ export default function SmartWorkspaceNameField({
     () => getRepoOwnerRoutedSettings(settings, selectedRepo),
     [selectedRepo, settings]
   )
-  const githubSourceContext = useMemo(
-    () =>
-      selectedRepo
-        ? buildTaskSourceContextFromRepo({
-            provider: 'github',
-            projectId: selectedRepo.id,
-            repo: selectedRepo
-          })
-        : null,
-    [selectedRepo]
-  )
+  const githubSourceContext = useMemo(() => {
+    if (githubSourceContextOverride?.provider === 'github') {
+      return githubSourceContextOverride
+    }
+    return selectedRepo
+      ? buildTaskSourceContextFromRepo({
+          provider: 'github',
+          projectId: selectedRepo.id,
+          repo: selectedRepo
+        })
+      : null
+  }, [githubSourceContextOverride, selectedRepo])
   const gitlabSourceContext = useMemo(
     () =>
       selectedRepo
@@ -797,6 +816,13 @@ export default function SmartWorkspaceNameField({
       value
     ]
   )
+  const { typedTextActionRow, searchResultRows } = useMemo(() => {
+    const typedTextRow = rows.find(isTypedTextSourceRow) ?? null
+    return {
+      typedTextActionRow: typedTextRow,
+      searchResultRows: typedTextRow ? rows.filter((row) => row !== typedTextRow) : rows
+    }
+  }, [rows])
 
   // Why: source rows (GitHub/branches/Linear) are driven by debouncedQuery,
   // so they're stale until the user pauses typing for SEARCH_DEBOUNCE_MS.
@@ -1020,6 +1046,7 @@ export default function SmartWorkspaceNameField({
                 // dialog wider than its max-w.
                 <div
                   ref={setSelectedSourceNode}
+                  data-workspace-source-pill="true"
                   tabIndex={0}
                   onKeyDown={(event) => {
                     if (
@@ -1100,6 +1127,7 @@ export default function SmartWorkspaceNameField({
                   />
                   <Input
                     ref={setInputNode}
+                    data-workspace-name-input="true"
                     value={value}
                     onChange={(event) => {
                       onValueChange(event.target.value)
@@ -1210,13 +1238,29 @@ export default function SmartWorkspaceNameField({
               </div>
             ) : null}
             <CommandList className="!max-h-none min-h-0 flex-1 scrollbar-sleek">
-              {loading && rows.length === 0 ? (
+              {typedTextActionRow ? (
+                <div
+                  className="sticky top-0 z-10 border-b border-border/40 bg-popover p-1"
+                  onMouseDown={(event) => event.preventDefault()}
+                >
+                  <CommandItem
+                    key={typedTextActionRow.value}
+                    value={typedTextActionRow.value}
+                    onSelect={() => handleSelect(typedTextActionRow)}
+                    className={getRowItemClassName(typedTextActionRow, { pinnedAction: true })}
+                  >
+                    <RowIcon row={typedTextActionRow} />
+                    <RowLabel row={typedTextActionRow} />
+                  </CommandItem>
+                </div>
+              ) : null}
+              {loading && searchResultRows.length === 0 ? (
                 <div className="space-y-1 p-1">
                   {[0, 1, 2].map((index) => (
                     <div key={index} className="h-8 animate-pulse rounded bg-muted/40" />
                   ))}
                 </div>
-              ) : rows.length === 0 ? (
+              ) : searchResultRows.length === 0 && !typedTextActionRow ? (
                 <div className="px-3 py-6 text-center text-xs text-muted-foreground">
                   {mode === 'linear' && linearStatusChecked && !linearStatus.connected
                     ? translate(
@@ -1225,21 +1269,21 @@ export default function SmartWorkspaceNameField({
                       )
                     : getSmartWorkspaceEmptyHint(mode)}
                 </div>
-              ) : (
+              ) : searchResultRows.length > 0 ? (
                 <CommandGroup className="p-1">
-                  {rows.map((row) => (
+                  {searchResultRows.map((row) => (
                     <CommandItem
                       key={row.value}
                       value={row.value}
                       onSelect={() => handleSelect(row)}
-                      className="gap-2 px-2 py-1.5 text-xs"
+                      className={getRowItemClassName(row)}
                     >
                       <RowIcon row={row} />
                       <RowLabel row={row} />
                     </CommandItem>
                   ))}
                 </CommandGroup>
-              )}
+              ) : null}
             </CommandList>
           </PopoverContent>
         </Command>
@@ -1367,7 +1411,7 @@ function RowLabel({ row }: { row: RowEntry }): React.JSX.Element {
   if (row.kind === 'use-name') {
     return (
       <span className="min-w-0 truncate">
-        {translate('auto.components.new.workspace.SmartWorkspaceNameField.b1a7d679ba', 'Use')}
+        {translate('auto.components.new.workspace.SmartWorkspaceNameField.b1a7d679ba', 'Use')}{' '}
         <span className="font-medium text-foreground">
           {translate('auto.components.new.workspace.SmartWorkspaceNameField.34ca97bce3', '"')}
           {row.name}

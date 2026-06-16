@@ -40,6 +40,8 @@ import type {
   GitCommitCompareResult,
   GitConflictOperation,
   GitDiffResult,
+  GitForkSyncExpectedUpstream,
+  GitForkSyncResult,
   GitPushTarget,
   GitStatusResult,
   GitUpstreamStatus,
@@ -164,6 +166,7 @@ import type {
   Worktree,
   WorktreeBaseStatusEvent,
   WorktreeLineage,
+  WorkspaceLineage,
   WorktreeMeta,
   WorktreeRemoteBranchConflictEvent,
   RemoveWorktreeResult,
@@ -790,10 +793,12 @@ export type PreloadApi = {
           | 'externalWorktreeVisibilityPromptDismissedAt'
           | 'projectGroupId'
           | 'projectGroupOrder'
+          | 'forkSyncMode'
         >
       > & { sourceControlAi?: Repo['sourceControlAi'] | null }
     }) => Promise<Repo>
     pickFolder: () => Promise<string | null>
+    pickFolders: () => Promise<string[]>
     pickDirectory: () => Promise<string | null>
     clone: (args: { url: string; destination: string }) => Promise<Repo>
     cloneRemote: (args: { connectionId: string; url: string; destination: string }) => Promise<Repo>
@@ -964,7 +969,10 @@ export type PreloadApi = {
       expectedHead: string
     }) => Promise<ForceDeleteWorktreeBranchResult>
     updateMeta: (args: { worktreeId: string; updates: Partial<WorktreeMeta> }) => Promise<Worktree>
-    listLineage: () => Promise<Record<string, WorktreeLineage>>
+    listLineage: () => Promise<{
+      lineage: Record<string, WorktreeLineage>
+      workspaceLineage?: Record<string, WorkspaceLineage>
+    }>
     updateLineage: (args: {
       worktreeId: string
       parentWorktreeId?: string
@@ -1271,6 +1279,7 @@ export type PreloadApi = {
       args: GitHubRepoSelectorArgs & {
         prNumber: number
         enabled: boolean
+        method?: 'merge' | 'squash' | 'rebase'
         prRepo?: GitHubOwnerRepo | null
       }
     ) => Promise<{ ok: true } | { ok: false; error: string }>
@@ -2155,6 +2164,11 @@ export type PreloadApi = {
       connectionId?: string
       pushTarget?: GitPushTarget
     }) => Promise<void>
+    syncFork: (args: {
+      worktreePath: string
+      connectionId?: string
+      expectedUpstream: GitForkSyncExpectedUpstream
+    }) => Promise<GitForkSyncResult>
     push: (args: {
       worktreePath: string
       publish?: boolean
@@ -2290,11 +2304,17 @@ export type PreloadApi = {
       line: number
       connectionId?: string
     }) => Promise<string | null>
+    remoteCommitUrl: (args: {
+      worktreePath: string
+      sha: string
+      connectionId?: string
+    }) => Promise<string | null>
   }
   ui: {
     get: () => Promise<PersistedUIState>
     set: (args: Partial<PersistedUIState>) => Promise<void>
     recordFeatureInteraction: (id: FeatureInteractionId) => Promise<PersistedUIState>
+    onStateChanged: (callback: (ui: PersistedUIState) => void) => () => void
     onOpenSettings: (callback: () => void) => () => void
     onOpenSetupGuide: (callback: () => void) => () => void
     onOpenFeatureTour: (callback: () => void) => () => void
@@ -2322,6 +2342,7 @@ export type PreloadApi = {
         url: string
         worktreeId?: string
         sessionProfileId?: string
+        activate?: boolean
       }) => void
     ) => () => void
     replyTabCreate: (reply: { requestId: string; browserPageId?: string; error?: string }) => void
