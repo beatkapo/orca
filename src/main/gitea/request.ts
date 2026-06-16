@@ -48,10 +48,17 @@ function sameHost(apiBaseUrl: string, repoHost: string): boolean {
 
 export function resolveGiteaAuth(repo: GiteaRepoRef): GiteaResolvedAuth {
   const env = getEnvGiteaAuth()
-  // Why: only apply the env token to its explicitly configured host — never to an
-  // arbitrary repo-derived host, which would leak a global token to other servers.
-  if (env.token && env.apiBaseUrl && sameHost(env.apiBaseUrl, repo.host)) {
-    return { apiBaseUrl: env.apiBaseUrl, token: env.token }
+  if (env.token) {
+    // With an explicit ORCA_GITEA_API_BASE_URL, scope the token to that host so a
+    // global token can't leak to a different server. Without one, fall back to the
+    // repo's own host — the documented env-var back-compat that hosted review uses.
+    if (env.apiBaseUrl) {
+      if (sameHost(env.apiBaseUrl, repo.host)) {
+        return { apiBaseUrl: env.apiBaseUrl, token: env.token }
+      }
+    } else {
+      return { apiBaseUrl: repo.apiBaseUrl, token: env.token }
+    }
   }
   const stored = getServerForHost(repo.host)
   if (stored) {
