@@ -21,8 +21,8 @@ import type {
   GiteaWorkItem,
   Repo
 } from '../../../shared/types'
-import type { GiteaIssueScope } from '@/store/slices/gitea'
 import type { GiteaWorkspaceSelection } from './GiteaIssueWorkspace'
+import { scoped } from './gitea-pr-request-scope'
 import { translate } from '@/i18n/i18n'
 
 // On Windows the custom window controls (minimize/close) float over the
@@ -35,22 +35,6 @@ type GiteaPullRequestWorkspaceProps = {
   selection: GiteaWorkspaceSelection | null
   onUse: (repo: Repo, item: GiteaWorkItem) => void
   onClose: () => void
-}
-
-function scoped<T extends Record<string, unknown>>(
-  scope: GiteaIssueScope,
-  extra: T
-): {
-  repoPath: string
-  repoId: string | null
-  sourceContext: GiteaIssueScope['sourceContext']
-} & T {
-  return {
-    repoPath: scope.repoPath,
-    repoId: scope.repoId ?? null,
-    sourceContext: scope.sourceContext ?? null,
-    ...extra
-  }
 }
 
 export function GiteaPullRequestWorkspace({
