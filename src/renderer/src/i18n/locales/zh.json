@@ -10952,7 +10952,8 @@
         "filterClosed": "Closed",
         "typeAll": "All",
         "typeIssues": "Issues",
-        "typePulls": "PRs"
+        "typePulls": "PRs",
+        "newIssue": "New issue"
       },
       "GiteaIssueWorkspace": {
         "copied": "{{value0}} copied",
@@ -11036,6 +11037,14 @@
       "giteaPrMergeButton": {
         "conflicts": "Conflicts",
         "merge": "Merge"
+      },
+      "giteaNewIssueDialog": {
+        "title": "New issue in {{value0}}",
+        "description": "Create an issue in the selected Gitea project.",
+        "titleLabel": "Title",
+        "bodyLabel": "Description",
+        "cancel": "Cancel",
+        "create": "Create issue"
       }
     },
     "i18n": {

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CircleDot, GitPullRequest, LoaderCircle, RefreshCw } from 'lucide-react'
+import { CircleDot, GitPullRequest, LoaderCircle, Plus, RefreshCw } from 'lucide-react'
 import type { GiteaWorkItem, GiteaWorkItemFilter, Repo } from '../../../shared/types'
 import type { GiteaIssueScope } from '@/store/slices/gitea'
 import { useAppStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { GiteaNewIssueDialog } from '@/components/gitea-new-issue-dialog'
 import { translate } from '@/i18n/i18n'
 
 type GiteaTypeFilter = 'all' | 'issue' | 'pull'
@@ -63,12 +64,17 @@ export function GiteaTaskList({
   projectPicker
 }: GiteaTaskListProps): React.JSX.Element {
   const fetchGiteaWorkItems = useAppStore((s) => s.fetchGiteaWorkItems)
+  const createGiteaIssue = useAppStore((s) => s.createGiteaIssue)
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<GiteaWorkItemFilter>('all')
   const [typeFilter, setTypeFilter] = useState<GiteaTypeFilter>('all')
   const [nonce, setNonce] = useState(0)
+  const [newIssueOpen, setNewIssueOpen] = useState(false)
+
+  // New issues target the first selected project (narrow the picker to choose).
+  const newIssueRepo = repos[0] ?? null
 
   const load = useCallback(async () => {
     if (repos.length === 0) {
@@ -101,11 +107,26 @@ export function GiteaTaskList({
     [rows, typeFilter]
   )
 
+  const handleCreateIssue = useCallback(
+    async (title: string, body: string): Promise<boolean> => {
+      if (!newIssueRepo) {
+        return false
+      }
+      const result = await createGiteaIssue(makeScope(newIssueRepo), { title, body })
+      if (result.ok) {
+        setNonce((n) => n + 1)
+        return true
+      }
+      return false
+    },
+    [createGiteaIssue, makeScope, newIssueRepo]
+  )
+
   return (
     <div className="flex min-h-0 min-w-0 max-h-full flex-col overflow-hidden rounded-md border border-border/50 bg-muted/50 shadow-sm">
       <div className="flex min-w-0 flex-col gap-2 border-b border-border/50 p-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1 text-xs">
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1 text-xs">
             {getTypeFilters().map(({ id, label }) => (
               <button
                 key={id}
@@ -123,24 +144,35 @@ export function GiteaTaskList({
             ))}
           </div>
           {projectPicker ? (
-            <div className="min-w-0 w-full sm:w-[200px]">{projectPicker}</div>
-          ) : null}
-          <div className="ml-auto flex items-center">
+            <div className="min-w-0 flex-1">{projectPicker}</div>
+          ) : (
+            <div className="flex-1" />
+          )}
+          {newIssueRepo ? (
             <Button
               variant="outline"
-              size="icon"
-              onClick={() => setNonce((n) => n + 1)}
-              disabled={loading}
-              aria-label={translate('auto.components.GiteaTaskList.refresh', 'Refresh Gitea tasks')}
-              className="size-8 border-border/50 bg-transparent hover:bg-muted/50"
+              size="sm"
+              onClick={() => setNewIssueOpen(true)}
+              className="shrink-0 gap-1.5 border-border/50 bg-transparent hover:bg-muted/50"
             >
-              {loading ? (
-                <LoaderCircle className="size-4 animate-spin" />
-              ) : (
-                <RefreshCw className="size-4" />
-              )}
+              <Plus className="size-4" />
+              {translate('auto.components.GiteaTaskList.newIssue', 'New issue')}
             </Button>
-          </div>
+          ) : null}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setNonce((n) => n + 1)}
+            disabled={loading}
+            aria-label={translate('auto.components.GiteaTaskList.refresh', 'Refresh Gitea tasks')}
+            className="size-8 shrink-0 border-border/50 bg-transparent hover:bg-muted/50"
+          >
+            {loading ? (
+              <LoaderCircle className="size-4 animate-spin" />
+            ) : (
+              <RefreshCw className="size-4" />
+            )}
+          </Button>
         </div>
         <div className="flex flex-wrap gap-2">
           {getFilterPresets().map(({ id, label }) => (
@@ -226,6 +258,15 @@ export function GiteaTaskList({
           </div>
         )}
       </div>
+
+      {newIssueRepo ? (
+        <GiteaNewIssueDialog
+          open={newIssueOpen}
+          onOpenChange={setNewIssueOpen}
+          repoName={newIssueRepo.displayName}
+          onCreate={handleCreateIssue}
+        />
+      ) : null}
     </div>
   )
 }
