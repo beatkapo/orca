@@ -6,6 +6,7 @@ import {
   GitLabIntegrationCard
 } from './source-control-integration-cards'
 import {
+  GiteaTaskIntegrationCard,
   GlpiTaskIntegrationCard,
   JiraIntegrationCard,
   LinearIntegrationCard
@@ -55,6 +56,7 @@ export function IntegrationsPane(): React.JSX.Element {
         <div className="space-y-3">
           <LinearIntegrationCard />
           <JiraIntegrationCard />
+          <GiteaTaskIntegrationCard />
           <GlpiTaskIntegrationCard />
         </div>
       </section>

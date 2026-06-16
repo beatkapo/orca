@@ -227,4 +227,5 @@ function ProviderAccountScopeRow({ scope }: { scope: ReturnType<typeof getProvid
 }
 
 export { JiraIntegrationCard } from './jira-integration-card'
+export { GiteaTaskIntegrationCard } from './gitea-integration-card'
 export { GlpiTaskIntegrationCard } from './glpi-integration-card'

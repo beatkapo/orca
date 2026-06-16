@@ -21,6 +21,7 @@ describe('task providers', () => {
       'gitlab',
       'linear',
       'jira',
+      'gitea',
       'glpi'
     ])
   })
@@ -121,5 +122,24 @@ describe('task providers', () => {
         linearConnected: false
       })
     ).toEqual(['github'])
+  })
+
+  it('hides Gitea until a server connection is configured', () => {
+    expect(
+      filterAvailableTaskProviders(['github', 'gitea'], {
+        gitlabInstalled: false,
+        linearConnected: false
+      })
+    ).toEqual(['github'])
+  })
+
+  it('exposes Gitea once a server connection is configured', () => {
+    expect(
+      filterAvailableTaskProviders(['github', 'gitea'], {
+        gitlabInstalled: false,
+        linearConnected: false,
+        giteaConfigured: true
+      })
+    ).toEqual(['github', 'gitea'])
   })
 })

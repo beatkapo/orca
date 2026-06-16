@@ -1,10 +1,11 @@
-export type TaskProvider = 'github' | 'gitlab' | 'linear' | 'jira' | 'glpi'
+export type TaskProvider = 'github' | 'gitlab' | 'linear' | 'jira' | 'gitea' | 'glpi'
 
 export const TASK_PROVIDERS: readonly TaskProvider[] = [
   'github',
   'gitlab',
   'linear',
   'jira',
+  'gitea',
   'glpi'
 ]
 
@@ -61,6 +62,9 @@ export function normalizeVisibleTaskProviders(value: unknown): TaskProvider[] {
 export type TaskProviderAvailability = {
   gitlabInstalled: boolean
   linearConnected: boolean
+  // Optional so existing call sites keep compiling; Gitea stays hidden from the
+  // Tasks surface until at least one server connection is configured.
+  giteaConfigured?: boolean
 }
 
 export function filterAvailableTaskProviders(
@@ -111,6 +115,11 @@ function isTaskProviderAvailable(
   // setup.
   if (provider === 'jira' || provider === 'glpi') {
     return true
+  }
+  // Why: Gitea needs a self-hosted server + token before any read can work, so
+  // it stays hidden until a connection is configured (like gitlab's CLI gate).
+  if (provider === 'gitea') {
+    return availability.giteaConfigured === true
   }
   return availability.linearConnected
 }

@@ -5,6 +5,8 @@ export type TaskPageListChromeVisibilityState = {
   hasGitHubDetail: boolean
   hasGitLabDetail: boolean
   hasJiraDetail: boolean
+  // Optional until the Gitea detail panel is wired into TaskPage.
+  hasGiteaDetail?: boolean
   hasGlpiDetail: boolean
   hasLinearIssueDetail: boolean
   hasLinearProjectContext: boolean
@@ -16,6 +18,7 @@ export function shouldHideTaskPageListChrome({
   hasGitHubDetail,
   hasGitLabDetail,
   hasJiraDetail,
+  hasGiteaDetail,
   hasGlpiDetail,
   hasLinearIssueDetail,
   hasLinearProjectContext,
@@ -30,6 +33,8 @@ export function shouldHideTaskPageListChrome({
       return hasGitLabDetail
     case 'jira':
       return hasJiraDetail
+    case 'gitea':
+      return hasGiteaDetail === true
     case 'glpi':
       return hasGlpiDetail
     case 'linear':

@@ -1712,6 +1712,32 @@ export type {
 } from './jira-types'
 
 export type {
+  GiteaComment,
+  GiteaConnectArgs,
+  GiteaConnectionStatus,
+  GiteaCreateIssueArgs,
+  GiteaCreateIssueResult,
+  GiteaIssue,
+  GiteaIssueFilter,
+  GiteaIssueUpdate,
+  GiteaLabel,
+  GiteaMutationResult,
+  GiteaMergeMethod,
+  GiteaPRCheck,
+  GiteaPRFile,
+  GiteaPRFileContents,
+  GiteaPRFileStatus,
+  GiteaPRReviewComment,
+  GiteaPullRequestDetail,
+  GiteaServer,
+  GiteaServerSelection,
+  GiteaUser,
+  GiteaViewer,
+  GiteaWorkItem,
+  GiteaWorkItemFilter
+} from './gitea-types'
+
+export type {
   GlpiConnectArgs,
   GlpiConnectionStatus,
   GlpiCreateTicketArgs,

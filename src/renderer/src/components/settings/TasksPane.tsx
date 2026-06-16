@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { GlpiIcon } from '@/components/icons/GlpiIcon'
 import { JiraIcon } from '@/components/icons/JiraIcon'
 import { LinearIcon } from '@/components/icons/LinearIcon'
+import { GiteaIcon } from '@/components/icons/GiteaIcon'
 import { Label } from '../ui/label'
 import { SearchableSetting } from './SearchableSetting'
 import { SettingsSubsectionHeader } from './SettingsFormControls'
@@ -78,6 +79,19 @@ const TASK_PROVIDER_OPTIONS: readonly {
     Icon: ({ className }) => <JiraIcon className={className} />
   },
   {
+    id: 'gitea',
+    get label() {
+      return translate('auto.components.settings.TasksPane.d8a6f1c3fe', 'Gitea')
+    },
+    get description() {
+      return translate(
+        'auto.components.settings.TasksPane.a054078ab7',
+        'Show Gitea in the Tasks source picker and sidebar shortcuts.'
+      )
+    },
+    Icon: ({ className }) => <GiteaIcon className={className} />
+  },
+  {
     id: 'glpi',
     get label() {
       return translate('auto.components.settings.TasksPane.db2872c3eb', 'GLPI')
@@ -137,6 +151,7 @@ export function TasksPane({ settings, updateSettings }: TasksPaneProps): React.J
             'linear',
             'jira',
             'atlassian',
+            'gitea',
             'glpi',
             'itsm',
             'display',
