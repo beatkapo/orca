@@ -23,6 +23,8 @@ import type {
   GitHubCommentResult,
   GitHubWorkItem,
   GitPushTarget,
+  GitForkSyncExpectedUpstream,
+  GitForkSyncResult,
   GitUpstreamStatus,
   GhosttyImportPreview,
   ListWorkItemsResult,
@@ -36,6 +38,7 @@ import type {
   NotificationSoundResult,
   NestedRepoScanResult,
   OnboardingState,
+  PersistedUIState,
   FloatingTerminalCwdRequest,
   MarkdownDocument,
   SearchResult,
@@ -475,6 +478,8 @@ const api = {
 
     pickFolder: () => ipcRenderer.invoke('repos:pickFolder'),
 
+    pickFolders: () => ipcRenderer.invoke('repos:pickFolders'),
+
     pickDirectory: () => ipcRenderer.invoke('repos:pickDirectory'),
 
     clone: (args) => ipcRenderer.invoke('repos:clone', args),
@@ -609,9 +614,16 @@ const api = {
 
     persistSortOrder: (args) => ipcRenderer.invoke('worktrees:persistSortOrder', args),
 
-    onChanged: (callback: (data: { repoId: string }) => void): (() => void) => {
-      const listener = (_event: Electron.IpcRendererEvent, data: { repoId: string }) =>
-        callback(data)
+    onChanged: (
+      callback: (data: {
+        repoId: string
+        renamed?: { oldWorktreeId: string; newWorktreeId: string }
+      }) => void
+    ): (() => void) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        data: { repoId: string; renamed?: { oldWorktreeId: string; newWorktreeId: string } }
+      ) => callback(data)
       ipcRenderer.on('worktrees:changed', listener)
       return () => ipcRenderer.removeListener('worktrees:changed', listener)
     },
@@ -1096,6 +1108,7 @@ const api = {
       sourceContext?: TaskSourceContext | null
       prNumber: number
       enabled: boolean
+      method?: 'merge' | 'squash' | 'rebase'
       prRepo?: { owner: string; repo: string } | null
     }): Promise<{ ok: true } | { ok: false; error: string }> =>
       ipcRenderer.invoke('gh:setPRAutoMerge', args),
@@ -1503,6 +1516,150 @@ const api = {
 
     listTransitions: (args: { key: string; siteId?: string }): Promise<unknown[]> =>
       ipcRenderer.invoke('jira:listTransitions', args)
+  },
+
+  gitea: {
+    connect: (args: {
+      baseUrl: string
+      token: string
+    }): Promise<{ ok: true; viewer: unknown } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('gitea:connect', args),
+
+    disconnect: (args?: { serverId?: string }): Promise<void> =>
+      ipcRenderer.invoke('gitea:disconnect', args),
+
+    selectServer: (args: { serverId: string }): Promise<unknown> =>
+      ipcRenderer.invoke('gitea:selectServer', args),
+
+    status: (): Promise<unknown> => ipcRenderer.invoke('gitea:status'),
+
+    testConnection: (args?: {
+      serverId?: string
+    }): Promise<{ ok: true; viewer: unknown } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('gitea:testConnection', args),
+
+    listWorkItems: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+      filter?: 'assigned' | 'created' | 'all' | 'closed'
+      limit?: number
+    }): Promise<unknown[]> => ipcRenderer.invoke('gitea:listWorkItems', args),
+
+    issue: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+      number: number
+    }): Promise<unknown> => ipcRenderer.invoke('gitea:issue', args),
+
+    issueComments: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+      number: number
+    }): Promise<unknown[]> => ipcRenderer.invoke('gitea:issueComments', args),
+
+    labels: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+    }): Promise<unknown[]> => ipcRenderer.invoke('gitea:labels', args),
+
+    assignees: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+    }): Promise<unknown[]> => ipcRenderer.invoke('gitea:assignees', args),
+
+    prDetail: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+      number: number
+    }): Promise<unknown> => ipcRenderer.invoke('gitea:prDetail', args),
+
+    prFiles: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+      number: number
+    }): Promise<unknown[]> => ipcRenderer.invoke('gitea:prFiles', args),
+
+    prFileContents: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+      path: string
+      oldPath?: string
+      status: string
+      baseSha: string
+      headSha: string
+    }): Promise<unknown> => ipcRenderer.invoke('gitea:prFileContents', args),
+
+    prChecks: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+      headSha: string
+    }): Promise<unknown[]> => ipcRenderer.invoke('gitea:prChecks', args),
+
+    prMerge: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+      number: number
+      method?: string
+    }): Promise<{ ok: true } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('gitea:prMerge', args),
+
+    prReviewComments: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+      number: number
+    }): Promise<unknown[]> => ipcRenderer.invoke('gitea:prReviewComments', args),
+
+    prAddReviewComment: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+      number: number
+      path: string
+      line: number
+      body: string
+    }): Promise<{ ok: true } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('gitea:prAddReviewComment', args),
+
+    createIssue: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+      title: string
+      body?: string
+      assignees?: string[]
+      labelIds?: number[]
+    }): Promise<
+      { ok: true; id: number; number: number; url: string } | { ok: false; error: string }
+    > => ipcRenderer.invoke('gitea:createIssue', args),
+
+    updateIssue: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+      number: number
+      updates: unknown
+    }): Promise<{ ok: true } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('gitea:updateIssue', args),
+
+    addIssueComment: (args: {
+      repoPath: string
+      repoId?: string | null
+      sourceContext?: unknown
+      number: number
+      body: string
+    }): Promise<{ ok: true } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('gitea:addIssueComment', args)
   },
 
   starNag: {
@@ -2526,6 +2683,11 @@ const api = {
       connectionId?: string
       pushTarget?: GitPushTarget
     }): Promise<void> => ipcRenderer.invoke('git:fetch', args),
+    syncFork: (args: {
+      worktreePath: string
+      connectionId?: string
+      expectedUpstream: GitForkSyncExpectedUpstream
+    }): Promise<GitForkSyncResult> => ipcRenderer.invoke('git:syncFork', args),
     push: (args: {
       worktreePath: string
       publish?: boolean
@@ -2636,13 +2798,24 @@ const api = {
       relativePath: string
       line: number
       connectionId?: string
-    }): Promise<string | null> => ipcRenderer.invoke('git:remoteFileUrl', args)
+    }): Promise<string | null> => ipcRenderer.invoke('git:remoteFileUrl', args),
+    remoteCommitUrl: (args: {
+      worktreePath: string
+      sha: string
+      connectionId?: string
+    }): Promise<string | null> => ipcRenderer.invoke('git:remoteCommitUrl', args)
   },
 
   ui: {
     get: () => ipcRenderer.invoke('ui:get'),
     set: (args) => ipcRenderer.invoke('ui:set', args),
     recordFeatureInteraction: (id) => ipcRenderer.invoke('ui:recordFeatureInteraction', id),
+    onStateChanged: (callback: (ui: PersistedUIState) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, ui: PersistedUIState): void =>
+        callback(ui)
+      ipcRenderer.on('ui:stateChanged', listener)
+      return () => ipcRenderer.removeListener('ui:stateChanged', listener)
+    },
     onOpenSettings: (callback: () => void): (() => void) => {
       const listener = (_event: Electron.IpcRendererEvent) => callback()
       ipcRenderer.on('ui:openSettings', listener)
@@ -2752,11 +2925,18 @@ const api = {
         url: string
         worktreeId?: string
         sessionProfileId?: string
+        activate?: boolean
       }) => void
     ): (() => void) => {
       const listener = (
         _event: Electron.IpcRendererEvent,
-        data: { requestId: string; url: string; worktreeId?: string; sessionProfileId?: string }
+        data: {
+          requestId: string
+          url: string
+          worktreeId?: string
+          sessionProfileId?: string
+          activate?: boolean
+        }
       ) => callback(data)
       ipcRenderer.on('browser:requestTabCreate', listener)
       return () => ipcRenderer.removeListener('browser:requestTabCreate', listener)

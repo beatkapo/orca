@@ -165,7 +165,9 @@
         "editor": {
           "dcb521ed29": "This file is in a conflict state, but no working-tree file is available to edit.",
           "51f15c37d3": "Cannot open directory: {{value0}}",
-          "f2e00db373": "File not found: {{value0}}"
+          "f2e00db373": "File not found: {{value0}}",
+          "checkRunDetailsUnavailable": "No details are available for this check.",
+          "checkRunDetailsLoadFailed": "Failed to load check details."
         },
         "github": {
           "f129c42773": "GitHub did not return the new comment.",
@@ -1793,7 +1795,8 @@
             "fd15491034": "Open view in GitHub",
             "22df63c393": "Sub-issue data is unavailable for your token.",
             "067119985c": "GitHub search, e.g. assignee:@me is:open",
-            "1850fceac8": "{{value0}}/{{value1}} isn't added to Orca. Add it to start work, or open in GitHub."
+            "1850fceac8": "{{value0}}/{{value1}} isn't added to Orca. Add it to start work, or open in GitHub.",
+            "1aa7c952b9": "Project view"
           },
           "slug": {
             "dialog": {
@@ -2440,7 +2443,9 @@
             "efb33546ff": "Git Bash",
             "1a8af49530": "CMD Prompt",
             "2148f65e04": "PowerShell",
-            "ab589350e5": "Could not build launch command for {{value0}}."
+            "ab589350e5": "Could not build launch command for {{value0}}.",
+            "7a9b4af2af": "Scroll tabs left",
+            "232e075b07": "Scroll tabs right"
           },
           "TabBarCreateEntry": {
             "d62d63b807": "Create file",
@@ -3685,6 +3690,9 @@
         "WorktreeCardAgents": {
           "1b0a156717": "Agents"
         },
+        "WorktreeCardReviewDetailSection": {
+          "reviewHeader": "{{value0}} #{{value1}}"
+        },
         "WorktreeCardMeta": {
           "3e65e11cc6": "Workspace metadata",
           "c7fa72ead0": "Edit notes",
@@ -3922,7 +3930,9 @@
           "0dc4d1b657": "Enter a host path for the clone destination."
         },
         "useAddRepoLocalFolderFlow": {
-          "7ab10e4974": "Use a host path to add projects from a remote host."
+          "7ab10e4974": "Use a host path to add projects from a remote host.",
+          "skippedBatchFolders": "Some folders were skipped",
+          "skippedBatchFoldersDescription": "Add skipped folders individually to review or confirm them."
         },
         "useAddRepoNestedImportFlow": {
           "680cac2c82": "{{value0}} failed",
@@ -4274,7 +4284,13 @@
           "cfb3f35775": "Arguments",
           "6f99bf5dd0": "No default arguments",
           "8fbe1f37c1": "Environment",
-          "2d133152fa": "No default environment"
+          "2d133152fa": "No default environment",
+          "agentPermissions": "Agent Permissions",
+          "agentPermissionsInfo": "Agent permissions info",
+          "agentPermissionsTooltip": "Doesn't apply to agents where you've overridden launch arguments.",
+          "agentPermissionsDescription": "Choose whether Orca launches agents with fewer permission prompts or with manual checks.",
+          "agentPermissionsYolo": "Yolo",
+          "agentPermissionsManual": "Manual"
         },
         "AppIconSelector": {
           "d5a112dc9b": "Next icon",
@@ -4324,7 +4340,8 @@
             "tintColorDescription": "The color mixed into the left sidebar surface.",
             "tintOpacity": "Tint Strength",
             "tintOpacityDescription": "Controls how strongly the tint is mixed into the sidebar."
-          }
+          },
+          "workspaceCardLayoutGuidance": "Use the workspace sidebar options menu > Card layout > Compact."
         },
         "AutoRenameBranchFromWorkSetting": {
           "1626524572": "Nautilus",
@@ -4610,7 +4627,7 @@
           "e7bb06007c": "Local Network",
           "4a73f5217a": "Apple Events for scripts that control other local apps.",
           "e119f0d66b": "Automation",
-          "7ca17b62c8": "Persistent access to protected folders from terminal sessions.",
+          "7ca17b62c8": "Recommended when projects, worktrees, or symlinked files touch macOS-protected folders.",
           "c566bca278": "Full Disk Access",
           "9f35980756": "Keystroke injection, window control, and UI automation tools.",
           "5b2f22ca2d": "Accessibility",
@@ -4632,6 +4649,15 @@
           "0277901cf7": "Adds an Agents entry to the left sidebar with a threaded worktree feed for completed agents, blocking questions, unread state, and worktree creation events. Experimental — the event model and UI may change.",
           "a05bcdaf57": "Agents View",
           "f63ea281e3": "Threaded left-sidebar feed for agent completions and blocking states.",
+          "agentHibernation": {
+            "copy": "Stops idle background agent terminals after the configured idle window and resumes supported sessions when you open them again. Experimental while we tune the safety model.",
+            "description": "Stops idle background agent terminals after the configured idle window and resumes supported sessions when you open them again.",
+            "idleMinutesDescription": "How many idle minutes a completed background agent must wait before Orca can hibernate it.",
+            "idleMinutesLabel": "Hibernate after",
+            "idleMinutesSuffix": "minutes",
+            "title": "Agent hibernation",
+            "toggleLabel": "Toggle agent hibernation"
+          },
           "ca2219fe5e": "Shows a small animated pet pinned to the bottom-right corner. Pick a character (Claudino, OpenCode, Gremlin) or upload your own PNG, APNG, GIF, WebP, JPG, or SVG from the status-bar pet menu. Hide it any time from the same menu without disabling this setting.",
           "dd6f0a1d45": "Pet",
           "0e89a574ae": "Floating animated pet in the bottom-right corner."
@@ -5910,7 +5936,9 @@
           "dd67a1b6e1": "Show GitLab in the Tasks source picker and sidebar shortcuts.",
           "7c5d7fdc20": "GitLab",
           "1db47236cd": "Show GitHub in the Tasks source picker and sidebar shortcuts.",
-          "e14063e727": "GitHub"
+          "e14063e727": "GitHub",
+          "d8a6f1c3fe": "Gitea",
+          "a054078ab7": "Show Gitea in the Tasks source picker and sidebar shortcuts."
         },
         "TerminalAppearanceSection": {
           "a14a427ae4": "Thickness of the pane divider line.",
@@ -6335,7 +6363,9 @@
             "5784ae8c43": "rename",
             "8a17fd6026": "stable",
             "a79d266f71": "session",
-            "afbf35be68": "stable session"
+            "afbf35be68": "stable session",
+            "agentPermissions": "Agent Permissions",
+            "agentPermissionsDescription": "Switch agent permission defaults between Yolo and Manual."
           }
         },
         "appearance": {
@@ -6452,6 +6482,17 @@
             "leftSidebarAppearance": {
               "title": "Left Sidebar Appearance",
               "description": "Make the left sidebar match your terminal, stay default, or use a tint."
+            },
+            "workspaceCardLayout": {
+              "title": "Workspace Card Layout",
+              "description": "Switch between compact and detailed workspace cards from the workspace sidebar options menu.",
+              "compact": "compact",
+              "compactDisplay": "compact display",
+              "workspaceCards": "workspace cards",
+              "worktreeCards": "worktree cards",
+              "cardLayout": "card layout",
+              "workspaceOptions": "workspace options",
+              "detailed": "detailed"
             }
           }
         },
@@ -6642,7 +6683,7 @@
               "a0c19119fb": "downloads",
               "4438f81bfa": "documents",
               "c10e36cbd1": "full disk access",
-              "05ab708ee5": "Open the macOS privacy pane for broad terminal file access.",
+              "05ab708ee5": "Open the macOS privacy pane for protected project and worktree file access.",
               "bbf543a3a1": "Full Disk Access",
               "7f145a3984": "window",
               "5610022e1e": "automation",
@@ -6696,6 +6737,16 @@
             "9bb3bd5098": "terminal",
             "11877246fc": "Persistent pane highlight for terminal bell and agent-completion events.",
             "9e4ddf776d": "Terminal attention",
+            "agentHibernation": {
+              "agent": "agent",
+              "agents": "agents",
+              "description": "Stops idle background agent terminals after the configured idle window and resumes supported sessions when opened again.",
+              "hibernate": "hibernate",
+              "minutes": "minutes",
+              "sleep": "sleep",
+              "terminal": "terminal",
+              "title": "Agent hibernation"
+            },
             "fe5688b761": "sidebar",
             "ca5d1f3f46": "timeline",
             "d01b3882ba": "notifications",
@@ -7338,7 +7389,9 @@
             "cd73b976d7": "repository name",
             "92af66c7ce": "project name",
             "883aad2801": "Project-specific display details for the sidebar and tabs.",
-            "7e1e456a95": "Display Name"
+            "7e1e456a95": "Display Name",
+            "keepForkUpToDate": "Keep Fork Up to Date",
+            "keepForkUpToDateDescription": "Safely fast-forward this fork from upstream."
           }
         },
         "runtime": {
@@ -7868,6 +7921,52 @@
           "workspaceDirectory": "The client default is inherited until a host needs its own worktree directory.",
           "providerHost": "Provider host",
           "providerAccounts": "Credentials and account checks belong to the local client or selected remote server that owns the provider integration."
+        },
+        "RepositoryForkSyncSection": {
+          "defaultBranch": "default branch",
+          "synced": "Fork updated",
+          "syncedDescriptionSingular": "Fast-forwarded {{branch}} by 1 commit.",
+          "syncedDescriptionPlural": "Fast-forwarded {{branch}} by {{count}} commits.",
+          "upToDate": "Fork already up to date",
+          "upToDateDescription": "{{branch}} already matches upstream.",
+          "missingOrigin": "origin remote is missing.",
+          "missingUpstream": "upstream remote is missing.",
+          "upstreamMismatch": "upstream remote no longer matches this fork.",
+          "missingUpstreamBranch": "upstream default branch could not be resolved.",
+          "missingOriginBranch": "origin does not have the upstream default branch.",
+          "diverged": "origin has commits that are not in upstream.",
+          "blocked": "Fork sync skipped",
+          "blockedFallback": "Orca could not fast-forward this fork safely.",
+          "failed": "Fork sync failed",
+          "title": "Keep Fork Up to Date",
+          "description": "Safely fast-forward this fork from upstream.",
+          "longDescription": "When this fork is behind upstream, Orca can safely fast-forward its default branch. Orca skips the update if the branch has local-only commits or conflicts.",
+          "forkOf": "Fork of {{owner}}/{{repo}}",
+          "syncing": "Syncing",
+          "syncNow": "Sync Now",
+          "modeLabel": "Fork sync mode",
+          "ask": "Ask",
+          "safeAuto": "Safe Auto",
+          "off": "Off"
+        },
+        "gitea": {
+          "integration": {
+            "card": {
+              "069f07af1c": "{{value0}} server{{value1}} connected",
+              "31b7f980fb": "Checking Gitea access before showing setup actions.",
+              "5a8cd33300": "Browse, create, and start work from Gitea issues.",
+              "d4e5f6a7b8": "Connection failed.",
+              "bdcb1e773f": "Add server",
+              "9ce5f12a0d": "Connect Gitea",
+              "3852b1fd6f": "Verified",
+              "09bde44485": "Testing...",
+              "2bf28d5929": "Test",
+              "d0b31b4845": "Disconnect {{value0}}",
+              "f47924e554": "Each connected Gitea server stores one token, encrypted locally.",
+              "c043731756": "Connect a self-hosted Gitea server with its URL and a personal access token. Credentials are stored locally and encrypted when local runtime storage supports it.",
+              "9a555db81e": "Re-check"
+            }
+          }
         }
       },
       "right": {
@@ -7954,7 +8053,8 @@
           "FileExplorer": {
             "79b1537dd3": "Select a workspace to browse files",
             "4da4d89845": "Back to Explorer",
-            "6ed5ce817b": "Search"
+            "6ed5ce817b": "Search",
+            "2f4483d6c4": "No files match this filter"
           },
           "FileExplorerBackgroundMenu": {
             "3b5e2dcb8d": "New Folder",
@@ -7991,7 +8091,8 @@
             "31b4c3195d": "More Explorer Actions",
             "d95e30fe28": "Refresh Explorer",
             "6026b16950": "Collapse All",
-            "693cbeadd0": "Search"
+            "693cbeadd0": "Search",
+            "c1f3f3ec70": "Search file contents"
           },
           "FileExplorerTreeStatus": {
             "ce03835e1f": "No files in this workspace",
@@ -8008,7 +8109,8 @@
             "9a8b85882d": "loading",
             "62e685d5ec": "idle",
             "111e1d0db4": "error",
-            "e5e81e59a6": "Resize commits"
+            "e5e81e59a6": "Resize commits",
+            "6d1e0a7c3b": "Failed to load commit files"
           },
           "HostedReviewActions": {
             "4d5fb5a284": "Close",
@@ -8116,6 +8218,10 @@
             "4567e6e0b6": "Match Whole Word",
             "464ae3974f": "Match Case",
             "693cbeadd0": "Search"
+          },
+          "SearchQueryRow": {
+            "queryLabel": "Search files",
+            "clearLabel": "Clear search"
           },
           "SearchResultItems": {
             "cc06595a3b": "Copy Line Path",
@@ -8281,7 +8387,14 @@
             "e2b7a1c0d9f4": "Failed to create {{value0}}",
             "hugeRepoIgnorePrompt": "This repository has too many active changes. Add \"{{value0}}\" to .gitignore?",
             "hugeRepoIgnoreAction": "Add to .gitignore",
-            "tooManyChanges": "Too many changes detected. Only the first {{value0}} are shown."
+            "tooManyChanges": "Too many changes detected. Only the first {{value0}} are shown.",
+            "bf5082de46": "{{value0}} copied",
+            "c06193ef57": "Failed to copy {{value0}}",
+            "d172a4f068": "Commit hash",
+            "e283b50179": "Commit message",
+            "f394c6128a": "No agent available to explain this commit",
+            "04a5d7239b": "This repository has no supported web remote",
+            "15b6e834ac": "Failed to open commit in browser"
           },
           "SourceControlAgentActionDialog": {
             "8e856842d1": "Could not start the selected agent.",
@@ -8475,7 +8588,9 @@
             "6306b48afd": "source-control",
             "ef182dcb12": "search",
             "fc3095d2ed": "explorer",
-            "aiVaultSessionHistory": "Agents"
+            "aiVaultSessionHistory": "Agents",
+            "folderWorkspaces": "Attached worktrees",
+            "parentPrChecks": "PR Checks"
           },
           "right": {
             "panel": {
@@ -8614,11 +8729,14 @@
           "AiVaultPanel": {
             "resumeCommandCopied": "Resume command copied",
             "valueCopied": "{{value0}} copied",
+            "valueCopyFailed": "Unable to copy {{value0}}",
             "openWorkspaceBeforeResuming": "Open a workspace before resuming a session.",
             "localWorkspacesOnly": "Resume from history is only available in local workspaces.",
             "agentSessionQueued": "{{value0}} session queued",
             "sessionHistory": "Agent Session History",
+            "agents": "Agents",
             "shownRecent": "{{value0}} shown · {{value1}} recent",
+            "sessionsShownCompact": "{{value0}} shown",
             "resumePastSessions": "Resume past sessions",
             "refreshSessionHistory": "Refresh Session History",
             "searchSessions": "Search sessions",
@@ -8667,6 +8785,7 @@
             "usageValue": "{{value0}} msgs{{value1}}",
             "tokenSuffix": " · {{value0}} tok",
             "session": "Session",
+            "sessionId": "Session ID",
             "copyDetailValue": "Copy {{value0}}",
             "latestLog": "Latest log",
             "noReadablePreview": "No readable message preview in this transcript.",
@@ -8696,6 +8815,7 @@
           "AiVaultSessionRow": {
             "resumeAgentSession": "Resume {{value0}} session",
             "resumeInNewTab": "Resume in New Tab",
+            "toggleSessionDetails": "{{value0}} session details",
             "copyResumeCommand": "Copy Resume Command",
             "openLog": "Open Log",
             "revealLog": "Reveal Log",
@@ -8703,7 +8823,36 @@
             "copySessionId": "Copy Session ID",
             "copyLogPath": "Copy Log Path",
             "messageCount": "{{value0}} msgs",
-            "tokenCount": "{{value0}} tok"
+            "tokenCount": "{{value0}} tok",
+            "hideDetails": "Hide Details",
+            "showDetails": "Show Details",
+            "moreSessionActions": "More Session Actions",
+            "moreActions": "More Actions"
+          },
+          "FileExplorerNameFilter": {
+            "26fb73c6e3": "Find files",
+            "4d5a6b2a49": "Clear file filter",
+            "7a9fb1e6aa": "Contents"
+          },
+          "FileExplorerViewSwitch": {
+            "c4e9a2b713": "Names",
+            "b3c8f1a902": "Filter files by name",
+            "f8a2c4d1e0": "Explorer search mode"
+          },
+          "GitHistoryCommitFiles": {
+            "a1b2c3d4e5": "Loading files…",
+            "b2c3d4e5f6": "No file changes in this commit",
+            "c3d4e5f6a7": "Open all changes together"
+          },
+          "GitHistoryRow": {
+            "2f9c41ab07": "Show files in commit {{value0}}: {{value1}}",
+            "4a8d9e0c1f": "Hide files in commit {{value0}}: {{value1}}"
+          },
+          "GitHistoryCommitContextMenu": {
+            "7b1c4e9a02": "Open commit in browser",
+            "8c2d5fab13": "Copy commit hash",
+            "9d3e60bc24": "Copy commit message",
+            "ae4f71cd35": "Explain changes"
           }
         }
       },
@@ -8773,7 +8922,10 @@
           "69af7e9c1c": "isn't on your PATH yet. Orca will set it as your default and you can install it any time.",
           "1eee1c7bd8": "No agents detected on your PATH. Pick one to install later, or continue with a blank terminal.",
           "hideAgents": "Hide agents",
-          "showMoreAgents": "Show {{value0}} more agents→"
+          "showMoreAgents": "Show {{value0}} more agents→",
+          "yoloPermissionsLabel": "Yolo / Dangerously skip permissions",
+          "yoloPermissionsInfo": "Agent permission info",
+          "yoloPermissionsTooltip": "Skip permission checks for agents for less interruptions"
         },
         "FeatureSetupChecklist": {
           "77f74946f5": "Agents can message each other, take tasks, and coordinate handoffs.",
@@ -9594,6 +9746,17 @@
                 "close_step": "Close"
               }
             }
+          },
+          "FullDiskAccessSetupPrompt": {
+            "bbb3f1e404": "Checking",
+            "48d87edcd2": "Granted",
+            "6db9a69f4e": "Recommended",
+            "fa809e8ada": "Opened macOS Privacy & Security",
+            "bfa3402305": "Could not request permission",
+            "c566bca278": "Full Disk Access",
+            "0d6efe9cf4": "Recommended on macOS when projects or worktrees live in protected folders.",
+            "dac08ec03e": "Opening...",
+            "6e3d62b816": "Open Full Disk Access"
           }
         },
         "tips": {
@@ -9793,7 +9956,9 @@
           "f5cf81cec2": "Loading diff...",
           "72f71f52eb": "Text diff is unavailable for this file.",
           "7ce8436458": "Text diff is unavailable for this file in branch compare.",
-          "bdbf02d5df": "binary"
+          "bdbf02d5df": "binary",
+          "b5675b0694": "Save",
+          "593f2193f6": "This draft crossed the safe display limit, but it can still be saved."
         },
         "DiffSectionHeader": {
           "8915726e93": "Copy path"
@@ -9814,7 +9979,8 @@
           "8a0898ae4c": "Text diff is unavailable for this file.",
           "3c6e71df22": "Text diff is unavailable for this file in branch compare.",
           "d07e4b8553": "branch",
-          "d16e037f40": "rich"
+          "d16e037f40": "rich",
+          "6c4f1a8d2e": "Check details are unavailable."
         },
         "EditorPanelHeader": {
           "fb8331694e": "Open Preview to the Side",
@@ -9928,7 +10094,8 @@
           "06357eea60": "Table of Contents",
           "27d0a9c49a": "Table of contents",
           "65b036a6c8": "Expand {{value0}}",
-          "97ad46f11f": "Collapse {{value0}}"
+          "97ad46f11f": "Collapse {{value0}}",
+          "8f4d2c1a9b": "Resize table of contents"
         },
         "MarkdownTemplatePicker": {
           "22cd94426f": "untitled.md",
@@ -10160,6 +10327,47 @@
         },
         "useRichMarkdownReviewData": {
           "f9d2acd6b0": "All unsent notes"
+        },
+        "LargeDiffFallback": {
+          "a3c74f8a21": "line count exceeds the safe display limit",
+          "fd92fbde46": "character count exceeds the safe display limit",
+          "7d424bb761": "This diff is too large to display safely.",
+          "28aa2cc90b": "Original lines",
+          "20857938dd": "Modified lines",
+          "e5f0d2182e": "Characters",
+          "877c25a02f": "Reason",
+          "5fca073b72": "Limits",
+          "f1d136a163": "lines per side",
+          "23433fcdea": "combined characters",
+          "7944ed9fb8": "Not counted"
+        },
+        "DiffViewer": {
+          "b5675b0694": "Save",
+          "593f2193f6": "This draft crossed the safe display limit, but it can still be saved."
+        },
+        "CheckRunDetailsPanel": {
+          "8f2d0f5a91": "Passed",
+          "4c8e1b2d73": "Failed",
+          "91a4c7e2b0": "Cancelled",
+          "2f6d8a1c45": "Timed out",
+          "7b3e9d4f12": "Skipped",
+          "5a1c8e3d67": "Neutral",
+          "3d9f2b8e14": "Pending",
+          "b7f5e2c91a": "Refresh",
+          "a54ae21c6f": "Status:",
+          "fd46a70f1a": "Started",
+          "00e1c1658a": "Completed",
+          "aa8494ae3c": "check #",
+          "2dd5ddabc4": "workflow #",
+          "1f2b980522": "Loading check details…",
+          "d098e5529a": "Output",
+          "f2fe8a4e8f": "Annotations",
+          "cdbfda4dec": "Annotation",
+          "066fedd446": "Failed jobs",
+          "49731703ea": "Jobs",
+          "ee07b33924": "unknown",
+          "07eccfa397": "No details are available for this check.",
+          "a916648574": "Open details"
         }
       },
       "diff": {
@@ -10828,6 +11036,58 @@
           }
         }
       },
+      "rightSidebar": {
+        "FolderWorkspaceWorktreesPanel": {
+          "unavailable": "Workspaces are only shown for folder workspaces.",
+          "label": "Workspaces",
+          "description": "Shows worktrees attached to this folder workspace.",
+          "countOne": "1 attached worktree",
+          "countMany": "{{value0}} attached worktrees",
+          "emptyTitle": "No attached worktrees yet",
+          "emptyCopy": "Worktrees created from this workspace will show up here."
+        },
+        "FolderWorkspacePrChecksPanel": {
+          "unavailable": "PR checks are only shown for folder workspaces.",
+          "refresh": "Refresh PR checks",
+          "emptyTitle": "No attached worktrees yet",
+          "emptyCopy": "PR checks will appear here after worktrees are attached to this folder workspace.",
+          "openChecksTab": "Open {{value0}} Checks tab",
+          "openReviewExternally": "Open {{value0}} externally",
+          "summary": "{{value0}} attached · {{value1}} with PR/MR · {{value2}} attention · {{value3}} pending · {{value4}} passing · {{value5}} no PR · {{value6}} unknown",
+          "showDetails": "Show {{value0}} PR check details",
+          "hideDetails": "Hide {{value0}} PR check details"
+        },
+        "parentPrChecks": {
+          "rowSummary": {
+            "failingCount": "{{value0}} failing",
+            "pendingCount": "{{value0}} pending",
+            "checksFailing": "Checks failing",
+            "mergeConflicts": "Merge conflicts",
+            "checksPending": "Checks pending",
+            "checksPassing": "Checks passing",
+            "merged": "Merged",
+            "closedWithoutMerge": "Closed without merge",
+            "draftReview": "Draft review",
+            "noCheckSignal": "No check signal",
+            "reviewUnavailable": "Review status unavailable",
+            "noPrLinked": "No PR linked",
+            "detailsUnavailable": "Review details unavailable",
+            "refreshFailed": "Refresh failed",
+            "checking": "Checking review status…",
+            "notFetched": "Status not fetched yet",
+            "unavailableWorktree": "Unavailable for this worktree"
+          },
+          "groups": {
+            "needsAttention": "Needs attention",
+            "pending": "Pending",
+            "merged": "Merged",
+            "passing": "Passing",
+            "draftOrNoChecks": "Draft / no checks",
+            "noPr": "No PR",
+            "unavailable": "Unavailable"
+          }
+        }
+      },
       "link": {
         "routing": {
           "preference": {
@@ -10878,6 +11138,13 @@
               "chooseSource": "Choose task source"
             }
           }
+        },
+        "page": {
+          "localized": {
+            "options": {
+              "3de5a79478": "Gitea"
+            }
+          }
         }
       },
       "taskPageEmptyState": {
@@ -10896,6 +11163,155 @@
         "sourceUnavailable": "{{value0}} source unavailable: {{value1}}",
         "someSourceHostsUnavailable": "Some {{value0}} source hosts unavailable: {{value1}}",
         "reconnectOrUpdateTitle": "Reconnect or update {{value0}} to load this source."
+      },
+      "gitea": {
+        "connect": {
+          "dialog": {
+            "d2823a1de0": "Connect Gitea server",
+            "d076a10ae3": "Use a Gitea server URL and a personal access token to browse and manage issues.",
+            "690c1da1bb": "Gitea server URL",
+            "83b75fa9b7": "https://gitea.example.com",
+            "062ae1ea05": "Access token",
+            "79c04f358b": "Gitea personal access token",
+            "3ecb3e1153": "Create a token under your Gitea user settings → Applications, with read/write access to issues.",
+            "4d1f2d9f21": "Your token is stored locally and encrypted when local runtime storage supports it.",
+            "7acfed1da5": "Cancel",
+            "f5d526570f": "Verifying…",
+            "f68c3d011f": "Connect"
+          }
+        },
+        "issue": {
+          "meta": {
+            "controls": {
+              "ba343731c0": "Failed to update issue.",
+              "63f46a8d86": "Title",
+              "8cc407607b": "Labels",
+              "11fac85e07": "No labels in this repo.",
+              "401f7dc7a2": "Assignees",
+              "3cd6f5acbd": "No assignable users."
+            }
+          },
+          "comments": {
+            "8608602d16": "Comments",
+            "ea3f6f14a1": "No comments yet.",
+            "6a519bdb1c": "Unknown"
+          }
+        },
+        "pr": {
+          "file": {
+            "diff": {
+              "81e07de6a5": "Binary file not shown.",
+              "f1a2b3c4d5": "Failed to load file diff.",
+              "e6f7a8b9c0": "Retry"
+            }
+          },
+          "checks": {
+            "bed82a55cd": "No status checks reported for this PR.",
+            "448c6113a4": "Open check details"
+          },
+          "line": {
+            "comments": {
+              "489b36633a": "Line {{value0}}",
+              "c01a062b92": "Unknown",
+              "4e59b0c4f8": "Line #",
+              "a43b5cc38b": "New-file line number from the diff",
+              "02339776da": "Review comment…",
+              "317313f8af": "Comment",
+              "6cbd906d88": "Comment on a line"
+            }
+          },
+          "tab": {
+            "body": {
+              "1fe3a05742": "No description provided.",
+              "413feaa83a": "Inline",
+              "5372c28376": "Side by side",
+              "53ab0c5a49": "No changed files."
+            }
+          },
+          "merge": {
+            "button": {
+              "2378ab4908": "Conflicts",
+              "8e662b9b6b": "Merge"
+            }
+          }
+        },
+        "new": {
+          "issue": {
+            "dialog": {
+              "db951c3a29": "New issue in {{value0}}",
+              "b42f72cfc5": "Create an issue in the selected Gitea project.",
+              "becfadf1df": "Title",
+              "6c8b731fb2": "Description",
+              "032fd2ed27": "Cancel",
+              "5e1d23a112": "Create issue"
+            }
+          }
+        }
+      },
+      "GiteaTaskList": {
+        "heading": "Issues & pull requests",
+        "c07dd13940": "All open",
+        "ab2a229e50": "Assigned to me",
+        "74f30cd767": "Created",
+        "031c70d963": "Closed",
+        "bf66fad935": "All",
+        "65a3bffe7a": "Issues",
+        "9b21aab4c9": "PRs",
+        "9986e0e679": "Merged",
+        "747423c0f8": "Draft",
+        "980519b0c8": "Open",
+        "0285721e62": "Failed to load Gitea tasks.",
+        "5997067bee": "New issue",
+        "e3db16e7c7": "Refresh Gitea tasks",
+        "34cd2d1024": "Select a Gitea-hosted project to see its issues and pull requests.",
+        "6e1e6691d7": "Loading Gitea tasks…",
+        "00f67933b5": "No open issues or pull requests."
+      },
+      "GiteaIssueWorkspace": {
+        "comments": "Comments",
+        "noComments": "No comments yet.",
+        "unknown": "Unknown",
+        "47b064c003": "{{value0}} copied",
+        "927222e135": "Failed to copy.",
+        "2d2e69fe70": "Failed to update issue.",
+        "b7c8d9e0f1": "Failed to load issue.",
+        "565680a39b": "Failed to add comment.",
+        "a792c22414": "Gitea item",
+        "01b6ea43ca": "Preview and start work from the selected Gitea item.",
+        "ce513e3ca2": "Close",
+        "e849a4c80f": "Start workspace",
+        "c0d4f97901": "Closed",
+        "ab08895bb5": "Open",
+        "1ab551635b": "Reopen",
+        "6b3c5a3144": "Close issue",
+        "63cbb99973": "Open in Gitea",
+        "c29b657be3": "Copy URL",
+        "ca242eaf5d": "No description provided.",
+        "0fee3f06ff": "Add a comment...",
+        "d3e0033e0f": "Comment"
+      },
+      "GiteaPullRequestWorkspace": {
+        "conflicts": "Conflicts",
+        "merge": "Merge",
+        "noDescription": "No description provided.",
+        "inline": "Inline",
+        "sideBySide": "Side by side",
+        "noFiles": "No changed files.",
+        "f5cf34ed40": "Failed to add comment.",
+        "c2d3e4f5a6": "Failed to load PR checks.",
+        "22f9c29c9b": "Pull request merged.",
+        "d93415a77d": "Failed to merge.",
+        "c7c84081fc": "Failed to add review comment.",
+        "f51240a59a": "Conversation",
+        "4f4abe43ab": "Files",
+        "95a6c97ba6": "Checks",
+        "8e44409da0": "Gitea pull request",
+        "0a432f2c1a": "Review files, checks, and conversation, then merge or start work.",
+        "5fa5ec9fff": "Close",
+        "f88c7cf08c": "Start workspace",
+        "9813b44d73": "Open in Gitea",
+        "ddc99ed766": "Add a comment...",
+        "d646ddef48": "Comment"
       }
     },
     "i18n": {

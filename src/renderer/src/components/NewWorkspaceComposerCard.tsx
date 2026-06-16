@@ -42,6 +42,7 @@ import type { NewWorkspaceProjectOption } from '@/lib/new-workspace-project-opti
 import type { ProjectHostSetupOption } from '@/lib/project-host-setup-options'
 import type { WorkspaceCreateErrorDisplay } from '@/lib/workspace-create-error-format'
 import type { SshConnectionStatus } from '../../../shared/ssh-types'
+import type { TaskSourceContext } from '../../../shared/task-source-context'
 import { translate } from '@/i18n/i18n'
 
 type RepoOption = React.ComponentProps<typeof RepoCombobox>['repos'][number]
@@ -79,6 +80,7 @@ type NewWorkspaceComposerCardProps = {
   onSmartLinearIssueSelect: (issue: LinearIssue) => void
   smartNameSelection: SmartWorkspaceNameSelection | null
   onClearSmartNameSelection: () => void
+  smartNameGitHubSourceContext?: TaskSourceContext | null
   /** Advisory shown under the name field when a fork PR can't accept maintainer pushes. */
   forkPushWarning: string | null
   detectedAgentIds: Set<TuiAgent> | null
@@ -307,6 +309,7 @@ export default function NewWorkspaceComposerCard({
   onSmartLinearIssueSelect,
   smartNameSelection,
   onClearSmartNameSelection,
+  smartNameGitHubSourceContext,
   forkPushWarning,
   detectedAgentIds,
   onOpenAgentSettings,
@@ -518,12 +521,10 @@ export default function NewWorkspaceComposerCard({
               projectPlaceholder ??
               translate('auto.components.NewWorkspaceComposerCard.dccd26d4e4', 'Choose project')
             }
-            // Why: programmatic .focus() from the Dialog's onOpenAutoFocus
-            // handler does not reliably trigger :focus-visible in Chromium.
-            // Mirror the Input component's standard ring (border-ring +
-            // ring-ring/50, 3px) onto :focus so the autofocused repo trigger
-            // paints the familiar field ring instead of leaving no visible
-            // focus state.
+            // Why: programmatic .focus() does not reliably trigger
+            // :focus-visible in Chromium. Mirror the Input component's
+            // standard ring (border-ring + ring-ring/50, 3px) onto :focus so
+            // keyboard navigation paints the familiar field ring.
             triggerClassName="h-9 w-full border-input text-sm focus:border-ring focus:ring-[3px] focus:ring-ring/50"
             invalid={Boolean(projectError)}
             describedBy={projectDescriptionId}
@@ -615,6 +616,7 @@ export default function NewWorkspaceComposerCard({
             onLinearIssueSelect={onSmartLinearIssueSelect}
             selectedSource={smartNameSelection}
             onClearSelectedSource={onClearSmartNameSelection}
+            githubSourceContext={smartNameGitHubSourceContext}
             disabled={selectedRepoRequiresConnection}
             disabledPlaceholder="Connect this repo first"
             textOnly={!selectedRepoIsGit}

@@ -87,6 +87,7 @@ import {
   getFolderWorkspacePathStatusForPath
 } from '../project-groups/folder-workspace-path-status'
 import { getGitCloneFailureMessage } from '../../shared/git-clone-failure-message'
+import { prepareLocalWorktreeRootForRepo } from '../worktree-root-preparation'
 
 // Why: `method` answers "which entry point did the user take?", not "what did
 // they add?" — so the IPC the renderer invoked IS the method. We never send
@@ -177,7 +178,10 @@ async function addLocalRepoFromPath(
     return { error: `Not a valid git repository: ${path}` }
   }
 
-  const existing = store.getRepos().find((r) => r.path === path)
+  const pathKey = normalizeRuntimePathForComparison(path)
+  const existing = store
+    .getRepos()
+    .find((repo) => !repo.connectionId && normalizeRuntimePathForComparison(repo.path) === pathKey)
   if (existing) {
     return { repo: existing, alreadyExisted: true }
   }
@@ -203,6 +207,7 @@ async function addLocalRepoFromPath(
   }
 
   store.addRepo(repo)
+  await prepareLocalWorktreeRootForRepo(store, repo)
   return { repo, alreadyExisted: false }
 }
 
@@ -1096,6 +1101,7 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
   ipcMain.removeHandler('folderWorkspaces:delete')
   ipcMain.removeHandler('folderWorkspaces:getPathStatus')
   ipcMain.removeHandler('repos:pickFolder')
+  ipcMain.removeHandler('repos:pickFolders')
   ipcMain.removeHandler('repos:pickDirectory')
   ipcMain.removeHandler('repos:clone')
   ipcMain.removeHandler('repos:cloneAbort')
@@ -1149,6 +1155,10 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
       const result = store.updateProjectHostSetup(args)
       if (!result) {
         throw new Error(`Project host setup not found: ${args.setupId}`)
+      }
+      if ('worktreeBasePath' in args.updates && result.repo) {
+        void prepareLocalWorktreeRootForRepo(store, result.repo)
+        invalidateAuthorizedRootsCache()
       }
       notifyReposChanged(mainWindow)
       return result
@@ -1212,7 +1222,16 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
       invalidateAuthorizedRootsCache()
       notifyReposChanged(mainWindow)
       emitRepoAdded('folder_picker', result.alreadyExisted)
-      return alignRepoWithRequestedProject(store, result.repo, args.projectId, args.setupMethod)
+      const aligned = alignRepoWithRequestedProject(
+        store,
+        result.repo,
+        args.projectId,
+        args.setupMethod
+      )
+      if (result.alreadyExisted) {
+        await prepareLocalWorktreeRootForRepo(store, aligned.repo)
+      }
+      return aligned
     }
   )
 
@@ -1492,6 +1511,7 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
               : {})
           }
           store.addRepo(repo)
+          await prepareLocalWorktreeRootForRepo(store, repo)
           if (args.connectionId) {
             getActiveMultiplexer(args.connectionId)?.notify('session.registerRoot', {
               rootPath: repoPath
@@ -1540,6 +1560,9 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
       const result = await addLocalRepoFromPath(store, args.path, args.kind)
       if ('error' in result) {
         return result
+      }
+      if (result.alreadyExisted) {
+        await prepareLocalWorktreeRootForRepo(store, result.repo)
       }
       invalidateAuthorizedRootsCache()
       notifyReposChanged(mainWindow)
@@ -1784,6 +1807,7 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
       }
 
       store.addRepo(repo)
+      await prepareLocalWorktreeRootForRepo(store, repo)
       invalidateAuthorizedRootsCache()
       notifyReposChanged(mainWindow)
       // Why: `repos:create` git-inits when kind is 'git', so `repoKind` is the
@@ -1834,6 +1858,7 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
             | 'kind'
             | 'symlinkPaths'
             | 'issueSourcePreference'
+            | 'forkSyncMode'
             | 'externalWorktreeVisibility'
             | 'externalWorktreeVisibilityPromptDismissedAt'
             | 'projectGroupId'
@@ -1857,6 +1882,15 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
         updates.issueSourcePreference !== 'auto'
       ) {
         delete updates.issueSourcePreference
+      }
+      if (
+        'forkSyncMode' in updates &&
+        updates.forkSyncMode !== undefined &&
+        updates.forkSyncMode !== 'ask' &&
+        updates.forkSyncMode !== 'safe-auto' &&
+        updates.forkSyncMode !== 'off'
+      ) {
+        delete updates.forkSyncMode
       }
       // Why: `symlinkPaths` is consumed by `createWorktreeSymlinks` which
       // calls `.trim()` on each entry. A renderer bug or preload-version skew
@@ -1927,6 +1961,7 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
       const updated = store.updateRepo(args.repoId, updates)
       if (updated) {
         if ('worktreeBasePath' in updates) {
+          void prepareLocalWorktreeRootForRepo(store, updated)
           invalidateAuthorizedRootsCache()
         }
         notifyReposChanged(mainWindow)
@@ -1992,6 +2027,16 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
       return null
     }
     return result.filePaths[0]
+  })
+
+  ipcMain.handle('repos:pickFolders', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory', 'multiSelections']
+    })
+    if (result.canceled || result.filePaths.length === 0) {
+      return []
+    }
+    return result.filePaths
   })
 
   // Why: pickDirectory is a generic "choose a folder" picker, separate from
@@ -2165,6 +2210,8 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
                 projectHostSetupMethod: 'cloned'
               })
               if (updated) {
+                await prepareLocalWorktreeRootForRepo(store, updated)
+                invalidateAuthorizedRootsCache()
                 notifyReposChanged(mainWindow)
                 // Why: folder→git upgrade is a real new git repo provisioning event.
                 emitRepoAdded('clone_url', false, true)
@@ -2190,6 +2237,7 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
           }
 
           store.addRepo(repo)
+          await prepareLocalWorktreeRootForRepo(store, repo)
           invalidateAuthorizedRootsCache()
           notifyReposChanged(mainWindow)
           emitRepoAdded('clone_url', false, true)

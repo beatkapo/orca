@@ -24,6 +24,7 @@ import type {
 } from '../../../shared/types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
 import { translate } from '@/i18n/i18n'
+import { getWorkspaceComposerInitialFocusTarget } from '@/lib/workspace-composer-initial-focus'
 
 type ComposerModalData = {
   prefilledName?: string
@@ -87,14 +88,11 @@ function ComposerModalBody({
         onOpenAutoFocus={(event) => {
           // Why: Radix's FocusScope fires this once the dialog has mounted.
           // preventDefault stops it from focusing whatever first-tabbable it
-          // picks (close button), and we instead focus the repo picker so the
-          // keyboard flow starts at the top of the unified create form.
+          // picks (close button), and we instead focus the name/source field
+          // so users can start typing immediately.
           event.preventDefault()
           const content = event.currentTarget as HTMLElement
-          const trigger = content.querySelector<HTMLElement>(
-            '[data-repo-combobox-root="true"][role="combobox"]'
-          )
-          trigger?.focus({ preventScroll: true })
+          getWorkspaceComposerInitialFocusTarget(content)?.focus({ preventScroll: true })
         }}
       >
         <QuickTabBody modalData={modalData} onClose={onClose} active />

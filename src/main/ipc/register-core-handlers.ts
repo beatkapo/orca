@@ -12,6 +12,7 @@ import { registerCodexUsageHandlers } from './codex-usage'
 import { registerOpenCodeUsageHandlers } from './opencode-usage'
 import { registerGitHubHandlers } from './github'
 import { registerGitLabHandlers } from './gitlab'
+import { registerGiteaHandlers } from './gitea'
 import { registerHostedReviewHandlers } from './hosted-review'
 import { registerLinearHandlers } from './linear'
 import { registerJiraHandlers } from './jira'
@@ -49,7 +50,6 @@ import { registerCodexAccountHandlers } from './codex-accounts'
 import { registerAgentHookHandlers } from './agent-hooks'
 import { registerAgentTrustHandlers } from './agent-trust'
 import { registerClaudeAccountHandlers } from './claude-accounts'
-import { warmSystemFontFamilies } from '../system-fonts'
 import { registerUpdaterHandlers } from '../window/attach-main-window-services'
 import { registerClipboardHandlers } from '../window/clipboard-ipc-handlers'
 import type { ClaudeUsageStore } from '../claude-usage/store'
@@ -112,6 +112,7 @@ export function registerCoreHandlers(
   registerRateLimitHandlers(rateLimits)
   registerGitHubHandlers(store, stats)
   registerGitLabHandlers(store)
+  registerGiteaHandlers(store)
   registerHostedReviewHandlers(store, stats)
   registerLinearHandlers()
   registerJiraHandlers()
@@ -163,5 +164,4 @@ export function registerCoreHandlers(
   registerClipboardHandlers()
   registerUpdaterHandlers(store)
   registerSpeechHandlers(store)
-  warmSystemFontFamilies()
 }
