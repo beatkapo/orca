@@ -1680,6 +1680,24 @@ export type {
   JiraViewer
 } from './jira-types'
 
+export type {
+  GlpiConnectArgs,
+  GlpiConnectionStatus,
+  GlpiCreateTicketArgs,
+  GlpiCreateTicketResult,
+  GlpiFollowup,
+  GlpiMutationResult,
+  GlpiServer,
+  GlpiServerSelection,
+  GlpiTicket,
+  GlpiTicketFilter,
+  GlpiTicketStatus,
+  GlpiTicketType,
+  GlpiTicketUpdate,
+  GlpiUser,
+  GlpiViewer
+} from './glpi-types'
+
 /**
  * GitHub API rate-limit buckets surfaced in the TaskPage header so users can
  * see remaining budget before they hit the wall. `core` = REST (5000/hr),

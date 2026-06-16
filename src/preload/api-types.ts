@@ -89,6 +89,17 @@ import type {
   JiraTransition,
   JiraUser,
   JiraViewer,
+  GlpiConnectArgs,
+  GlpiConnectionStatus,
+  GlpiCreateTicketArgs,
+  GlpiCreateTicketResult,
+  GlpiFollowup,
+  GlpiMutationResult,
+  GlpiServerSelection,
+  GlpiTicket,
+  GlpiTicketFilter,
+  GlpiTicketUpdate,
+  GlpiViewer,
   LinearViewer,
   LinearCollectionResult,
   LinearConnectionStatus,
@@ -1695,6 +1706,35 @@ export type PreloadApi = {
       siteId?: string
     }) => Promise<JiraUser[]>
     listTransitions: (args: { key: string; siteId?: string }) => Promise<JiraTransition[]>
+  }
+  glpi: {
+    connect: (
+      args: GlpiConnectArgs
+    ) => Promise<{ ok: true; viewer: GlpiViewer } | { ok: false; error: string }>
+    disconnect: (args?: { serverId?: string }) => Promise<void>
+    selectServer: (args: { serverId: GlpiServerSelection }) => Promise<GlpiConnectionStatus>
+    status: () => Promise<GlpiConnectionStatus>
+    testConnection: (args?: {
+      serverId?: string
+    }) => Promise<{ ok: true; viewer: GlpiViewer } | { ok: false; error: string }>
+    listWorkItems: (args?: {
+      serverId?: GlpiServerSelection
+      filter?: GlpiTicketFilter
+      limit?: number
+    }) => Promise<GlpiTicket[]>
+    ticket: (args: { serverId?: string; id: number }) => Promise<GlpiTicket | null>
+    followups: (args: { serverId?: string; id: number }) => Promise<GlpiFollowup[]>
+    addFollowup: (args: {
+      serverId?: string
+      id: number
+      content: string
+    }) => Promise<GlpiMutationResult>
+    updateTicket: (args: {
+      serverId?: string
+      id: number
+      updates: GlpiTicketUpdate
+    }) => Promise<GlpiMutationResult>
+    createTicket: (args: GlpiCreateTicketArgs) => Promise<GlpiCreateTicketResult>
   }
   starNag: {
     onShow: (callback: (payload?: { mode?: 'gh' | 'web' }) => void) => () => void
