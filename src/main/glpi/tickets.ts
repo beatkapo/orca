@@ -24,6 +24,7 @@ import {
   type RawGlpiUser
 } from './mappers'
 import { buildSearchQuery, filterCriteria, workItemFilterCriteria } from './ticket-search-query'
+import { inlineGlpiContentImages } from './glpi-content-images'
 
 async function resolveViewerId(server: GlpiServer): Promise<number> {
   const data = await glpiServerRequest<{ session?: Partial<GlpiFullSession> }>(
@@ -116,6 +117,9 @@ export async function getGlpiTicket(server: GlpiServer, id: number): Promise<Glp
       .filter((link) => link.type === 2)
       .map((link) => users.get(link.users_id ?? 0))
       .filter((user): user is GlpiUser => user !== undefined)
+    if (ticket.content) {
+      ticket.content = await inlineGlpiContentImages(server, ticket.content)
+    }
     return ticket
   } finally {
     release()
@@ -131,9 +135,14 @@ export async function listGlpiFollowups(server: GlpiServer, id: number): Promise
       server,
       followups.map((followup) => followup.users_id ?? 0)
     )
-    return followups
-      .map((followup) => mapGlpiFollowup(followup, users.get(followup.users_id ?? 0)))
-      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    const mapped = await Promise.all(
+      followups.map(async (followup) => {
+        const entry = mapGlpiFollowup(followup, users.get(followup.users_id ?? 0))
+        entry.content = await inlineGlpiContentImages(server, entry.content)
+        return entry
+      })
+    )
+    return mapped.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   } finally {
     release()
   }

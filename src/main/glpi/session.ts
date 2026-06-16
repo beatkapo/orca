@@ -136,12 +136,12 @@ async function rawRequest<T>(
   return (await response.json()) as T
 }
 
-// Authenticated request against a stored server: resolves credentials, reuses
-// the cached session token, and re-inits once on an auth failure.
-export async function glpiServerRequest<T>(
+// Runs an authenticated operation against a stored server: resolves credentials,
+// reuses the cached session token, and re-inits once on a 401 (an expired/invalid
+// session token; a 403 is a genuine authorization denial that re-init can't fix).
+async function withSession<T>(
   server: GlpiServer,
-  path: string,
-  init?: RequestInit
+  perform: (apiBaseUrl: string, appToken: string, sessionToken: string) => Promise<T>
 ): Promise<T> {
   const credentials = readCredentials(server.id)
   if (!credentials) {
@@ -149,17 +149,60 @@ export async function glpiServerRequest<T>(
   }
   const sessionToken = await ensureSession(server, credentials)
   try {
-    return await rawRequest<T>(server.apiBaseUrl, credentials.appToken, sessionToken, path, init)
+    return await perform(server.apiBaseUrl, credentials.appToken, sessionToken)
   } catch (error) {
-    // Only 401 means an expired/invalid session token; a 403 is a genuine
-    // authorization denial that re-initializing the session cannot fix.
     if (!(error instanceof GlpiApiError) || error.status !== 401) {
       throw error
     }
     sessionTokens.delete(server.id)
     const refreshed = await ensureSession(server, credentials)
-    return rawRequest<T>(server.apiBaseUrl, credentials.appToken, refreshed, path, init)
+    return perform(server.apiBaseUrl, credentials.appToken, refreshed)
   }
+}
+
+export async function glpiServerRequest<T>(
+  server: GlpiServer,
+  path: string,
+  init?: RequestInit
+): Promise<T> {
+  return withSession(server, (apiBaseUrl, appToken, sessionToken) =>
+    rawRequest<T>(apiBaseUrl, appToken, sessionToken, path, init)
+  )
+}
+
+export type GlpiBinaryResponse = { data: Buffer; contentType: string }
+
+async function rawBinary(
+  apiBaseUrl: string,
+  appToken: string,
+  sessionToken: string,
+  path: string
+): Promise<GlpiBinaryResponse | null> {
+  const headers = new Headers()
+  headers.set('Accept', 'application/octet-stream')
+  headers.set('Session-Token', sessionToken)
+  headers.set('App-Token', appToken)
+  const response = await fetch(`${apiBaseUrl}${path}`, { headers })
+  if (!response.ok) {
+    throw new GlpiApiError(await readGlpiError(response), response.status)
+  }
+  if (response.status === 204) {
+    return null
+  }
+  return {
+    data: Buffer.from(await response.arrayBuffer()),
+    contentType: response.headers.get('content-type') ?? 'application/octet-stream'
+  }
+}
+
+// Downloads a binary resource (e.g. a Document) with the same session handling.
+export async function glpiServerRequestBinary(
+  server: GlpiServer,
+  path: string
+): Promise<GlpiBinaryResponse | null> {
+  return withSession(server, (apiBaseUrl, appToken, sessionToken) =>
+    rawBinary(apiBaseUrl, appToken, sessionToken, path)
+  )
 }
 
 export type GlpiFullSession = {
