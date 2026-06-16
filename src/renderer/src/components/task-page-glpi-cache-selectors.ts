@@ -53,3 +53,15 @@ export function findTaskPageGlpiTicket(
 
   return null
 }
+
+// Why: GLPI ids are unique per server, so a same-id ticket on a different
+// server must not count as still-present when pruning the stale selection.
+export function isGlpiTicketStillDisplayed(
+  tickets: GlpiTicket[],
+  ticketId: number,
+  serverId: string | null
+): boolean {
+  return tickets.some(
+    (ticket) => ticket.id === ticketId && (serverId === null || ticket.serverId === serverId)
+  )
+}

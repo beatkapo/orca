@@ -63,15 +63,21 @@ export function GlpiTaskIntegrationCard(): React.JSX.Element {
       delete next[serverId]
       return next
     })
-    const result = await testGlpiConnection(serverId)
-    if (!mountedRef.current) {
-      return
+    try {
+      const result = await testGlpiConnection(serverId)
+      if (!mountedRef.current) {
+        return
+      }
+      setTestResultByServer((prev) => ({
+        ...prev,
+        [serverId]: result.ok ? { state: 'ok' } : { state: 'error', error: result.error }
+      }))
+    } finally {
+      // Why: reset in finally so a thrown test call can't leave the button stuck.
+      if (mountedRef.current) {
+        setTestingServerId(null)
+      }
     }
-    setTestResultByServer((prev) => ({
-      ...prev,
-      [serverId]: result.ok ? { state: 'ok' } : { state: 'error', error: result.error }
-    }))
-    setTestingServerId(null)
   }
 
   return (
@@ -181,17 +187,19 @@ export function GlpiTaskIntegrationCard(): React.JSX.Element {
                     translate('auto.components.settings.glpi.integration.card.d667078dfa', 'Test')
                   )}
                 </Button>
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
                   onClick={() => void handleDisconnect(server.id)}
                   aria-label={translate(
                     'auto.components.settings.glpi.integration.card.3652362824',
                     'Disconnect {{value0}}',
                     { value0: server.displayName }
                   )}
-                  className="rounded-md p-1 text-muted-foreground/50 transition-colors hover:text-destructive"
+                  className="shrink-0 text-muted-foreground/50 hover:text-destructive"
                 >
                   <Unlink className="size-3.5" />
-                </button>
+                </Button>
               </div>
             )
           })}

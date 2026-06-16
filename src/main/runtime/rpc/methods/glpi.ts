@@ -1,12 +1,6 @@
 import { z } from 'zod'
 import { defineMethod, type RpcMethod } from '../core'
-import {
-  OptionalFiniteNumber,
-  OptionalPlainString,
-  OptionalString,
-  requiredNumber,
-  requiredString
-} from '../schemas'
+import { OptionalPlainString, OptionalString, requiredNumber, requiredString } from '../schemas'
 
 const VALID_FILTERS = ['assigned', 'created', 'all', 'closed'] as const
 
@@ -32,13 +26,13 @@ const ListWorkItems = z
   .object({
     serverId: OptionalString,
     filter: z.enum(VALID_FILTERS).optional().default('all'),
-    limit: OptionalFiniteNumber.default(30),
+    limit: z.number().int().min(1).max(100).optional().default(30),
     filters: z
       .object({
         type: z.enum(['incident', 'request']).optional(),
         text: z.string().optional(),
         category: z.string().optional(),
-        priority: z.number().optional()
+        priority: z.number().int().min(1).max(5).optional()
       })
       .optional()
   })
@@ -70,7 +64,7 @@ const CreateTicket = z.object({
   title: requiredString('Title is required'),
   content: OptionalPlainString,
   type: z.enum(['incident', 'request']).optional(),
-  urgency: OptionalFiniteNumber
+  urgency: z.number().int().min(1).max(5).optional()
 })
 
 export const GLPI_METHODS: RpcMethod[] = [

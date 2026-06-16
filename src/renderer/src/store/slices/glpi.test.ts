@@ -7,7 +7,13 @@ import {
   type TaskSourceContext
 } from '../../../../shared/task-source-context'
 import { credentialDecryptionMessage } from '../../../../shared/integration-credential-errors'
+import { getProviderRuntimeContextKey } from '@/lib/provider-runtime-context'
 import { createGlpiSlice } from './glpi'
+
+// Why: default-scope cache keys are namespaced by the runtime context key so
+// cached data can't bleed across runtime environments.
+const defaultScope = getProviderRuntimeContextKey(null)
+const defaultKey = (key: string): string => `${defaultScope}::${key}`
 
 const glpiStatus = vi.fn()
 const glpiConnect = vi.fn()
@@ -195,7 +201,7 @@ describe('createGlpiSlice list caching', () => {
     expect(
       store.getState().glpiListCache[`${scope}::srv-1::list::assigned::30::{}`]?.data?.[0]?.title
     ).toBe('Source ticket')
-    expect(store.getState().glpiListCache['srv-1::list::assigned::30']).toBeUndefined()
+    expect(store.getState().glpiListCache[defaultKey('srv-1::list::assigned::30')]).toBeUndefined()
   })
 })
 
@@ -213,7 +219,7 @@ describe('createGlpiSlice ticket caching', () => {
     await expect(store.getState().fetchGlpiTicket(7, 'srv-1')).resolves.toMatchObject({ id: 7 })
 
     expect(glpiTicket).toHaveBeenCalledTimes(1)
-    expect(store.getState().glpiTicketCache['srv-1::7']?.data?.id).toBe(7)
+    expect(store.getState().glpiTicketCache[defaultKey('srv-1::7')]?.data?.id).toBe(7)
   })
 
   it('keeps separate cache entries per server', async () => {
@@ -227,8 +233,12 @@ describe('createGlpiSlice ticket caching', () => {
     await store.getState().fetchGlpiTicket(7, 'srv-2')
 
     expect(glpiTicket).toHaveBeenCalledTimes(2)
-    expect(store.getState().glpiTicketCache['srv-1::7']?.data?.serverName).toBe('Server A')
-    expect(store.getState().glpiTicketCache['srv-2::7']?.data?.serverName).toBe('Server B')
+    expect(store.getState().glpiTicketCache[defaultKey('srv-1::7')]?.data?.serverName).toBe(
+      'Server A'
+    )
+    expect(store.getState().glpiTicketCache[defaultKey('srv-2::7')]?.data?.serverName).toBe(
+      'Server B'
+    )
   })
 })
 
@@ -242,7 +252,7 @@ describe('createGlpiSlice mutation cache invalidation', () => {
     store.setState({
       glpiStatus: connectionStatus('octocat'),
       glpiTicketCache: {
-        'srv-1::7': { data: ticket(7), fetchedAt: Date.now() }
+        [defaultKey('srv-1::7')]: { data: ticket(7), fetchedAt: Date.now() }
       }
     })
     glpiAddFollowup.mockResolvedValueOnce({ ok: true })
@@ -251,7 +261,7 @@ describe('createGlpiSlice mutation cache invalidation', () => {
       store.getState().addGlpiFollowupComment(7, 'Looking into it', 'srv-1')
     ).resolves.toEqual({ ok: true })
 
-    expect(store.getState().glpiTicketCache['srv-1::7']).toBeUndefined()
+    expect(store.getState().glpiTicketCache[defaultKey('srv-1::7')]).toBeUndefined()
   })
 
   it('does not invalidate the cached ticket when the followup comment fails', async () => {
@@ -259,14 +269,14 @@ describe('createGlpiSlice mutation cache invalidation', () => {
     store.setState({
       glpiStatus: connectionStatus('octocat'),
       glpiTicketCache: {
-        'srv-1::7': { data: ticket(7), fetchedAt: Date.now() }
+        [defaultKey('srv-1::7')]: { data: ticket(7), fetchedAt: Date.now() }
       }
     })
     glpiAddFollowup.mockResolvedValueOnce({ ok: false, error: 'nope' })
 
     await store.getState().addGlpiFollowupComment(7, 'Looking into it', 'srv-1')
 
-    expect(store.getState().glpiTicketCache['srv-1::7']).toBeDefined()
+    expect(store.getState().glpiTicketCache[defaultKey('srv-1::7')]).toBeDefined()
   })
 
   it('invalidates the cached ticket after a successful detail update', async () => {
@@ -274,7 +284,7 @@ describe('createGlpiSlice mutation cache invalidation', () => {
     store.setState({
       glpiStatus: connectionStatus('octocat'),
       glpiTicketCache: {
-        'srv-1::7': { data: ticket(7), fetchedAt: Date.now() }
+        [defaultKey('srv-1::7')]: { data: ticket(7), fetchedAt: Date.now() }
       }
     })
     glpiUpdateTicket.mockResolvedValueOnce({ ok: true })
@@ -283,7 +293,7 @@ describe('createGlpiSlice mutation cache invalidation', () => {
       store.getState().updateGlpiTicketDetail(7, { title: 'Renamed' }, 'srv-1')
     ).resolves.toEqual({ ok: true })
 
-    expect(store.getState().glpiTicketCache['srv-1::7']).toBeUndefined()
+    expect(store.getState().glpiTicketCache[defaultKey('srv-1::7')]).toBeUndefined()
   })
 
   it('invalidates the list cache after creating a ticket', async () => {
@@ -291,7 +301,7 @@ describe('createGlpiSlice mutation cache invalidation', () => {
     store.setState({
       glpiStatus: connectionStatus('octocat'),
       glpiListCache: {
-        'srv-1::list::assigned::30': { data: [ticket(1)], fetchedAt: Date.now() }
+        [defaultKey('srv-1::list::assigned::30')]: { data: [ticket(1)], fetchedAt: Date.now() }
       }
     })
     glpiCreateTicket.mockResolvedValueOnce({ ok: true, id: 9, url: 'https://glpi.example.com/9' })
@@ -300,7 +310,7 @@ describe('createGlpiSlice mutation cache invalidation', () => {
       { ok: true, id: 9 }
     )
 
-    expect(store.getState().glpiListCache['srv-1::list::assigned::30']).toBeUndefined()
+    expect(store.getState().glpiListCache[defaultKey('srv-1::list::assigned::30')]).toBeUndefined()
   })
 })
 
@@ -314,7 +324,7 @@ describe('createGlpiSlice credential errors', () => {
     store.setState({
       glpiStatus: connectionStatus('octocat'),
       glpiTicketCache: {
-        'srv-1::7': { data: ticket(7), fetchedAt: Date.now() }
+        [defaultKey('srv-1::7')]: { data: ticket(7), fetchedAt: Date.now() }
       }
     })
 

@@ -115,35 +115,40 @@ export default function GlpiTicketWorkspace({
     void loadFollowups(ticket.id, requestId)
   }, [ticket, fetchGlpiTicket, loadFollowups, sourceContext])
 
-  const refreshTicket = useCallback(async (): Promise<void> => {
-    const latest = await fetchGlpiTicket(displayed.id, serverId, options).catch(() => null)
-    if (latest && requestIdRef.current) {
-      setFullTicket(latest)
-    }
-  }, [displayed.id, fetchGlpiTicket, options, serverId])
+  const refreshTicket = useCallback(
+    async (id: number, server: string | null, requestId: number): Promise<void> => {
+      const latest = await fetchGlpiTicket(id, server, options).catch(() => null)
+      // Why: ignore the result if the user switched tickets mid-flight.
+      if (latest && requestId === requestIdRef.current && latest.id === id) {
+        setFullTicket(latest)
+      }
+    },
+    [fetchGlpiTicket, options]
+  )
 
   const handleStatusChange = useCallback(
     async (next: GlpiTicketStatus): Promise<void> => {
       if (statusPending || next === displayed.status) {
         return
       }
+      const requestId = requestIdRef.current
+      const ticketId = displayed.id
+      const server = serverId
       setStatusPending(true)
       const previous = displayed.status
       // Optimistic flip so the badge updates before the round-trip resolves.
       setFullTicket((current) => ({ ...current, status: next }))
       try {
-        const result = await updateGlpiTicketDetail(
-          displayed.id,
-          { status: next },
-          serverId,
-          options
-        )
+        const result = await updateGlpiTicketDetail(ticketId, { status: next }, server, options)
         if (!result.ok) {
           throw new Error(result.error)
         }
-        await refreshTicket()
+        await refreshTicket(ticketId, server, requestId)
       } catch (error) {
-        setFullTicket((current) => ({ ...current, status: previous }))
+        // Why: only roll back if the same ticket is still selected.
+        if (requestId === requestIdRef.current && displayed.id === ticketId) {
+          setFullTicket((current) => ({ ...current, status: previous }))
+        }
         toast.error(
           error instanceof Error
             ? error.message
@@ -153,7 +158,9 @@ export default function GlpiTicketWorkspace({
               )
         )
       } finally {
-        setStatusPending(false)
+        if (requestId === requestIdRef.current) {
+          setStatusPending(false)
+        }
       }
     },
     [
@@ -175,14 +182,20 @@ export default function GlpiTicketWorkspace({
     if (!content) {
       return
     }
+    const requestId = requestIdRef.current
+    const ticketId = displayed.id
+    const server = serverId
     setFollowupSubmitting(true)
     try {
-      const result = await addGlpiFollowupComment(displayed.id, content, serverId, options)
+      const result = await addGlpiFollowupComment(ticketId, content, server, options)
       if (!result.ok) {
         throw new Error(result.error)
       }
-      setFollowupDraft('')
-      await loadFollowups(displayed.id, requestIdRef.current)
+      // Why: don't reset the draft or reload if the user switched tickets.
+      if (requestId === requestIdRef.current) {
+        setFollowupDraft('')
+        await loadFollowups(ticketId, requestId)
+      }
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -190,7 +203,9 @@ export default function GlpiTicketWorkspace({
           : translate('auto.components.GlpiTicketWorkspace.ac04e56c2f', 'Failed to add followup.')
       )
     } finally {
-      setFollowupSubmitting(false)
+      if (requestId === requestIdRef.current) {
+        setFollowupSubmitting(false)
+      }
     }
   }, [
     addGlpiFollowupComment,

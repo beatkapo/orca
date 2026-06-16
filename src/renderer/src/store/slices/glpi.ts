@@ -269,7 +269,8 @@ export const createGlpiSlice: StateCreator<AppState, [], [], GlpiSlice> = (set, 
     },
 
     addGlpiFollowupComment: async (id, content, serverId, options) => {
-      const result = await glpiAddFollowup(get().settings, serverId, id, content)
+      const scope = getGlpiReadScope(get().settings, options?.sourceContext)
+      const result = await glpiAddFollowup(scope.settings, serverId, id, content)
       if (result.ok) {
         invalidateGlpiTicket(id, serverId, options?.sourceContext, store)
       }
@@ -277,7 +278,8 @@ export const createGlpiSlice: StateCreator<AppState, [], [], GlpiSlice> = (set, 
     },
 
     updateGlpiTicketDetail: async (id, updates, serverId, options) => {
-      const result = await glpiUpdateTicket(get().settings, serverId, id, updates)
+      const scope = getGlpiReadScope(get().settings, options?.sourceContext)
+      const result = await glpiUpdateTicket(scope.settings, serverId, id, updates)
       if (result.ok) {
         invalidateGlpiTicket(id, serverId, options?.sourceContext, store)
       }
@@ -285,7 +287,8 @@ export const createGlpiSlice: StateCreator<AppState, [], [], GlpiSlice> = (set, 
     },
 
     createGlpiTicket: async (args, options) => {
-      const result = await glpiCreateTicket(get().settings, args)
+      const scope = getGlpiReadScope(get().settings, options?.sourceContext)
+      const result = await glpiCreateTicket(scope.settings, args)
       if (result.ok) {
         invalidateGlpiList(options?.sourceContext, store)
       }

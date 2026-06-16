@@ -9,7 +9,10 @@ import {
 import type { ExecutionHostScope } from '../../../shared/execution-host'
 import type { GlpiServer, GlpiTicket, TaskProvider } from '../../../shared/types'
 import type { LinkedWorkItemSummary } from '@/lib/new-workspace'
-import { findTaskPageGlpiTicket } from '@/components/task-page-glpi-cache-selectors'
+import {
+  findTaskPageGlpiTicket,
+  isGlpiTicketStillDisplayed
+} from '@/components/task-page-glpi-cache-selectors'
 import { getGlpiTicketWorkspaceSeed } from '@/components/task-page-glpi-presentation'
 import type { GlpiPresetId } from '@/components/task-page-localized-options'
 import {
@@ -156,10 +159,7 @@ export function useTaskPageGlpi(args: UseTaskPageGlpiArgs): UseTaskPageGlpiResul
     glpiCacheSnapshot.ticketCache,
     glpiCacheSnapshot.listCache,
     selectedGlpiTicketId,
-    {
-      sourceContext: glpiTaskSourceContext,
-      serverId: selectedGlpiTicketFallback?.serverId ?? null
-    }
+    { sourceContext: glpiTaskSourceContext, serverId: selectedGlpiTicketFallback?.serverId ?? null }
   )
   const selectedGlpiTicket =
     selectedGlpiTicketId !== null ? (cachedSelectedGlpiTicket ?? selectedGlpiTicketFallback) : null
@@ -280,9 +280,10 @@ export function useTaskPageGlpi(args: UseTaskPageGlpiArgs): UseTaskPageGlpiResul
       }
       return
     }
+    const serverId = selectedGlpiTicketFallback?.serverId ?? null
     if (
       selectedGlpiTicketId !== null &&
-      !displayedGlpiTickets.some((ticket) => ticket.id === selectedGlpiTicketId)
+      !isGlpiTicketStillDisplayed(displayedGlpiTickets, selectedGlpiTicketId, serverId)
     ) {
       clearSelectedGlpiTicket()
     }

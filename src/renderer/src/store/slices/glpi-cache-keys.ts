@@ -61,10 +61,13 @@ export function getGlpiReadScope(
   sourceContext?: TaskSourceContext | null
 ): GlpiReadScope {
   if (!sourceContext) {
+    // Why: namespace default-scope keys by runtime context so cached data can't
+    // bleed across runtime environments, mirroring the source-scoped path.
+    const runtimeContextKey = getProviderRuntimeContextKey(settings)
     return {
       settings,
-      contextKey: getProviderRuntimeContextKey(settings),
-      cachePrefix: null,
+      contextKey: runtimeContextKey,
+      cachePrefix: runtimeContextKey,
       explicitSource: false
     }
   }

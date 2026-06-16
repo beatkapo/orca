@@ -91,8 +91,15 @@ export async function getGlpiTicket(server: GlpiServer, id: number): Promise<Glp
       return null
     }
     const ticket = mapGlpiTicketDetail(raw, server)
-    const categoryId = typeof raw.itilcategories_id === 'number' ? raw.itilcategories_id : 0
-    if (categoryId > 0) {
+    // Why: with expand_dropdowns off, GLPI returns itilcategories_id as a numeric
+    // string (e.g. "6"), so coerce strings too before the FK lookup.
+    const categoryId =
+      typeof raw.itilcategories_id === 'number'
+        ? raw.itilcategories_id
+        : typeof raw.itilcategories_id === 'string'
+          ? Number(raw.itilcategories_id)
+          : 0
+    if (Number.isInteger(categoryId) && categoryId > 0) {
       try {
         const category = await glpiServerRequest<{ completename?: string; name?: string }>(
           server,
@@ -103,20 +110,27 @@ export async function getGlpiTicket(server: GlpiServer, id: number): Promise<Glp
         // Category is optional context — ignore lookup failures.
       }
     }
-    const links = await glpiServerRequest<RawTicketUser[]>(server, `/Ticket/${id}/Ticket_User`)
-    const userLinks = Array.isArray(links) ? links : []
-    const users = await resolveUsers(
-      server,
-      userLinks.map((link) => link.users_id ?? 0)
-    )
-    ticket.requester = userLinks
-      .filter((link) => link.type === 1)
-      .map((link) => users.get(link.users_id ?? 0))
-      .find((user): user is GlpiUser => user !== undefined)
-    ticket.assignees = userLinks
-      .filter((link) => link.type === 2)
-      .map((link) => users.get(link.users_id ?? 0))
-      .filter((user): user is GlpiUser => user !== undefined)
+    // Why: requester/assignee enrichment is optional context — a failure here
+    // must not drop the already-loaded ticket detail, so swallow and continue.
+    try {
+      const links = await glpiServerRequest<RawTicketUser[]>(server, `/Ticket/${id}/Ticket_User`)
+      const userLinks = Array.isArray(links) ? links : []
+      const users = await resolveUsers(
+        server,
+        userLinks.map((link) => link.users_id ?? 0)
+      )
+      ticket.requester = userLinks
+        .filter((link) => link.type === 1)
+        .map((link) => users.get(link.users_id ?? 0))
+        .find((user): user is GlpiUser => user !== undefined)
+      ticket.assignees = userLinks
+        .filter((link) => link.type === 2)
+        .map((link) => users.get(link.users_id ?? 0))
+        .filter((user): user is GlpiUser => user !== undefined)
+    } catch {
+      ticket.requester = undefined
+      ticket.assignees = []
+    }
     if (ticket.content) {
       ticket.content = await inlineGlpiContentImages(server, ticket.content)
     }
