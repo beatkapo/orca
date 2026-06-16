@@ -45,6 +45,7 @@ import {
   removeSafeUntrackedDiscardTargets
 } from '../shared/git-discard-path-safety'
 import { getGitCloneFailureMessage } from '../shared/git-clone-failure-message'
+import { syncForkDefaultBranch, validateGitForkSyncExpectedUpstream } from '../shared/git-fork-sync'
 
 const execFileAsync = promisify(execFile)
 const MAX_GIT_BUFFER = 10 * 1024 * 1024
@@ -72,6 +73,8 @@ export class GitHandler {
     this.dispatcher.onRequest('git.bulkUnstage', (p) => this.bulkUnstage(p))
     this.dispatcher.onRequest('git.abortMerge', (p) => this.abortMerge(p))
     this.dispatcher.onRequest('git.abortRebase', (p) => this.abortRebase(p))
+    this.dispatcher.onRequest('git.checkout', (p) => this.checkout(p))
+    this.dispatcher.onRequest('git.localBranches', (p) => this.localBranches(p))
     this.dispatcher.onRequest('git.discard', (p) => this.discard(p))
     this.dispatcher.onRequest('git.bulkDiscard', (p) => this.bulkDiscard(p))
     this.dispatcher.onRequest('git.conflictOperation', (p) => this.conflictOperation(p))
@@ -79,6 +82,7 @@ export class GitHandler {
     this.dispatcher.onRequest('git.commitCompare', (p) => this.commitCompare(p))
     this.dispatcher.onRequest('git.upstreamStatus', (p) => this.upstreamStatus(p))
     this.dispatcher.onRequest('git.fetch', (p) => this.fetch(p))
+    this.dispatcher.onRequest('git.forkSync', (p, context) => this.forkSync(p, context))
     this.dispatcher.onRequest('git.fetchRemoteTrackingRef', (p) => this.fetchRemoteTrackingRef(p))
     this.dispatcher.onRequest('git.push', (p) => this.push(p))
     this.dispatcher.onRequest('git.pull', (p) => this.pull(p))
@@ -102,11 +106,22 @@ export class GitHandler {
   private async git(
     args: string[],
     cwd: string,
-    opts?: { maxBuffer?: number; disableOptionalLocks?: boolean; signal?: AbortSignal }
+    opts?: {
+      maxBuffer?: number
+      disableOptionalLocks?: boolean
+      signal?: AbortSignal
+      nonInteractive?: boolean
+    }
   ): Promise<{ stdout: string; stderr: string }> {
     const env = buildRelayCommandEnv()
     if (opts?.disableOptionalLocks) {
       env.GIT_OPTIONAL_LOCKS = '0'
+    }
+    if (opts?.nonInteractive) {
+      env.GIT_TERMINAL_PROMPT = '0'
+      env.GIT_ASKPASS = ''
+      env.SSH_ASKPASS = ''
+      env.GIT_SSH_COMMAND ??= 'ssh -o BatchMode=yes'
     }
     return execFileAsync('git', args, {
       cwd: expandTilde(cwd),
@@ -208,6 +223,45 @@ export class GitHandler {
   private async abortRebase(params: Record<string, unknown>) {
     const worktreePath = params.worktreePath as string
     await this.git(['rebase', '--abort'], worktreePath)
+  }
+
+  private async checkout(params: Record<string, unknown>) {
+    const worktreePath = params.worktreePath as string
+    const branch = params.branch as string
+    // Defense-in-depth: reject option-like branch tokens (the RPC schema also
+    // validates, but this relay entrypoint is reachable independently). The
+    // `startsWith('-')` guard is what prevents flag injection; the trailing `--`
+    // marks that no pathspecs follow so the token is treated as a branch ref.
+    if (typeof branch !== 'string' || branch.length === 0 || branch.startsWith('-')) {
+      throw new Error('invalid_branch_name')
+    }
+    await this.git(['checkout', branch, '--'], worktreePath)
+    return { ok: true as const, branch }
+  }
+
+  private async localBranches(params: Record<string, unknown>) {
+    const worktreePath = params.worktreePath as string
+    const { stdout } = await this.git(
+      ['for-each-ref', '--format=%(HEAD)%09%(refname:short)', 'refs/heads/'],
+      worktreePath
+    )
+    let current: string | null = null
+    const branches: string[] = []
+    for (const line of stdout.split('\n')) {
+      if (line.length === 0) {
+        continue
+      }
+      const [marker, name] = line.split('\t')
+      if (!name) {
+        continue
+      }
+      if (marker === '*') {
+        current = name
+      }
+      branches.push(name)
+    }
+    branches.sort((a, b) => (a === current ? -1 : b === current ? 1 : 0))
+    return { current, branches }
   }
 
   private normalizeGitPathForCompare(filePath: string): string {
@@ -441,6 +495,36 @@ export class GitHandler {
       // actionable messages instead of raw git stderr (which varies across
       // versions/locales and may embed credentials).
       throw new Error(normalizeGitErrorMessage(error, 'fetch'))
+    }
+  }
+
+  private async forkSync(params: Record<string, unknown>, context?: RequestContext) {
+    const worktreePath = params.worktreePath as string
+    const expectedUpstream = validateGitForkSyncExpectedUpstream(params.expectedUpstream, {
+      required: true
+    })
+    const controller = new AbortController()
+    const abortFromContext = () => controller.abort()
+    if (context?.signal?.aborted) {
+      controller.abort()
+    } else {
+      context?.signal?.addEventListener('abort', abortFromContext, { once: true })
+    }
+    const timeout = setTimeout(() => controller.abort(), 60_000)
+    try {
+      return await syncForkDefaultBranch(
+        (args) =>
+          this.git(args, worktreePath, {
+            nonInteractive: true,
+            signal: controller.signal
+          }),
+        { expectedUpstream }
+      )
+    } catch (error) {
+      throw new Error(normalizeGitErrorMessage(error, 'push'))
+    } finally {
+      clearTimeout(timeout)
+      context?.signal?.removeEventListener('abort', abortFromContext)
     }
   }
 

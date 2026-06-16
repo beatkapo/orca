@@ -188,6 +188,7 @@ export type ComposerCardProps = {
   onSmartGitLabItemSelect: (item: GitLabWorkItem) => void
   onSmartBranchSelect: (refName: string, localBranchName: string) => void
   onSmartLinearIssueSelect: (issue: LinearIssue) => void
+  smartNameGitHubSourceContext?: TaskSourceContext | null
   /** GitLab parallel of onBaseBranchPrSelect. */
   onBaseBranchMrSelect?: (
     baseBranch: string,
@@ -2846,6 +2847,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
     onSmartGitLabItemSelect: handleSmartGitLabItemSelect,
     onSmartBranchSelect: handleSmartBranchSelect,
     onSmartLinearIssueSelect: handleSmartLinearIssueSelect,
+    smartNameGitHubSourceContext: selectedRepoGitHubSourceContext,
     smartNameSelection,
     onClearSmartNameSelection: handleClearSmartNameSelection,
     agentPrompt,
