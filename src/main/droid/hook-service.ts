@@ -5,6 +5,7 @@ import {
   createManagedCommandMatcher,
   buildWindowsAgentHookPostCommand,
   getSharedManagedScriptPath,
+  quoteWindowsHookCommandPath,
   readHooksJson,
   removeManagedCommands,
   wrapPosixHookCommand,
@@ -56,7 +57,9 @@ function getManagedScriptPath(): string {
 function getManagedCommand(scriptPath: string): string {
   // Why: Factory invokes the .cmd directly via cmd.exe (no bash), so native
   // backslashes are correct on Windows. Matches the codex/cursor pattern.
-  return process.platform === 'win32' ? scriptPath : wrapPosixHookCommand(scriptPath)
+  return process.platform === 'win32'
+    ? quoteWindowsHookCommandPath(scriptPath)
+    : wrapPosixHookCommand(scriptPath)
 }
 
 function getManagedScript(): string {
