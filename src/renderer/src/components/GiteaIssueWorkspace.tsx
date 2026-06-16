@@ -43,12 +43,12 @@ async function copyText(text: string, label: string): Promise<void> {
   try {
     await window.api.ui.writeClipboardText(text)
     toast.success(
-      translate('auto.components.GiteaIssueWorkspace.copied', '{{value0}} copied', {
+      translate('auto.components.GiteaIssueWorkspace.47b064c003', '{{value0}} copied', {
         value0: label
       })
     )
   } catch {
-    toast.error(translate('auto.components.GiteaIssueWorkspace.copyFailed', 'Failed to copy.'))
+    toast.error(translate('auto.components.GiteaIssueWorkspace.927222e135', 'Failed to copy.'))
   }
 }
 
@@ -166,7 +166,7 @@ export function GiteaIssueWorkspace({
       toast.error(
         error instanceof Error
           ? error.message
-          : translate('auto.components.GiteaIssueWorkspace.updateFailed', 'Failed to update issue.')
+          : translate('auto.components.GiteaIssueWorkspace.2d2e69fe70', 'Failed to update issue.')
       )
     } finally {
       setStatePending(false)
@@ -202,7 +202,7 @@ export function GiteaIssueWorkspace({
       toast.error(
         error instanceof Error
           ? error.message
-          : translate('auto.components.GiteaIssueWorkspace.commentFailed', 'Failed to add comment.')
+          : translate('auto.components.GiteaIssueWorkspace.565680a39b', 'Failed to add comment.')
       )
     } finally {
       setSubmitting(false)
@@ -223,13 +223,13 @@ export function GiteaIssueWorkspace({
       >
         <VisuallyHidden.Root asChild>
           <SheetTitle>
-            {title || translate('auto.components.GiteaIssueWorkspace.title', 'Gitea item')}
+            {title || translate('auto.components.GiteaIssueWorkspace.a792c22414', 'Gitea item')}
           </SheetTitle>
         </VisuallyHidden.Root>
         <VisuallyHidden.Root asChild>
           <SheetDescription>
             {translate(
-              'auto.components.GiteaIssueWorkspace.description',
+              'auto.components.GiteaIssueWorkspace.01b6ea43ca',
               'Preview and start work from the selected Gitea item.'
             )}
           </SheetDescription>
@@ -244,12 +244,12 @@ export function GiteaIssueWorkspace({
                   size="icon-sm"
                   className="shrink-0"
                   onClick={onClose}
-                  aria-label={translate('auto.components.GiteaIssueWorkspace.close', 'Close')}
+                  aria-label={translate('auto.components.GiteaIssueWorkspace.ce513e3ca2', 'Close')}
                 >
                   <X className="size-4" />
                 </Button>
                 <Button onClick={() => onUse(repo, item)} className="shrink-0 gap-2" size="sm">
-                  {translate('auto.components.GiteaIssueWorkspace.start', 'Start workspace')}
+                  {translate('auto.components.GiteaIssueWorkspace.e849a4c80f', 'Start workspace')}
                   <ArrowRight className="size-4" />
                 </Button>
                 <div className="min-w-0 flex-1">
@@ -281,8 +281,8 @@ export function GiteaIssueWorkspace({
                   )}
                 >
                   {closed
-                    ? translate('auto.components.GiteaIssueWorkspace.closed', 'Closed')
-                    : translate('auto.components.GiteaIssueWorkspace.open', 'Open')}
+                    ? translate('auto.components.GiteaIssueWorkspace.c0d4f97901', 'Closed')
+                    : translate('auto.components.GiteaIssueWorkspace.ab08895bb5', 'Open')}
                 </span>
                 {item.type === 'issue' ? (
                   <Button
@@ -294,8 +294,8 @@ export function GiteaIssueWorkspace({
                   >
                     {statePending ? <LoaderCircle className="size-3 animate-spin" /> : null}
                     {closed
-                      ? translate('auto.components.GiteaIssueWorkspace.reopen', 'Reopen')
-                      : translate('auto.components.GiteaIssueWorkspace.markClosed', 'Close issue')}
+                      ? translate('auto.components.GiteaIssueWorkspace.1ab551635b', 'Reopen')
+                      : translate('auto.components.GiteaIssueWorkspace.6b3c5a3144', 'Close issue')}
                   </Button>
                 ) : null}
                 {labels.map((label) => (
@@ -312,7 +312,7 @@ export function GiteaIssueWorkspace({
                     size="icon-sm"
                     onClick={() => window.api.shell.openUrl(item.url)}
                     aria-label={translate(
-                      'auto.components.GiteaIssueWorkspace.openInGitea',
+                      'auto.components.GiteaIssueWorkspace.63cbb99973',
                       'Open in Gitea'
                     )}
                   >
@@ -323,7 +323,7 @@ export function GiteaIssueWorkspace({
                     size="icon-sm"
                     onClick={() => void copyText(item.url, 'URL')}
                     aria-label={translate(
-                      'auto.components.GiteaIssueWorkspace.copyUrl',
+                      'auto.components.GiteaIssueWorkspace.c29b657be3',
                       'Copy URL'
                     )}
                   >
@@ -353,7 +353,7 @@ export function GiteaIssueWorkspace({
                 ) : (
                   <p className="text-sm italic text-muted-foreground">
                     {translate(
-                      'auto.components.GiteaIssueWorkspace.noDescription',
+                      'auto.components.GiteaIssueWorkspace.ca242eaf5d',
                       'No description provided.'
                     )}
                   </p>
@@ -368,7 +368,7 @@ export function GiteaIssueWorkspace({
                   value={commentDraft}
                   onChange={(event) => setCommentDraft(event.target.value)}
                   placeholder={translate(
-                    'auto.components.GiteaIssueWorkspace.addComment',
+                    'auto.components.GiteaIssueWorkspace.0fee3f06ff',
                     'Add a comment...'
                   )}
                   rows={2}
@@ -385,7 +385,7 @@ export function GiteaIssueWorkspace({
                   ) : (
                     <Send className="size-4" />
                   )}
-                  {translate('auto.components.GiteaIssueWorkspace.comment', 'Comment')}
+                  {translate('auto.components.GiteaIssueWorkspace.d3e0033e0f', 'Comment')}
                 </Button>
               </div>
             </div>

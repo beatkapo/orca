@@ -61,17 +61,17 @@ export function GiteaTaskIntegrationCard(): React.JSX.Element {
       description={
         connected
           ? translate(
-              'auto.components.settings.gitea.integration.card.connected',
+              'auto.components.settings.gitea.integration.card.069f07af1c',
               '{{value0}} server{{value1}} connected',
               { value0: serverCount, value1: serverCount === 1 ? '' : 's' }
             )
           : checking
             ? translate(
-                'auto.components.settings.gitea.integration.card.checking',
+                'auto.components.settings.gitea.integration.card.31b7f980fb',
                 'Checking Gitea access before showing setup actions.'
               )
             : translate(
-                'auto.components.settings.gitea.integration.card.idle',
+                'auto.components.settings.gitea.integration.card.5a8cd33300',
                 'Browse, create, and start work from Gitea issues.'
               )
       }
@@ -86,9 +86,12 @@ export function GiteaTaskIntegrationCard(): React.JSX.Element {
             onClick={() => setDialogOpen(true)}
           >
             {connected
-              ? translate('auto.components.settings.gitea.integration.card.addServer', 'Add server')
+              ? translate(
+                  'auto.components.settings.gitea.integration.card.bdcb1e773f',
+                  'Add server'
+                )
               : translate(
-                  'auto.components.settings.gitea.integration.card.connect',
+                  'auto.components.settings.gitea.integration.card.9ce5f12a0d',
                   'Connect Gitea'
                 )}
           </Button>
@@ -124,7 +127,7 @@ export function GiteaTaskIntegrationCard(): React.JSX.Element {
                   <span className="flex shrink-0 items-center gap-1 text-xs text-status-success">
                     <CheckCircle2 className="size-3.5" />
                     {translate(
-                      'auto.components.settings.gitea.integration.card.verified',
+                      'auto.components.settings.gitea.integration.card.3852b1fd6f',
                       'Verified'
                     )}
                   </span>
@@ -145,18 +148,18 @@ export function GiteaTaskIntegrationCard(): React.JSX.Element {
                     <>
                       <LoaderCircle className="size-3.5 mr-1.5 animate-spin" />
                       {translate(
-                        'auto.components.settings.gitea.integration.card.testing',
+                        'auto.components.settings.gitea.integration.card.09bde44485',
                         'Testing...'
                       )}
                     </>
                   ) : (
-                    translate('auto.components.settings.gitea.integration.card.test', 'Test')
+                    translate('auto.components.settings.gitea.integration.card.2bf28d5929', 'Test')
                   )}
                 </Button>
                 <button
                   onClick={() => void handleDisconnect(server.id)}
                   aria-label={translate(
-                    'auto.components.settings.gitea.integration.card.disconnectServer',
+                    'auto.components.settings.gitea.integration.card.d0b31b4845',
                     'Disconnect {{value0}}',
                     { value0: server.displayName }
                   )}
@@ -169,7 +172,7 @@ export function GiteaTaskIntegrationCard(): React.JSX.Element {
           })}
           <p className="text-[11px] text-muted-foreground/70">
             {translate(
-              'auto.components.settings.gitea.integration.card.tokenNote',
+              'auto.components.settings.gitea.integration.card.f47924e554',
               'Each connected Gitea server stores one token, encrypted locally.'
             )}
           </p>
@@ -178,12 +181,12 @@ export function GiteaTaskIntegrationCard(): React.JSX.Element {
         <IntegrationCardDetails>
           <p className="text-xs text-muted-foreground">
             {translate(
-              'auto.components.settings.gitea.integration.card.credentialCopy',
+              'auto.components.settings.gitea.integration.card.c043731756',
               'Connect a self-hosted Gitea server with its URL and a personal access token. Credentials are stored locally and encrypted when local runtime storage supports it.'
             )}
           </p>
           <Button variant="ghost" size="sm" onClick={() => void refreshGiteaStatus()}>
-            {translate('auto.components.settings.gitea.integration.card.recheck', 'Re-check')}
+            {translate('auto.components.settings.gitea.integration.card.9a555db81e', 'Re-check')}
           </Button>
         </IntegrationCardDetails>
       ) : null}

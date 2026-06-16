@@ -60,7 +60,10 @@ export function GiteaIssueMetaControls({
       toast.error(
         error instanceof Error
           ? error.message
-          : translate('auto.components.giteaIssueMetaControls.failed', 'Failed to update issue.')
+          : translate(
+              'auto.components.gitea.issue.meta.controls.ba343731c0',
+              'Failed to update issue.'
+            )
       )
     } finally {
       setPending(null)
@@ -107,7 +110,7 @@ export function GiteaIssueMetaControls({
             }
           }}
           className="h-8 text-xs"
-          aria-label={translate('auto.components.giteaIssueMetaControls.title', 'Title')}
+          aria-label={translate('auto.components.gitea.issue.meta.controls.63f46a8d86', 'Title')}
         />
         <Button
           size="sm"
@@ -131,7 +134,7 @@ export function GiteaIssueMetaControls({
             ) : (
               <Tag className="size-3.5" />
             )}
-            {translate('auto.components.giteaIssueMetaControls.labels', 'Labels')}
+            {translate('auto.components.gitea.issue.meta.controls.8cc407607b', 'Labels')}
             {labelNames.length > 0 ? (
               <span className="text-muted-foreground">{labelNames.length}</span>
             ) : null}
@@ -141,7 +144,7 @@ export function GiteaIssueMetaControls({
           {repoLabels.length === 0 ? (
             <p className="px-2 py-1.5 text-xs text-muted-foreground">
               {translate(
-                'auto.components.giteaIssueMetaControls.noLabels',
+                'auto.components.gitea.issue.meta.controls.11fac85e07',
                 'No labels in this repo.'
               )}
             </p>
@@ -184,7 +187,7 @@ export function GiteaIssueMetaControls({
             ) : (
               <UserPlus className="size-3.5" />
             )}
-            {translate('auto.components.giteaIssueMetaControls.assignees', 'Assignees')}
+            {translate('auto.components.gitea.issue.meta.controls.401f7dc7a2', 'Assignees')}
             {assigneeLogins.length > 0 ? (
               <span className="text-muted-foreground">{assigneeLogins.length}</span>
             ) : null}
@@ -194,7 +197,7 @@ export function GiteaIssueMetaControls({
           {repoAssignees.length === 0 ? (
             <p className="px-2 py-1.5 text-xs text-muted-foreground">
               {translate(
-                'auto.components.giteaIssueMetaControls.noAssignees',
+                'auto.components.gitea.issue.meta.controls.3cd6f5acbd',
                 'No assignable users.'
               )}
             </p>

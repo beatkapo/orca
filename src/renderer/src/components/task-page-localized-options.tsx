@@ -128,7 +128,7 @@ export const getSourceOptions = createLocalizedCatalog((): SourceOption[] => [
   },
   {
     id: 'gitea',
-    label: translate('auto.components.TaskPage.gitea_source_label', 'Gitea'),
+    label: translate('auto.components.task.page.localized.options.3de5a79478', 'Gitea'),
     Icon: ({ className }) => <GiteaIcon className={className} />
   }
 ])

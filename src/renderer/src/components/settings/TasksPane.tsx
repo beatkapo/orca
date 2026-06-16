@@ -80,11 +80,11 @@ const TASK_PROVIDER_OPTIONS: readonly {
   {
     id: 'gitea',
     get label() {
-      return translate('auto.components.settings.TasksPane.gitea_label', 'Gitea')
+      return translate('auto.components.settings.TasksPane.d8a6f1c3fe', 'Gitea')
     },
     get description() {
       return translate(
-        'auto.components.settings.TasksPane.gitea_description',
+        'auto.components.settings.TasksPane.a054078ab7',
         'Show Gitea in the Tasks source picker and sidebar shortcuts.'
       )
     },

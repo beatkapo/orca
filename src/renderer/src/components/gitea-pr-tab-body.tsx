@@ -52,7 +52,7 @@ export function GiteaPrTabBody({
           ) : (
             <p className="text-sm italic text-muted-foreground">
               {translate(
-                'auto.components.giteaPrTabBody.noDescription',
+                'auto.components.gitea.pr.tab.body.1fe3a05742',
                 'No description provided.'
               )}
             </p>
@@ -68,13 +68,13 @@ export function GiteaPrTabBody({
         <div className="flex items-center justify-end">
           <Button variant="outline" size="xs" onClick={onToggleSideBySide}>
             {sideBySide
-              ? translate('auto.components.giteaPrTabBody.inline', 'Inline')
-              : translate('auto.components.giteaPrTabBody.sideBySide', 'Side by side')}
+              ? translate('auto.components.gitea.pr.tab.body.413feaa83a', 'Inline')
+              : translate('auto.components.gitea.pr.tab.body.5372c28376', 'Side by side')}
           </Button>
         </div>
         {files.length === 0 ? (
           <p className="px-1 py-6 text-sm text-muted-foreground">
-            {translate('auto.components.giteaPrTabBody.noFiles', 'No changed files.')}
+            {translate('auto.components.gitea.pr.tab.body.53ab0c5a49', 'No changed files.')}
           </p>
         ) : (
           files.map((file) => (

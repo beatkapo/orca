@@ -100,7 +100,7 @@ export function GiteaPrFileDiff({
           </div>
         ) : isBinary ? (
           <p className="px-3 py-4 text-sm text-muted-foreground">
-            {translate('auto.components.giteaPrFileDiff.binary', 'Binary file not shown.')}
+            {translate('auto.components.gitea.pr.file.diff.81e07de6a5', 'Binary file not shown.')}
           </p>
         ) : (
           <DiffEditor

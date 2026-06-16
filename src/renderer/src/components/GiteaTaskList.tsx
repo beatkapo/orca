@@ -21,36 +21,36 @@ type Row = { repo: Repo; item: GiteaWorkItem }
 
 function getFilterPresets(): { id: GiteaWorkItemFilter; label: string }[] {
   return [
-    { id: 'all', label: translate('auto.components.GiteaTaskList.filterAll', 'All open') },
+    { id: 'all', label: translate('auto.components.GiteaTaskList.c07dd13940', 'All open') },
     {
       id: 'assigned',
-      label: translate('auto.components.GiteaTaskList.filterAssigned', 'Assigned to me')
+      label: translate('auto.components.GiteaTaskList.ab2a229e50', 'Assigned to me')
     },
-    { id: 'created', label: translate('auto.components.GiteaTaskList.filterCreated', 'Created') },
-    { id: 'closed', label: translate('auto.components.GiteaTaskList.filterClosed', 'Closed') }
+    { id: 'created', label: translate('auto.components.GiteaTaskList.74f30cd767', 'Created') },
+    { id: 'closed', label: translate('auto.components.GiteaTaskList.031c70d963', 'Closed') }
   ]
 }
 
 function getTypeFilters(): { id: GiteaTypeFilter; label: string }[] {
   return [
-    { id: 'all', label: translate('auto.components.GiteaTaskList.typeAll', 'All') },
-    { id: 'issue', label: translate('auto.components.GiteaTaskList.typeIssues', 'Issues') },
-    { id: 'pull', label: translate('auto.components.GiteaTaskList.typePulls', 'PRs') }
+    { id: 'all', label: translate('auto.components.GiteaTaskList.bf66fad935', 'All') },
+    { id: 'issue', label: translate('auto.components.GiteaTaskList.65a3bffe7a', 'Issues') },
+    { id: 'pull', label: translate('auto.components.GiteaTaskList.9b21aab4c9', 'PRs') }
   ]
 }
 
 function stateLabel(item: GiteaWorkItem): string {
   if (item.type === 'pull') {
     if (item.state === 'merged') {
-      return translate('auto.components.GiteaTaskList.stateMerged', 'Merged')
+      return translate('auto.components.GiteaTaskList.9986e0e679', 'Merged')
     }
     if (item.draft) {
-      return translate('auto.components.GiteaTaskList.stateDraft', 'Draft')
+      return translate('auto.components.GiteaTaskList.747423c0f8', 'Draft')
     }
   }
   return item.state === 'closed'
-    ? translate('auto.components.GiteaTaskList.stateClosed', 'Closed')
-    : translate('auto.components.GiteaTaskList.stateOpen', 'Open')
+    ? translate('auto.components.GiteaTaskList.031c70d963', 'Closed')
+    : translate('auto.components.GiteaTaskList.980519b0c8', 'Open')
 }
 
 // Self-contained Tasks-page panel for the Gitea source: fetches unified work
@@ -92,7 +92,7 @@ export function GiteaTaskList({
       )
       setRows(results.flat())
     } catch {
-      setError(translate('auto.components.GiteaTaskList.loadError', 'Failed to load Gitea tasks.'))
+      setError(translate('auto.components.GiteaTaskList.0285721e62', 'Failed to load Gitea tasks.'))
     } finally {
       setLoading(false)
     }
@@ -156,7 +156,7 @@ export function GiteaTaskList({
               className="shrink-0 gap-1.5 border-border/50 bg-transparent hover:bg-muted/50"
             >
               <Plus className="size-4" />
-              {translate('auto.components.GiteaTaskList.newIssue', 'New issue')}
+              {translate('auto.components.GiteaTaskList.5997067bee', 'New issue')}
             </Button>
           ) : null}
           <Button
@@ -164,7 +164,10 @@ export function GiteaTaskList({
             size="icon"
             onClick={() => setNonce((n) => n + 1)}
             disabled={loading}
-            aria-label={translate('auto.components.GiteaTaskList.refresh', 'Refresh Gitea tasks')}
+            aria-label={translate(
+              'auto.components.GiteaTaskList.e3db16e7c7',
+              'Refresh Gitea tasks'
+            )}
             className="size-8 shrink-0 border-border/50 bg-transparent hover:bg-muted/50"
           >
             {loading ? (
@@ -199,19 +202,19 @@ export function GiteaTaskList({
         ) : repos.length === 0 ? (
           <div className="px-4 py-6 text-sm text-muted-foreground">
             {translate(
-              'auto.components.GiteaTaskList.noRepos',
+              'auto.components.GiteaTaskList.34cd2d1024',
               'Select a Gitea-hosted project to see its issues and pull requests.'
             )}
           </div>
         ) : loading && rows.length === 0 ? (
           <div className="flex items-center gap-2 px-4 py-6 text-sm text-muted-foreground">
             <LoaderCircle className="size-4 animate-spin" />
-            {translate('auto.components.GiteaTaskList.loading', 'Loading Gitea tasks…')}
+            {translate('auto.components.GiteaTaskList.6e1e6691d7', 'Loading Gitea tasks…')}
           </div>
         ) : visibleRows.length === 0 ? (
           <div className="px-4 py-6 text-sm text-muted-foreground">
             {translate(
-              'auto.components.GiteaTaskList.empty',
+              'auto.components.GiteaTaskList.00f67933b5',
               'No matching issues or pull requests.'
             )}
           </div>

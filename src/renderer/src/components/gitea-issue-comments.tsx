@@ -24,14 +24,14 @@ export function GiteaIssueComments({ comments }: { comments: GiteaComment[] }): 
   return (
     <section className="px-4 py-4">
       <div className="mb-3 text-[13px] font-medium text-foreground">
-        {translate('auto.components.giteaIssueComments.heading', 'Comments')}
+        {translate('auto.components.gitea.issue.comments.8608602d16', 'Comments')}
         {comments.length > 0 ? (
           <span className="ml-2 text-[12px] text-muted-foreground">{comments.length}</span>
         ) : null}
       </div>
       {comments.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          {translate('auto.components.giteaIssueComments.empty', 'No comments yet.')}
+          {translate('auto.components.gitea.issue.comments.ea3f6f14a1', 'No comments yet.')}
         </p>
       ) : (
         <div className="flex flex-col gap-3">
@@ -40,7 +40,7 @@ export function GiteaIssueComments({ comments }: { comments: GiteaComment[] }): 
               <div className="flex min-w-0 items-center gap-2 border-b border-border/40 px-3 py-2">
                 <span className="truncate text-[13px] font-semibold text-foreground">
                   {comment.user?.login ??
-                    translate('auto.components.giteaIssueComments.unknown', 'Unknown')}
+                    translate('auto.components.gitea.issue.comments.6a519bdb1c', 'Unknown')}
                 </span>
                 <span className="shrink-0 text-[12px] text-muted-foreground">
                   {formatRelativeTime(comment.createdAt)}

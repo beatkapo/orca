@@ -48,13 +48,17 @@ export function GiteaPrLineComments({
             <div key={comment.id} className="rounded-md border border-border/50 bg-background/60">
               <div className="flex items-center gap-2 border-b border-border/40 px-2.5 py-1.5 text-[11px] text-muted-foreground">
                 <span className="rounded bg-muted px-1.5 py-0.5 font-mono">
-                  {translate('auto.components.giteaPrLineComments.line', 'Line {{value0}}', {
-                    value0: comment.line
-                  })}
+                  {translate(
+                    'auto.components.gitea.pr.line.comments.489b36633a',
+                    'Line {{value0}}',
+                    {
+                      value0: comment.line
+                    }
+                  )}
                 </span>
                 <span className="truncate font-medium text-foreground">
                   {comment.user?.login ??
-                    translate('auto.components.giteaPrLineComments.unknown', 'Unknown')}
+                    translate('auto.components.gitea.pr.line.comments.c01a062b92', 'Unknown')}
                 </span>
               </div>
               <div className="px-2.5 py-1.5">
@@ -73,15 +77,12 @@ export function GiteaPrLineComments({
               min={1}
               value={line}
               onChange={(event) => setLine(event.target.value)}
-              placeholder={translate(
-                'auto.components.giteaPrLineComments.linePlaceholder',
-                'Line #'
-              )}
+              placeholder={translate('auto.components.gitea.pr.line.comments.4e59b0c4f8', 'Line #')}
               className="h-8 w-24 text-xs"
             />
             <span className="text-[11px] text-muted-foreground">
               {translate(
-                'auto.components.giteaPrLineComments.lineHint',
+                'auto.components.gitea.pr.line.comments.a43b5cc38b',
                 'New-file line number from the diff'
               )}
             </span>
@@ -93,7 +94,7 @@ export function GiteaPrLineComments({
               rows={2}
               disabled={submitting}
               placeholder={translate(
-                'auto.components.giteaPrLineComments.bodyPlaceholder',
+                'auto.components.gitea.pr.line.comments.02339776da',
                 'Review comment…'
               )}
               className="min-h-10 flex-1 resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
@@ -109,14 +110,14 @@ export function GiteaPrLineComments({
               ) : (
                 <Send className="size-4" />
               )}
-              {translate('auto.components.giteaPrLineComments.add', 'Comment')}
+              {translate('auto.components.gitea.pr.line.comments.317313f8af', 'Comment')}
             </Button>
           </div>
         </div>
       ) : (
         <Button variant="ghost" size="xs" onClick={() => setOpen(true)} className="gap-1.5">
           <MessageSquarePlus className="size-3.5" />
-          {translate('auto.components.giteaPrLineComments.addOnLine', 'Comment on a line')}
+          {translate('auto.components.gitea.pr.line.comments.6cbd906d88', 'Comment on a line')}
         </Button>
       )}
     </div>

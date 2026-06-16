@@ -54,6 +54,8 @@ function mapFileStatus(status: string | null | undefined): GiteaPRFileStatus {
     case 'renamed':
     case 'copied':
       return status
+    case null:
+    case undefined:
     default:
       return 'changed'
   }
@@ -69,6 +71,7 @@ function mapCheckState(value: string | null | undefined): GiteaPRCheck['state'] 
       return 'error'
     case 'warning':
       return 'warning'
+    case undefined:
     default:
       return 'pending'
   }

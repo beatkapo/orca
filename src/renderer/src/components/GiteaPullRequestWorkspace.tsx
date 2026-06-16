@@ -160,7 +160,7 @@ export function GiteaPullRequestWorkspace({
         error instanceof Error
           ? error.message
           : translate(
-              'auto.components.GiteaPullRequestWorkspace.commentFailed',
+              'auto.components.GiteaPullRequestWorkspace.f5cf34ed40',
               'Failed to add comment.'
             )
       )
@@ -183,14 +183,14 @@ export function GiteaPullRequestWorkspace({
           throw new Error(result.error)
         }
         toast.success(
-          translate('auto.components.GiteaPullRequestWorkspace.merged', 'Pull request merged.')
+          translate('auto.components.GiteaPullRequestWorkspace.22f9c29c9b', 'Pull request merged.')
         )
         setDetail((prev) => (prev ? { ...prev, state: 'merged', merged: true } : prev))
       } catch (error) {
         toast.error(
           error instanceof Error
             ? error.message
-            : translate('auto.components.GiteaPullRequestWorkspace.mergeFailed', 'Failed to merge.')
+            : translate('auto.components.GiteaPullRequestWorkspace.d93415a77d', 'Failed to merge.')
         )
       } finally {
         setMerging(false)
@@ -221,7 +221,7 @@ export function GiteaPullRequestWorkspace({
           error instanceof Error
             ? error.message
             : translate(
-                'auto.components.GiteaPullRequestWorkspace.reviewCommentFailed',
+                'auto.components.GiteaPullRequestWorkspace.c7c84081fc',
                 'Failed to add review comment.'
               )
         )
@@ -236,16 +236,16 @@ export function GiteaPullRequestWorkspace({
   const tabs: { id: Tab; label: string; count?: number }[] = [
     {
       id: 'conversation',
-      label: translate('auto.components.GiteaPullRequestWorkspace.conversation', 'Conversation')
+      label: translate('auto.components.GiteaPullRequestWorkspace.f51240a59a', 'Conversation')
     },
     {
       id: 'files',
-      label: translate('auto.components.GiteaPullRequestWorkspace.files', 'Files'),
+      label: translate('auto.components.GiteaPullRequestWorkspace.4f4abe43ab', 'Files'),
       count: files.length
     },
     {
       id: 'checks',
-      label: translate('auto.components.GiteaPullRequestWorkspace.checks', 'Checks'),
+      label: translate('auto.components.GiteaPullRequestWorkspace.95a6c97ba6', 'Checks'),
       count: checks.length
     }
   ]
@@ -261,13 +261,16 @@ export function GiteaPullRequestWorkspace({
         <VisuallyHidden.Root asChild>
           <SheetTitle>
             {item?.title ??
-              translate('auto.components.GiteaPullRequestWorkspace.title', 'Gitea pull request')}
+              translate(
+                'auto.components.GiteaPullRequestWorkspace.8e44409da0',
+                'Gitea pull request'
+              )}
           </SheetTitle>
         </VisuallyHidden.Root>
         <VisuallyHidden.Root asChild>
           <SheetDescription>
             {translate(
-              'auto.components.GiteaPullRequestWorkspace.description',
+              'auto.components.GiteaPullRequestWorkspace.0a432f2c1a',
               'Review files, checks, and conversation, then merge or start work.'
             )}
           </SheetDescription>
@@ -282,12 +285,18 @@ export function GiteaPullRequestWorkspace({
                   size="icon-sm"
                   className="shrink-0"
                   onClick={onClose}
-                  aria-label={translate('auto.components.GiteaPullRequestWorkspace.close', 'Close')}
+                  aria-label={translate(
+                    'auto.components.GiteaPullRequestWorkspace.5fa5ec9fff',
+                    'Close'
+                  )}
                 >
                   <X className="size-4" />
                 </Button>
                 <Button onClick={() => onUse(repo, item)} className="shrink-0 gap-2" size="sm">
-                  {translate('auto.components.GiteaPullRequestWorkspace.start', 'Start workspace')}
+                  {translate(
+                    'auto.components.GiteaPullRequestWorkspace.f88c7cf08c',
+                    'Start workspace'
+                  )}
                   <ArrowRight className="size-4" />
                 </Button>
                 <Button
@@ -296,7 +305,7 @@ export function GiteaPullRequestWorkspace({
                   className="shrink-0"
                   onClick={() => window.api.shell.openUrl(item.url)}
                   aria-label={translate(
-                    'auto.components.GiteaPullRequestWorkspace.openInGitea',
+                    'auto.components.GiteaPullRequestWorkspace.9813b44d73',
                     'Open in Gitea'
                   )}
                 >
@@ -384,7 +393,7 @@ export function GiteaPullRequestWorkspace({
                     value={commentDraft}
                     onChange={(event) => setCommentDraft(event.target.value)}
                     placeholder={translate(
-                      'auto.components.GiteaPullRequestWorkspace.addComment',
+                      'auto.components.GiteaPullRequestWorkspace.ddc99ed766',
                       'Add a comment...'
                     )}
                     rows={2}
@@ -401,7 +410,7 @@ export function GiteaPullRequestWorkspace({
                     ) : (
                       <Send className="size-4" />
                     )}
-                    {translate('auto.components.GiteaPullRequestWorkspace.comment', 'Comment')}
+                    {translate('auto.components.GiteaPullRequestWorkspace.d646ddef48', 'Comment')}
                   </Button>
                 </div>
               </div>

@@ -24,8 +24,8 @@ export function GiteaPrMergeButton({
           <Button size="sm" disabled={merging || !mergeable} className="gap-1">
             {merging ? <LoaderCircle className="size-3.5 animate-spin" /> : null}
             {mergeable === false
-              ? translate('auto.components.giteaPrMergeButton.conflicts', 'Conflicts')
-              : translate('auto.components.giteaPrMergeButton.merge', 'Merge')}
+              ? translate('auto.components.gitea.pr.merge.button.2378ab4908', 'Conflicts')
+              : translate('auto.components.gitea.pr.merge.button.8e662b9b6b', 'Merge')}
             <ChevronDown className="size-3.5" />
           </Button>
         </PopoverTrigger>

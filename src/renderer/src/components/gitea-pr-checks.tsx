@@ -12,7 +12,7 @@ function stateIcon(state: GiteaPRCheck['state']): React.JSX.Element {
       return <CircleX className="size-4 text-destructive" />
     case 'warning':
       return <CircleAlert className="size-4 text-amber-500" />
-    default:
+    case 'pending':
       return <CircleDot className="size-4 text-muted-foreground" />
   }
 }
@@ -21,7 +21,10 @@ export function GiteaPrChecks({ checks }: { checks: GiteaPRCheck[] }): React.JSX
   if (checks.length === 0) {
     return (
       <p className="px-4 py-6 text-sm text-muted-foreground">
-        {translate('auto.components.giteaPrChecks.empty', 'No status checks reported for this PR.')}
+        {translate(
+          'auto.components.gitea.pr.checks.bed82a55cd',
+          'No status checks reported for this PR.'
+        )}
       </p>
     )
   }
@@ -47,7 +50,7 @@ export function GiteaPrChecks({ checks }: { checks: GiteaPRCheck[] }): React.JSX
               type="button"
               onClick={() => check.targetUrl && window.api.shell.openUrl(check.targetUrl)}
               aria-label={translate(
-                'auto.components.giteaPrChecks.openDetails',
+                'auto.components.gitea.pr.checks.448c6113a4',
                 'Open check details'
               )}
               className="shrink-0 rounded p-1 text-muted-foreground/60 transition-colors hover:text-foreground"
