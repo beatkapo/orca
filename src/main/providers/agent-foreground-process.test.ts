@@ -100,6 +100,17 @@ describe('resolveAgentForegroundProcess', () => {
     await expect(resolveAgentForegroundProcess(100, 'node')).resolves.toBe('codex')
   })
 
+  it('does not report Claude print-mode hook descendants as foreground agents', async () => {
+    mockPs(
+      [
+        '100 99 Ss   bash -i',
+        '101 100 S+   claude --print --model haiku Analyze this conversation and determine next work'
+      ].join('\n')
+    )
+
+    await expect(resolveAgentForegroundProcess(100, 'bash')).resolves.toBe('bash')
+  })
+
   it('does not report a stopped agent after the shell regains foreground', async () => {
     mockPs(
       ['100 99 Ss+  bash -i', '101 100 T    node /Users/dev/.nvm/versions/node/bin/codex'].join(
