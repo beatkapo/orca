@@ -47,6 +47,39 @@ describe('focusTerminalTabSurface', () => {
     expect(textarea.focus).not.toHaveBeenCalled()
   })
 
+  it('does not steal focus via the global fallback while a terminal is already focused', () => {
+    flushAnimationFrames()
+    const fallback = { focus: vi.fn() }
+    vi.stubGlobal('document', {
+      // The requested tab is not mounted, so the scoped lookup misses and only
+      // the global fallback would match.
+      querySelector: vi.fn((selector: string) =>
+        selector === '.xterm-helper-textarea' ? fallback : null
+      ),
+      // The user is actively typing in some other terminal.
+      activeElement: { classList: { contains: (cls: string) => cls === 'xterm-helper-textarea' } }
+    })
+
+    focusTerminalTabSurface('not-mounted-tab')
+
+    expect(fallback.focus).not.toHaveBeenCalled()
+  })
+
+  it('uses the global fallback when focus is outside any terminal', () => {
+    flushAnimationFrames()
+    const fallback = { focus: vi.fn() }
+    vi.stubGlobal('document', {
+      querySelector: vi.fn((selector: string) =>
+        selector === '.xterm-helper-textarea' ? fallback : null
+      ),
+      activeElement: { classList: { contains: () => false } }
+    })
+
+    focusTerminalTabSurface('not-mounted-tab')
+
+    expect(fallback.focus).toHaveBeenCalled()
+  })
+
   it('cancels a pending focus frame when a newer focus request starts', () => {
     const cancelAnimationFrame = vi.fn()
     vi.stubGlobal(

@@ -45,6 +45,13 @@ export function focusTerminalTabSurface(tabId: string, leafId?: string | null): 
         // pane when the requested UUID leaf has not mounted yet.
         return
       }
+      // Why: the requested tab isn't mounted (stale/late IPC focus request, e.g.
+      // agent-status or runtime events). Only use the "any terminal" fallback
+      // when focus isn't already inside a terminal — otherwise we'd yank focus
+      // away from the terminal the user is actively typing in.
+      if (document.activeElement?.classList.contains('xterm-helper-textarea')) {
+        return
+      }
       const fallback = document.querySelector('.xterm-helper-textarea') as HTMLElement | null
       fallback?.focus()
     })
