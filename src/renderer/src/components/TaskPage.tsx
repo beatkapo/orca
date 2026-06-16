@@ -151,6 +151,7 @@ import { GlpiConnectDialog } from '@/components/glpi-connect-dialog'
 import { GlpiNewTicketDialog } from '@/components/glpi-new-ticket-dialog'
 import { useTaskPageGlpi } from '@/components/task-page-glpi-handlers'
 import { getGlpiStatusTone } from '@/components/task-page-glpi-presentation'
+import { getGlpiScaleLabel, getGlpiStatusLabel } from '@/components/glpi-ticket-status-control'
 import { GlpiFilterPopover } from '@/components/glpi-filter-popover'
 import type { GlpiTypeFilter } from '@/components/task-page-glpi-filters'
 import { cn } from '@/lib/utils'
@@ -9976,7 +9977,9 @@ export default function TaskPage(): React.JSX.Element {
                                   getGlpiStatusTone(ticket.status)
                                 )}
                               >
-                                <span className="truncate">{ticket.status}</span>
+                                <span className="truncate">
+                                  {getGlpiStatusLabel(ticket.status)}
+                                </span>
                               </span>
                               <span className="min-w-0 truncate text-[11px] text-muted-foreground">
                                 {ticket.assignees[0]?.fullName ??
@@ -10000,12 +10003,12 @@ export default function TaskPage(): React.JSX.Element {
                                 getGlpiStatusTone(ticket.status)
                               )}
                             >
-                              <span className="truncate">{ticket.status}</span>
+                              <span className="truncate">{getGlpiStatusLabel(ticket.status)}</span>
                             </span>
                           </div>
 
                           <span className="block truncate text-[12px] text-muted-foreground max-md:!hidden">
-                            {ticket.priority}
+                            {getGlpiScaleLabel(ticket.priority)}
                           </span>
 
                           <div className="flex min-w-0 items-center gap-2 text-[12px] text-muted-foreground max-lg:!hidden">

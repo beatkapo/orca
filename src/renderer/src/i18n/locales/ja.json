@@ -10919,11 +10919,11 @@
           "localized": {
             "options": {
               "13db236c75": "GLPI",
-              "a998fc39b1": "Created by me",
-              "81c1ca89fd": "All open",
-              "b8436633d8": "All",
-              "e2b9c8c892": "Incidents",
-              "b8609b0793": "Requests"
+              "a998fc39b1": "自分が作成",
+              "81c1ca89fd": "未解決すべて",
+              "b8436633d8": "すべて",
+              "e2b9c8c892": "インシデント",
+              "b8609b0793": "リクエスト"
             }
           }
         }

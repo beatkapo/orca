@@ -10919,11 +10919,11 @@
           "localized": {
             "options": {
               "13db236c75": "GLPI",
-              "a998fc39b1": "Created by me",
-              "81c1ca89fd": "All open",
-              "b8436633d8": "All",
-              "e2b9c8c892": "Incidents",
-              "b8609b0793": "Requests"
+              "a998fc39b1": "Creadas por mí",
+              "81c1ca89fd": "Todas abiertas",
+              "b8436633d8": "Todas",
+              "e2b9c8c892": "Incidencias",
+              "b8609b0793": "Solicitudes"
             }
           }
         }
