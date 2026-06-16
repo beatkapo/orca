@@ -150,14 +150,26 @@ async function resolveUsers(server: GlpiServer, ids: number[]): Promise<Map<numb
 export async function getGlpiTicket(server: GlpiServer, id: number): Promise<GlpiTicket | null> {
   await acquire()
   try {
-    const raw = await glpiServerRequest<RawGlpiTicket>(
-      server,
-      `/Ticket/${id}?expand_dropdowns=true`
-    )
+    // Why: request raw values (expand_dropdowns off) so status/urgency/priority/
+    // type stay numeric — expanding them returns localized strings that break the
+    // int→key mapping. The FK category name is resolved separately below.
+    const raw = await glpiServerRequest<RawGlpiTicket>(server, `/Ticket/${id}?expand_dropdowns=0`)
     if (typeof raw.id !== 'number') {
       return null
     }
     const ticket = mapGlpiTicketDetail(raw, server)
+    const categoryId = typeof raw.itilcategories_id === 'number' ? raw.itilcategories_id : 0
+    if (categoryId > 0) {
+      try {
+        const category = await glpiServerRequest<{ completename?: string; name?: string }>(
+          server,
+          `/ITILCategory/${categoryId}`
+        )
+        ticket.category = category.completename ?? category.name ?? undefined
+      } catch {
+        // Category is optional context — ignore lookup failures.
+      }
+    }
     const links = await glpiServerRequest<RawTicketUser[]>(server, `/Ticket/${id}/Ticket_User`)
     const userLinks = Array.isArray(links) ? links : []
     const users = await resolveUsers(

@@ -45,6 +45,30 @@ export function isAuthError(error: unknown): boolean {
 }
 
 const sessionTokens = new Map<string, string>()
+// Why: dedupe concurrent initSession calls per server so a cold cache or a
+// simultaneous expiry doesn't open (and orphan) N server-side sessions.
+const openingSessions = new Map<string, Promise<string>>()
+
+function ensureSession(server: GlpiServer, credentials: GlpiCredentials): Promise<string> {
+  const cached = sessionTokens.get(server.id)
+  if (cached) {
+    return Promise.resolve(cached)
+  }
+  const inflight = openingSessions.get(server.id)
+  if (inflight) {
+    return inflight
+  }
+  const promise = openSession(server.apiBaseUrl, credentials)
+    .then((token) => {
+      sessionTokens.set(server.id, token)
+      return token
+    })
+    .finally(() => {
+      openingSessions.delete(server.id)
+    })
+  openingSessions.set(server.id, promise)
+  return promise
+}
 
 async function readGlpiError(response: Response): Promise<string> {
   try {
@@ -123,20 +147,17 @@ export async function glpiServerRequest<T>(
   if (!credentials) {
     throw new GlpiApiError('Not connected to this GLPI server.', 401)
   }
-  let sessionToken = sessionTokens.get(server.id)
-  if (!sessionToken) {
-    sessionToken = await openSession(server.apiBaseUrl, credentials)
-    sessionTokens.set(server.id, sessionToken)
-  }
+  const sessionToken = await ensureSession(server, credentials)
   try {
     return await rawRequest<T>(server.apiBaseUrl, credentials.appToken, sessionToken, path, init)
   } catch (error) {
-    if (!isAuthError(error)) {
+    // Only 401 means an expired/invalid session token; a 403 is a genuine
+    // authorization denial that re-initializing the session cannot fix.
+    if (!(error instanceof GlpiApiError) || error.status !== 401) {
       throw error
     }
-    // Session likely expired — refresh once and retry.
-    const refreshed = await openSession(server.apiBaseUrl, credentials)
-    sessionTokens.set(server.id, refreshed)
+    sessionTokens.delete(server.id)
+    const refreshed = await ensureSession(server, credentials)
     return rawRequest<T>(server.apiBaseUrl, credentials.appToken, refreshed, path, init)
   }
 }

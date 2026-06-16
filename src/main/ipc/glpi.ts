@@ -47,6 +47,14 @@ function normalizeTicketId(value: unknown): number | null {
   return Number.isInteger(id) && id > 0 ? id : null
 }
 
+// GLPI urgency is a 1 (very low) .. 5 (very high) scale.
+function normalizeUrgency(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined
+  }
+  return Math.min(Math.max(1, Math.round(value)), 5)
+}
+
 function normalizeUpdate(value: unknown): GlpiTicketUpdate | null {
   if (!value || typeof value !== 'object') {
     return null
@@ -182,7 +190,7 @@ export function registerGlpiHandlers(): void {
       title: args.title.trim(),
       content: typeof args.content === 'string' ? args.content : undefined,
       type,
-      urgency: typeof args.urgency === 'number' ? args.urgency : undefined
+      urgency: normalizeUrgency(args.urgency)
     })
   })
 }

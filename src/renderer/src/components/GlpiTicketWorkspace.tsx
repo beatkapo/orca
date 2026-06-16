@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, Clipboard, ExternalLink, GitBranch, LoaderCircle, X } from 'lucide-react'
+import { ArrowRight, LoaderCircle, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { VisuallyHidden } from 'radix-ui'
 
@@ -12,6 +12,7 @@ import { useAppStore } from '@/store'
 import type { GlpiFollowup, GlpiTicket, GlpiTicketStatus } from '../../../shared/types'
 import type { TaskSourceContext } from '../../../shared/task-source-context'
 import { translate } from '@/i18n/i18n'
+import { buildGlpiTicketActions } from './glpi-ticket-workspace-actions'
 import {
   formatGlpiRelativeTime,
   GlpiTicketFollowupComposer,
@@ -29,36 +30,6 @@ type GlpiTicketWorkspaceProps = {
   onUse: (ticket: GlpiTicket) => void
   onClose: () => void
   sourceContext?: TaskSourceContext | null
-}
-
-function buildGlpiBranchName(ticket: GlpiTicket): string {
-  const slug = ticket.title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 52)
-  return `glpi-${ticket.id}${slug ? `-${slug}` : ''}`
-}
-
-function buildGlpiPrompt(ticket: GlpiTicket): string {
-  return `Resolve GLPI ticket #${ticket.id}: ${ticket.title}\n\n${ticket.url}`
-}
-
-async function copyGlpiText(text: string, label: string): Promise<void> {
-  try {
-    await window.api.ui.writeClipboardText(text)
-    toast.success(
-      translate('auto.components.GlpiTicketWorkspace.57ccc6879c', '{{value0}} copied', {
-        value0: label
-      })
-    )
-  } catch {
-    toast.error(
-      translate('auto.components.GlpiTicketWorkspace.d75ad9a7a4', 'Failed to copy {{value0}}', {
-        value0: label.toLowerCase()
-      })
-    )
-  }
 }
 
 export default function GlpiTicketWorkspace({
@@ -231,39 +202,7 @@ export default function GlpiTicketWorkspace({
     serverId
   ])
 
-  const actionItems = useMemo(
-    () => [
-      {
-        label: translate('auto.components.GlpiTicketWorkspace.7f0167c940', 'Open in GLPI'),
-        icon: ExternalLink,
-        action: () => window.api.shell.openUrl(displayed.url)
-      },
-      {
-        label: translate('auto.components.GlpiTicketWorkspace.fff0f40146', 'Copy URL'),
-        icon: Clipboard,
-        action: () => void copyGlpiText(displayed.url, 'URL')
-      },
-      {
-        label: translate('auto.components.GlpiTicketWorkspace.a9a5c99719', 'Copy ID'),
-        icon: Clipboard,
-        action: () => void copyGlpiText(`#${displayed.id}`, 'ID')
-      },
-      {
-        label: translate(
-          'auto.components.GlpiTicketWorkspace.6df09513c6',
-          'Copy suggested branch name'
-        ),
-        icon: GitBranch,
-        action: () => void copyGlpiText(buildGlpiBranchName(displayed), 'Branch name')
-      },
-      {
-        label: translate('auto.components.GlpiTicketWorkspace.c9dda8c70a', 'Copy prompt'),
-        icon: Clipboard,
-        action: () => void copyGlpiText(buildGlpiPrompt(displayed), 'Prompt')
-      }
-    ],
-    [displayed]
-  )
+  const actionItems = useMemo(() => buildGlpiTicketActions(displayed), [displayed])
 
   const requesterLabel =
     displayed.requester?.fullName ??
