@@ -3,11 +3,11 @@ import { useAppStore } from '@/store'
 import {
   buildAgentDraftLaunchPlan,
   buildAgentStartupPlan,
-  type AgentDraftLaunchPlan,
   type AgentStartupPlan
 } from '@/lib/tui-agent-startup'
 import { CLIENT_PLATFORM } from '@/lib/new-workspace'
 import { getAgentLaunchPlatformForRepo } from '@/lib/agent-launch-platform'
+import { canUseInlineDraftLaunchPlan } from '@/lib/inline-draft-launch-safety'
 import { reconcileTabOrder } from '@/components/tab-bar/reconcile-order'
 import { track, tuiAgentToAgentKind } from '@/lib/telemetry'
 import { pasteDraftWhenAgentReady } from '@/lib/agent-paste-draft'
@@ -27,8 +27,6 @@ import { makePaneKey } from '../../../shared/stable-pane-id'
 import type { TuiAgent } from '../../../shared/types'
 import type { LaunchSource } from '../../../shared/telemetry-events'
 import { translate } from '@/i18n/i18n'
-
-const WIN32_INLINE_DRAFT_LIMIT_CHARS = 24_000
 
 export type LaunchAgentInNewTabArgs = {
   agent: TuiAgent
@@ -86,23 +84,6 @@ function seedCommandCodeSubmittedPromptStatus(tabId: string, prompt: string): vo
   } catch {
     // Best-effort UI seed. Real hooks still own refinement/completion.
   }
-}
-
-function canUseInlineDraftLaunchPlan(
-  plan: AgentDraftLaunchPlan,
-  platform: NodeJS.Platform
-): boolean {
-  if (platform !== 'win32') {
-    return true
-  }
-  const envChars = Object.entries(plan.env ?? {}).reduce(
-    (total, [key, value]) => total + key.length + value.length,
-    0
-  )
-  // Why: Windows CreateProcess/env blocks have tight length ceilings. Large
-  // generated drafts should use the existing post-ready paste path instead of
-  // failing the PTY spawn before the agent starts.
-  return plan.launchCommand.length + envChars <= WIN32_INLINE_DRAFT_LIMIT_CHARS
 }
 
 /**
