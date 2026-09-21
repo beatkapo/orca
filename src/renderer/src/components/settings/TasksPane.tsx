@@ -7,6 +7,7 @@ import {
   normalizeVisibleTaskProviders,
   resolveVisibleTaskProvider
 } from '../../../../shared/task-providers'
+import { GiteaIcon } from '@/components/icons/GiteaIcon'
 import { JiraIcon } from '@/components/icons/JiraIcon'
 import { LinearIcon } from '@/components/icons/LinearIcon'
 import { Button } from '@/components/ui/button'
@@ -89,6 +90,18 @@ const PROVIDER_META: Record<
       )
     },
     Icon: ({ className }) => <JiraIcon className={className} />
+  },
+  gitea: {
+    get label() {
+      return translate('auto.components.settings.TasksPane.giteaLabel', 'Gitea')
+    },
+    get description() {
+      return translate(
+        'auto.components.settings.TasksPane.giteaDescription',
+        'Connect a Gitea or Forgejo server and show its issues in Tasks.'
+      )
+    },
+    Icon: ({ className }) => <GiteaIcon className={className} />
   }
 }
 
