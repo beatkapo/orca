@@ -8590,7 +8590,11 @@
           "skillHint": ". After Linear is connected, usage examples stay under Settings → Linear.",
           "incompleteBannerBodyWithLinear": "Hide providers you do not use, or expand a card and finish its steps. For Linear: API access, the agent skill, and Show in Tasks.",
           "giteaLabel": "Gitea",
-          "giteaDescription": "Connect a Gitea or Forgejo server and show its issues in Tasks."
+          "giteaDescription": "Connect a Gitea or Forgejo server and show its issues in Tasks.",
+          "connectGiteaTitle": "Connect Gitea",
+          "connectGiteaDescription": "Add a Gitea or Forgejo server with a personal access token.",
+          "manageGitea": "Manage servers",
+          "addGitea": "Add Gitea server"
         },
         "TerminalAppearanceSection": {
           "a14a427ae4": "Thickness of the pane divider line.",
@@ -10391,7 +10395,8 @@
             "setup": "setup",
             "apiKey": "api key",
             "skill": "skill",
-            "connect": "connect"
+            "connect": "connect",
+            "gitea": "gitea"
           }
         },
         "terminal": {

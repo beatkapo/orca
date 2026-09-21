@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { useAppStore } from '@/store'
 import { IntegrationCardDetails, IntegrationCardShell } from './integration-card-shell'
+import { GITEA_INTEGRATION_SECTION_ID } from './task-provider-integration-section-ids'
 import { translate } from '@/i18n/i18n'
 
 type VerificationResult = { state: 'ok' | 'error'; error?: string }
@@ -83,6 +84,7 @@ export function GiteaTaskIntegrationCard(): React.JSX.Element {
 
   return (
     <IntegrationCardShell
+      settingsSectionId={GITEA_INTEGRATION_SECTION_ID}
       icon={<GiteaIcon className="size-5" />}
       name="Gitea"
       description={
