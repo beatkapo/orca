@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { ipcMain } from 'electron'
 import type {
   GiteaConnectArgs,
@@ -32,7 +33,7 @@ function normalizeServerId(value: unknown): string | undefined {
 }
 
 function normalizeServerSelection(value: unknown): GiteaServerSelection | undefined {
-  return normalizeServerId(value) as GiteaServerSelection | undefined
+  return normalizeServerId(value)
 }
 
 function clampLimit(value: unknown, fallback = 30): number {
@@ -40,41 +41,27 @@ function clampLimit(value: unknown, fallback = 30): number {
   return Math.min(Math.max(1, limit), 100)
 }
 
+const issueUpdateSchema = z.object({
+  title: z.string().optional(),
+  body: z.string().optional(),
+  state: z.enum(['open', 'closed']).optional(),
+  assignees: z.array(z.string()).optional(),
+  labelIds: z.array(z.number().int().positive()).optional()
+})
+
+function normalizeIssueUpdate(value: unknown): GiteaIssueUpdate | null {
+  const result = issueUpdateSchema.safeParse(value)
+  return result.success ? result.data : null
+}
+
 function normalizeStringArray(value: unknown): string[] | undefined {
-  if (value === undefined) {
-    return undefined
-  }
-  return Array.isArray(value) && value.every((item) => typeof item === 'string') ? value : undefined
+  const result = z.array(z.string()).safeParse(value)
+  return result.success ? result.data : undefined
 }
 
 function normalizeNumberArray(value: unknown): number[] | undefined {
-  if (value === undefined) {
-    return undefined
-  }
-  return Array.isArray(value) && value.every((item) => typeof item === 'number') ? value : undefined
-}
-
-function normalizeIssueUpdate(value: unknown): GiteaIssueUpdate | null {
-  if (!value || typeof value !== 'object') {
-    return null
-  }
-  const input = value as GiteaIssueUpdate
-  if (input.title !== undefined && typeof input.title !== 'string') {
-    return null
-  }
-  if (input.body !== undefined && typeof input.body !== 'string') {
-    return null
-  }
-  if (input.state !== undefined && input.state !== 'open' && input.state !== 'closed') {
-    return null
-  }
-  if (input.assignees !== undefined && normalizeStringArray(input.assignees) === undefined) {
-    return null
-  }
-  if (input.labelIds !== undefined && normalizeNumberArray(input.labelIds) === undefined) {
-    return null
-  }
-  return input
+  const result = z.array(z.number().int().positive()).safeParse(value)
+  return result.success ? result.data : undefined
 }
 
 export function registerGiteaHandlers(store: Store): void {
@@ -115,9 +102,7 @@ export function registerGiteaHandlers(store: Store): void {
       args: GiteaRepoSelectorArgs & { filter?: GiteaWorkItemFilter; limit?: number }
     ) => {
       const repo = assertRegisteredRepo(args, store)
-      const filter = VALID_FILTERS.has(args?.filter as GiteaWorkItemFilter)
-        ? (args.filter as GiteaWorkItemFilter)
-        : undefined
+      const filter = args.filter && VALID_FILTERS.has(args.filter) ? args.filter : undefined
       return listGiteaWorkItems(repo.path, filter, clampLimit(args.limit), repoConnectionId(repo))
     }
   )

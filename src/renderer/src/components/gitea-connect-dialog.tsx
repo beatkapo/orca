@@ -13,15 +13,12 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 
 type GiteaConnectDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   onConnected?: () => void
-  overlayClassName?: string
-  contentClassName?: string
 }
 
 type ConnectState = 'idle' | 'connecting' | 'error'
@@ -31,9 +28,7 @@ type ConnectState = 'idle' | 'connecting' | 'error'
 export function GiteaConnectDialog({
   open,
   onOpenChange,
-  onConnected,
-  overlayClassName,
-  contentClassName
+  onConnected
 }: GiteaConnectDialogProps): React.JSX.Element {
   const giteaConnect = useAppStore((s) => s.giteaConnect)
   const mountedRef = useMountedRef()
@@ -95,18 +90,15 @@ export function GiteaConnectDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent
-        overlayClassName={overlayClassName}
-        className={cn('sm:max-w-md', contentClassName)}
-      >
-        <DialogHeader className="gap-3">
-          <DialogTitle className="leading-tight">
+      <DialogContent overlayClassName="z-[110]" className="z-[120] sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>
             {translate('auto.components.gitea.connect.dialog.d2823a1de0', 'Connect Gitea server')}
           </DialogTitle>
           <DialogDescription>
             {translate(
               'auto.components.gitea.connect.dialog.d076a10ae3',
-              'Use a Gitea server URL and a personal access token to browse and manage issues.'
+              'Use a Gitea server URL and a personal access token to browse issues and review pull requests.'
             )}
           </DialogDescription>
         </DialogHeader>
@@ -119,7 +111,7 @@ export function GiteaConnectDialog({
         >
           <div className="flex flex-col gap-3">
             <div className="space-y-2">
-              <Label htmlFor={baseUrlId} className="text-xs">
+              <Label htmlFor={baseUrlId}>
                 {translate('auto.components.gitea.connect.dialog.690c1da1bb', 'Gitea server URL')}
               </Label>
               <Input
@@ -138,7 +130,7 @@ export function GiteaConnectDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor={tokenId} className="text-xs">
+              <Label htmlFor={tokenId}>
                 {translate('auto.components.gitea.connect.dialog.062ae1ea05', 'Access token')}
               </Label>
               <Input
@@ -166,7 +158,7 @@ export function GiteaConnectDialog({
             <p className="text-xs text-muted-foreground">
               {translate(
                 'auto.components.gitea.connect.dialog.3ecb3e1153',
-                'Create a token under your Gitea user settings → Applications, with read/write access to issues.'
+                'Create a token in Gitea Settings → Applications with read:user, write:issue, and write:repository scopes. Limit access to the repositories you need.'
               )}
             </p>
             <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground/70">

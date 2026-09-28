@@ -99,7 +99,7 @@ const PROVIDER_META: Record<
     get description() {
       return translate(
         'auto.components.settings.TasksPane.giteaDescription',
-        'Connect a Gitea or Forgejo server and show its issues in Tasks.'
+        'Connect a Gitea or Forgejo server and show its issues and pull requests in Tasks.'
       )
     },
     Icon: ({ className }) => <GiteaIcon className={className} />

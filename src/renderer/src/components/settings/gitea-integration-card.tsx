@@ -91,8 +91,8 @@ export function GiteaTaskIntegrationCard(): React.JSX.Element {
         connected
           ? translate(
               'auto.components.settings.gitea.integration.card.069f07af1c',
-              '{{value0}} server{{value1}} connected',
-              { value0: serverCount, value1: serverCount === 1 ? '' : 's' }
+              'Connected servers: {{value0}}',
+              { value0: serverCount }
             )
           : checking
             ? translate(
@@ -101,7 +101,7 @@ export function GiteaTaskIntegrationCard(): React.JSX.Element {
               )
             : translate(
                 'auto.components.settings.gitea.integration.card.5a8cd33300',
-                'Browse, create, and start work from Gitea issues.'
+                'Browse Gitea issues and pull requests, create issues, and start work.'
               )
       }
       checking={checking}
@@ -133,7 +133,7 @@ export function GiteaTaskIntegrationCard(): React.JSX.Element {
           {giteaStatus.credentialError}
         </p>
       ) : null}
-      {connected && servers.length > 0 ? (
+      {servers.length > 0 ? (
         <div className="mt-3 space-y-2">
           {servers.map((server) => {
             const testResult = testResultByServer[server.id]
@@ -202,7 +202,7 @@ export function GiteaTaskIntegrationCard(): React.JSX.Element {
           <p className="text-[11px] text-muted-foreground/70">
             {translate(
               'auto.components.settings.gitea.integration.card.f47924e554',
-              'Each connected Gitea server stores one token, encrypted locally.'
+              'Each server stores one token locally, encrypted when runtime storage supports it.'
             )}
           </p>
         </div>
@@ -224,8 +224,6 @@ export function GiteaTaskIntegrationCard(): React.JSX.Element {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onConnected={() => setTestResultByServer({})}
-        overlayClassName="z-[110]"
-        contentClassName="z-[120]"
       />
     </IntegrationCardShell>
   )

@@ -25,9 +25,9 @@ export function GiteaPrLineComments({
   const sorted = [...comments].sort((a, b) => a.line - b.line)
 
   const handleSubmit = async (): Promise<void> => {
-    const lineNumber = Number.parseInt(line, 10)
+    const lineNumber = Number(line)
     const trimmed = body.trim()
-    if (!Number.isInteger(lineNumber) || lineNumber <= 0 || !trimmed || submitting) {
+    if (!Number.isSafeInteger(lineNumber) || lineNumber <= 0 || !trimmed || submitting) {
       return
     }
     setSubmitting(true)
@@ -78,7 +78,7 @@ export function GiteaPrLineComments({
               value={line}
               onChange={(event) => setLine(event.target.value)}
               placeholder={translate('auto.components.gitea.pr.line.comments.4e59b0c4f8', 'Line #')}
-              className="h-8 w-24 text-xs"
+              className="h-8 w-24"
             />
             <span className="text-[11px] text-muted-foreground">
               {translate(
@@ -102,7 +102,7 @@ export function GiteaPrLineComments({
             <Button
               onClick={() => void handleSubmit()}
               disabled={submitting || !body.trim() || !line.trim()}
-              className="self-end gap-2"
+              className="self-end"
               size="sm"
             >
               {submitting ? (
@@ -115,7 +115,7 @@ export function GiteaPrLineComments({
           </div>
         </div>
       ) : (
-        <Button variant="ghost" size="xs" onClick={() => setOpen(true)} className="gap-1.5">
+        <Button variant="ghost" size="xs" onClick={() => setOpen(true)}>
           <MessageSquarePlus className="size-3.5" />
           {translate('auto.components.gitea.pr.line.comments.6cbd906d88', 'Comment on a line')}
         </Button>

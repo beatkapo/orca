@@ -14,9 +14,10 @@ type StoreState = {
   giteaTestConnection: (serverId?: string) => Promise<{ ok: boolean; error?: string }>
 }
 
-const mocks = vi.hoisted(() => ({
-  store: { current: null as StoreState | null }
-}))
+const mocks = vi.hoisted(() => {
+  const store: { current: StoreState | null } = { current: null }
+  return { store }
+})
 
 vi.mock('@/store', () => ({
   useAppStore: (selector: (state: StoreState) => unknown) => {
@@ -92,7 +93,7 @@ describe('GiteaTaskIntegrationCard', () => {
 
     const rendered = await renderCard()
 
-    expect(rendered.textContent).toContain('1 server connected')
+    expect(rendered.textContent).toContain('Connected servers: 1')
     expect(rendered.textContent).toContain('Acme Gitea')
     expect(rendered.textContent).toContain('https://gitea.example.com · octocat')
 

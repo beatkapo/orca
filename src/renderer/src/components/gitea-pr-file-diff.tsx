@@ -1,6 +1,3 @@
-/* oxlint-disable react-doctor/no-adjust-state-on-prop-change -- Why: the file's
-   diff content is loaded from Gitea IPC, so local state resets when the file or
-   commit shas change. */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { DiffEditor } from '@monaco-editor/react'
@@ -16,6 +13,7 @@ import type {
 } from '../../../shared/gitea-types'
 import type { GiteaIssueScope } from '@/store/slices/gitea'
 import { translate } from '@/i18n/i18n'
+import { giteaStatusLabel } from './gitea-status-label'
 
 type GiteaPrFileDiffProps = {
   file: GiteaPRFile
@@ -28,16 +26,7 @@ type GiteaPrFileDiffProps = {
   onAddReviewComment: (path: string, line: number, body: string) => Promise<boolean>
 }
 
-const STATUS_LABELS: Record<GiteaPRFile['status'], string> = {
-  added: 'Added',
-  modified: 'Modified',
-  deleted: 'Deleted',
-  renamed: 'Renamed',
-  copied: 'Copied',
-  changed: 'Changed'
-}
-
-export function GiteaPrFileDiff({
+function GiteaPrFileDiffContent({
   file,
   scope,
   baseSha,
@@ -55,10 +44,8 @@ export function GiteaPrFileDiff({
   const load = useCallback(() => {
     requestRef.current += 1
     const requestId = requestRef.current
-    setLoading(true)
-    setError(false)
-    void (
-      window.api.gitea.prFileContents({
+    void window.api.gitea
+      .prFileContents({
         repoPath: scope.repoPath,
         repoId: scope.repoId ?? null,
         sourceContext: scope.sourceContext ?? null,
@@ -67,8 +54,7 @@ export function GiteaPrFileDiff({
         status: file.status,
         baseSha,
         headSha
-      }) as Promise<GiteaPRFileContents>
-    )
+      })
       .then((result) => {
         if (requestId === requestRef.current) {
           setContents(result)
@@ -105,7 +91,7 @@ export function GiteaPrFileDiff({
           {file.path}
         </span>
         <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-          {STATUS_LABELS[file.status]}
+          {giteaStatusLabel(file.status)}
         </span>
         {file.additions > 0 ? (
           <span className="shrink-0 text-[11px] text-status-success">+{file.additions}</span>
@@ -127,7 +113,15 @@ export function GiteaPrFileDiff({
                 'Failed to load file diff.'
               )}
             </span>
-            <Button size="sm" variant="outline" onClick={load}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setLoading(true)
+                setError(false)
+                load()
+              }}
+            >
               {translate('auto.components.gitea.pr.file.diff.e6f7a8b9c0', 'Retry')}
             </Button>
           </div>
@@ -163,5 +157,14 @@ export function GiteaPrFileDiff({
         onAdd={(line, body) => onAddReviewComment(file.path, line, body)}
       />
     </div>
+  )
+}
+
+export function GiteaPrFileDiff(props: GiteaPrFileDiffProps): React.JSX.Element {
+  return (
+    <GiteaPrFileDiffContent
+      key={`${props.file.path}:${props.baseSha}:${props.headSha}:${JSON.stringify(props.scope)}`}
+      {...props}
+    />
   )
 }

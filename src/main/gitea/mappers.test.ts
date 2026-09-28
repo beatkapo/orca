@@ -44,6 +44,7 @@ describe('gitea mappers', () => {
       state: 'open',
       url: 'https://git.example.com/team/app/issues/4',
       labels: ['bug'],
+      labelIds: [2, 3],
       assignees: [{ id: 5, login: 'dev' }],
       author: { id: 1, login: 'octo', fullName: 'Octo Cat' },
       milestone: 'v1',

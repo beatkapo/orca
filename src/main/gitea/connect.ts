@@ -17,6 +17,8 @@ import {
   saveToken,
   writeServerFile
 } from './server-store'
+import { validateGiteaApiUrl } from './api-url'
+import { z } from 'zod'
 import { cancelUnreadResponseBody } from '../lib/unread-response-body'
 
 const USER_REQUEST_TIMEOUT_MS = 8000
@@ -49,7 +51,8 @@ async function fetchGiteaUser(
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), USER_REQUEST_TIMEOUT_MS)
   try {
-    const response = await fetch(`${apiBaseUrl}/user`, {
+    const response = await fetch(`${validateGiteaApiUrl(apiBaseUrl)}/user`, {
+      redirect: 'error',
       headers: authHeaders(token),
       signal: controller.signal
     })
@@ -68,7 +71,16 @@ async function fetchGiteaUser(
       await cancelUnreadResponseBody(response)
       return { ok: false, error: `Gitea request failed (${response.status}).` }
     }
-    const viewer = toViewer((await response.json()) as RawGiteaUser)
+    const viewer = toViewer(
+      z
+        .object({
+          login: z.string().nullable().optional(),
+          username: z.string().nullable().optional(),
+          full_name: z.string().nullable().optional(),
+          avatar_url: z.string().nullable().optional()
+        })
+        .parse(await response.json())
+    )
     return { ok: true, viewer }
   } catch {
     return { ok: false, error: 'Could not reach the Gitea server.' }
@@ -88,9 +100,10 @@ export function getStatus(): GiteaConnectionStatus {
     file.selectedServerId === 'all' || servers.some((server) => server.id === file.selectedServerId)
       ? file.selectedServerId
       : (activeServer?.id ?? null)
+  const usableServers = getServerTokens('all')
   const credentialError = getCredentialError(servers.map((server) => server.id))
   return {
-    connected: servers.length > 0,
+    connected: usableServers.length > 0,
     servers,
     activeServerId: activeServer?.id ?? null,
     selectedServerId: selectedServerId ?? activeServer?.id ?? null,
@@ -103,11 +116,17 @@ export async function connect(
 ): Promise<{ ok: true; viewer: GiteaViewer } | { ok: false; error: string }> {
   let apiBaseUrl: string
   try {
-    apiBaseUrl = normalizeGiteaApiBaseUrl(args.baseUrl)
-    // Reject inputs that do not parse as URLs (normalize only trims/suffixes).
-    new URL(apiBaseUrl)
+    new URL(args.baseUrl)
   } catch {
     return { ok: false, error: 'Enter a valid Gitea server URL.' }
+  }
+  try {
+    apiBaseUrl = normalizeGiteaApiBaseUrl(validateGiteaApiUrl(args.baseUrl))
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Enter a valid Gitea server URL.'
+    }
   }
 
   const token = args.token.trim()

@@ -65,6 +65,7 @@ export function GiteaTaskList({
   projectPicker
 }: GiteaTaskListProps): React.JSX.Element {
   const fetchGiteaWorkItems = useAppStore((s) => s.fetchGiteaWorkItems)
+  const cacheGeneration = useAppStore((s) => s.giteaCacheGeneration)
   const createGiteaIssue = useAppStore((s) => s.createGiteaIssue)
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(false)
@@ -88,6 +89,7 @@ export function GiteaTaskList({
       return
     }
     setLoading(true)
+    setRows([])
     setError(null)
     try {
       const results = await Promise.all(
@@ -114,7 +116,7 @@ export function GiteaTaskList({
 
   useEffect(() => {
     void load()
-  }, [load, nonce])
+  }, [load, nonce, cacheGeneration])
 
   const visibleRows = useMemo(
     () => (typeFilter === 'all' ? rows : rows.filter(({ item }) => item.type === typeFilter)),
@@ -167,7 +169,7 @@ export function GiteaTaskList({
               variant="outline"
               size="sm"
               onClick={() => setNewIssueOpen(true)}
-              className="shrink-0 gap-1.5 border-border/50 bg-transparent hover:bg-muted/50"
+              className="shrink-0"
             >
               <Plus className="size-4" />
               {translate('auto.components.GiteaTaskList.5997067bee', 'New issue')}
@@ -182,7 +184,7 @@ export function GiteaTaskList({
               'auto.components.GiteaTaskList.e3db16e7c7',
               'Refresh Gitea tasks'
             )}
-            className="size-8 shrink-0 border-border/50 bg-transparent hover:bg-muted/50"
+            className="shrink-0"
           >
             {loading ? (
               <LoaderCircle className="size-4 animate-spin" />

@@ -1,6 +1,4 @@
-/* oxlint-disable react-doctor/no-adjust-state-on-prop-change -- Why: the detail
-   and comments are loaded from Gitea IPC for the selected work item, so local
-   state must reset when the selection prop changes (mirrors JiraIssueWorkspace). */
+import { useAppStore } from '@/store'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ArrowRight,
@@ -103,10 +101,10 @@ export function GiteaIssueWorkspace({
     // Why: load each resource independently so the issue body/comments still
     // render when only labels/assignees fail, and surface at least one error.
     void Promise.allSettled([
-      window.api.gitea.issue(args) as Promise<GiteaIssue | null>,
-      window.api.gitea.issueComments(args) as Promise<GiteaComment[]>,
-      window.api.gitea.labels(listArgs) as Promise<GiteaLabel[]>,
-      window.api.gitea.assignees(listArgs) as Promise<GiteaUser[]>
+      window.api.gitea.issue(args),
+      window.api.gitea.issueComments(args),
+      window.api.gitea.labels(listArgs),
+      window.api.gitea.assignees(listArgs)
     ])
       .then(([issueResult, commentsResult, labelsResult, assigneesResult]) => {
         if (requestId !== requestRef.current) {
@@ -150,12 +148,12 @@ export function GiteaIssueWorkspace({
     if (!scope || !item) {
       return
     }
-    const issue = (await window.api.gitea.issue({
+    const issue = await window.api.gitea.issue({
       repoPath: scope.repoPath,
       repoId: scope.repoId ?? null,
       sourceContext: scope.sourceContext ?? null,
       number: item.number
-    })) as GiteaIssue | null
+    })
     if (issue) {
       setDetail(issue)
       setClosed(issue.state !== 'open')
@@ -169,13 +167,9 @@ export function GiteaIssueWorkspace({
     const nextState = closed ? 'open' : 'closed'
     setStatePending(true)
     try {
-      const result = await window.api.gitea.updateIssue({
-        repoPath: scope.repoPath,
-        repoId: scope.repoId ?? null,
-        sourceContext: scope.sourceContext ?? null,
-        number: item.number,
-        updates: { state: nextState }
-      })
+      const result = await useAppStore
+        .getState()
+        .updateGiteaIssue(scope, item.number, { state: nextState })
       if (!result.ok) {
         throw new Error(result.error)
       }
@@ -211,11 +205,15 @@ export function GiteaIssueWorkspace({
       if (!result.ok) {
         throw new Error(result.error)
       }
-      setComments((prev) => [
-        ...prev,
-        { id: Date.now(), body, createdAt: new Date().toISOString() }
-      ])
       setCommentDraft('')
+      setComments(
+        await window.api.gitea.issueComments({
+          repoPath: scope.repoPath,
+          repoId: scope.repoId,
+          sourceContext: scope.sourceContext,
+          number: item.number
+        })
+      )
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -236,7 +234,7 @@ export function GiteaIssueWorkspace({
       <SheetContent
         side="right"
         showCloseButton={false}
-        className="w-[min(92vw,780px)] p-0 sm:max-w-[780px]"
+        className="w-[min(92vw,780px)] sm:max-w-[780px]"
         onOpenAutoFocus={(event) => event.preventDefault()}
       >
         <VisuallyHidden.Root asChild>
@@ -266,7 +264,11 @@ export function GiteaIssueWorkspace({
                 >
                   <X className="size-4" />
                 </Button>
-                <Button onClick={() => onUse(repo, item)} className="shrink-0 gap-2" size="sm">
+                <Button
+                  onClick={() => onUse(repo, { ...item, title })}
+                  className="shrink-0"
+                  size="sm"
+                >
                   {translate('auto.components.GiteaIssueWorkspace.e849a4c80f', 'Start workspace')}
                   <ArrowRight className="size-4" />
                 </Button>
@@ -308,7 +310,6 @@ export function GiteaIssueWorkspace({
                     size="xs"
                     onClick={() => void handleToggleState()}
                     disabled={statePending}
-                    className="gap-1"
                   >
                     {statePending ? <LoaderCircle className="size-3 animate-spin" /> : null}
                     {closed
@@ -357,10 +358,11 @@ export function GiteaIssueWorkspace({
                 issueNumber={item.number}
                 title={title}
                 labelNames={labels}
+                labelIds={detail?.labelIds}
                 assigneeLogins={(detail?.assignees ?? []).map((user) => user.login)}
                 repoLabels={repoLabels}
                 repoAssignees={repoAssignees}
-                onChanged={() => void refreshDetail()}
+                onChanged={refreshDetail}
               />
             ) : null}
 
@@ -396,7 +398,7 @@ export function GiteaIssueWorkspace({
                 <Button
                   onClick={() => void handleSubmitComment()}
                   disabled={!commentDraft.trim() || submitting}
-                  className="self-end gap-2"
+                  className="self-end"
                 >
                   {submitting ? (
                     <LoaderCircle className="size-4 animate-spin" />

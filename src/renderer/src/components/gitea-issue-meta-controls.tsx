@@ -1,3 +1,4 @@
+import { useAppStore } from '@/store'
 import { useState } from 'react'
 import { Check, LoaderCircle, Save, Tag, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
@@ -14,19 +15,11 @@ type GiteaIssueMetaControlsProps = {
   issueNumber: number
   title: string
   labelNames: string[]
+  labelIds: number[] | undefined
   assigneeLogins: string[]
   repoLabels: GiteaLabel[]
   repoAssignees: GiteaUser[]
-  onChanged: () => void
-}
-
-function scopedArgs(scope: GiteaIssueScope, issueNumber: number) {
-  return {
-    repoPath: scope.repoPath,
-    repoId: scope.repoId ?? null,
-    sourceContext: scope.sourceContext ?? null,
-    number: issueNumber
-  }
+  onChanged: () => Promise<void>
 }
 
 export function GiteaIssueMetaControls({
@@ -34,6 +27,7 @@ export function GiteaIssueMetaControls({
   issueNumber,
   title,
   labelNames,
+  labelIds,
   assigneeLogins,
   repoLabels,
   repoAssignees,
@@ -48,14 +42,11 @@ export function GiteaIssueMetaControls({
     }
     setPending(field)
     try {
-      const result = await window.api.gitea.updateIssue({
-        ...scopedArgs(scope, issueNumber),
-        updates
-      })
+      const result = await useAppStore.getState().updateGiteaIssue(scope, issueNumber, updates)
       if (!result.ok) {
         throw new Error(result.error)
       }
-      onChanged()
+      await onChanged()
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -74,14 +65,16 @@ export function GiteaIssueMetaControls({
   const selectedLogins = new Set(assigneeLogins)
 
   const toggleLabel = (label: GiteaLabel): void => {
-    const next = new Set(selectedLabelNames)
-    if (next.has(label.name)) {
-      next.delete(label.name)
-    } else {
-      next.add(label.name)
+    if (!labelIds) {
+      return
     }
-    const labelIds = repoLabels.filter((entry) => next.has(entry.name)).map((entry) => entry.id)
-    void save('labels', { labelIds })
+    const next = new Set(labelIds)
+    if (next.has(label.id)) {
+      next.delete(label.id)
+    } else {
+      next.add(label.id)
+    }
+    void save('labels', { labelIds: [...next] })
   }
 
   const toggleAssignee = (user: GiteaUser): void => {
@@ -109,7 +102,7 @@ export function GiteaIssueMetaControls({
               }
             }
           }}
-          className="h-8 text-xs"
+          className="h-8"
           aria-label={translate('auto.components.gitea.issue.meta.controls.63f46a8d86', 'Title')}
         />
         <Button
@@ -128,7 +121,7 @@ export function GiteaIssueMetaControls({
 
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant="outline" size="sm" disabled={pending === 'labels'} className="gap-1.5">
+          <Button variant="outline" size="sm" disabled={pending === 'labels' || !labelIds}>
             {pending === 'labels' ? (
               <LoaderCircle className="size-3.5 animate-spin" />
             ) : (
@@ -140,48 +133,47 @@ export function GiteaIssueMetaControls({
             ) : null}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="popover-scroll-content scrollbar-sleek w-56 p-1" align="end">
-          {repoLabels.length === 0 ? (
-            <p className="px-2 py-1.5 text-xs text-muted-foreground">
-              {translate(
-                'auto.components.gitea.issue.meta.controls.11fac85e07',
-                'No labels in this repo.'
+        <PopoverContent className="w-56" align="end">
+          <div className="popover-scroll-content scrollbar-sleek p-1">
+            <div className="popover-scroll-content scrollbar-sleek p-1">
+              {repoLabels.length === 0 ? (
+                <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                  {translate(
+                    'auto.components.gitea.issue.meta.controls.11fac85e07',
+                    'No labels in this repo.'
+                  )}
+                </p>
+              ) : (
+                repoLabels.map((label) => (
+                  <button
+                    key={label.id}
+                    type="button"
+                    onClick={() => toggleLabel(label)}
+                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[12px] hover:bg-accent"
+                  >
+                    <span
+                      className="size-3 shrink-0 rounded-full border border-border/50"
+                      style={
+                        label.color
+                          ? { backgroundColor: `#${label.color.replace(/^#/, '')}` }
+                          : undefined
+                      }
+                    />
+                    <span className="min-w-0 flex-1 truncate">{label.name}</span>
+                    {selectedLabelNames.has(label.name) ? (
+                      <Check className="size-3.5 shrink-0" />
+                    ) : null}
+                  </button>
+                ))
               )}
-            </p>
-          ) : (
-            repoLabels.map((label) => (
-              <button
-                key={label.id}
-                type="button"
-                onClick={() => toggleLabel(label)}
-                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[12px] hover:bg-accent"
-              >
-                <span
-                  className="size-3 shrink-0 rounded-full border border-border/50"
-                  style={
-                    label.color
-                      ? { backgroundColor: `#${label.color.replace(/^#/, '')}` }
-                      : undefined
-                  }
-                />
-                <span className="min-w-0 flex-1 truncate">{label.name}</span>
-                {selectedLabelNames.has(label.name) ? (
-                  <Check className="size-3.5 shrink-0" />
-                ) : null}
-              </button>
-            ))
-          )}
+            </div>
+          </div>
         </PopoverContent>
       </Popover>
 
       <Popover>
         <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={pending === 'assignees'}
-            className="gap-1.5"
-          >
+          <Button variant="outline" size="sm" disabled={pending === 'assignees'}>
             {pending === 'assignees' ? (
               <LoaderCircle className="size-3.5 animate-spin" />
             ) : (
@@ -193,32 +185,36 @@ export function GiteaIssueMetaControls({
             ) : null}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="popover-scroll-content scrollbar-sleek w-56 p-1" align="end">
-          {repoAssignees.length === 0 ? (
-            <p className="px-2 py-1.5 text-xs text-muted-foreground">
-              {translate(
-                'auto.components.gitea.issue.meta.controls.3cd6f5acbd',
-                'No assignable users.'
+        <PopoverContent className="w-56" align="end">
+          <div className="popover-scroll-content scrollbar-sleek p-1">
+            <div className="popover-scroll-content scrollbar-sleek p-1">
+              {repoAssignees.length === 0 ? (
+                <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                  {translate(
+                    'auto.components.gitea.issue.meta.controls.3cd6f5acbd',
+                    'No assignable users.'
+                  )}
+                </p>
+              ) : (
+                repoAssignees.map((user) => (
+                  <button
+                    key={user.id}
+                    type="button"
+                    onClick={() => toggleAssignee(user)}
+                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[12px] hover:bg-accent"
+                  >
+                    {user.avatarUrl ? (
+                      <img src={user.avatarUrl} alt="" className="size-5 shrink-0 rounded-full" />
+                    ) : null}
+                    <span className="min-w-0 flex-1 truncate">{user.fullName || user.login}</span>
+                    {selectedLogins.has(user.login) ? (
+                      <Check className={cn('size-3.5 shrink-0')} />
+                    ) : null}
+                  </button>
+                ))
               )}
-            </p>
-          ) : (
-            repoAssignees.map((user) => (
-              <button
-                key={user.id}
-                type="button"
-                onClick={() => toggleAssignee(user)}
-                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-[12px] hover:bg-accent"
-              >
-                {user.avatarUrl ? (
-                  <img src={user.avatarUrl} alt="" className="size-5 shrink-0 rounded-full" />
-                ) : null}
-                <span className="min-w-0 flex-1 truncate">{user.fullName || user.login}</span>
-                {selectedLogins.has(user.login) ? (
-                  <Check className={cn('size-3.5 shrink-0')} />
-                ) : null}
-              </button>
-            ))
-          )}
+            </div>
+          </div>
         </PopoverContent>
       </Popover>
     </div>

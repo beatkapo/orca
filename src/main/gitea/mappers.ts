@@ -106,6 +106,9 @@ export function mapGiteaIssue(raw: RawGiteaIssue, context: GiteaIssueContext): G
     state: raw.state === 'closed' ? 'closed' : 'open',
     url: raw.html_url ?? '',
     labels: mapLabelNames(raw.labels),
+    labelIds: (raw.labels ?? []).flatMap((label) =>
+      typeof label.id === 'number' ? [label.id] : []
+    ),
     assignees: mapAssignees(raw.assignees),
     author: mapGiteaUser(raw.user),
     milestone: raw.milestone?.title?.trim() || undefined,

@@ -28,6 +28,7 @@ const mockApi = {
 globalThis.window = { api: mockApi }
 
 function createTestStore() {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: This isolated store exercises only GiteaSlice methods, all of which are installed by createGiteaSlice.
   return create<AppState>()((...a) => ({ ...createGiteaSlice(...a) }) as AppState)
 }
 
@@ -220,6 +221,58 @@ describe('createGiteaSlice updateGiteaIssue', () => {
 })
 
 describe('createGiteaSlice connection status', () => {
+  it('clears private cached data when replacing credentials on the same server', async () => {
+    const store = createTestStore()
+    mockApi.gitea.listWorkItems.mockResolvedValue([workItem(1)])
+    mockApi.gitea.issue.mockResolvedValue(issue(1))
+    await store.getState().fetchGiteaWorkItems(scope)
+    await store.getState().fetchGiteaIssue(scope, 1)
+    mockApi.gitea.connect.mockResolvedValue({ ok: true })
+    mockApi.gitea.status.mockResolvedValue(connectedStatus())
+    await store.getState().giteaConnect({ baseUrl: 'https://gitea.example.com', token: 'new' })
+    expect(store.getState().giteaWorkItems).toEqual({})
+    expect(store.getState().giteaIssueDetail).toEqual({})
+  })
+
+  it('discards requests started before credentials were disconnected', async () => {
+    const store = createTestStore()
+    let completeList: (items: GiteaWorkItem[]) => void = () => {}
+    let completeIssue: (value: GiteaIssue) => void = () => {}
+    mockApi.gitea.listWorkItems.mockReturnValue(
+      new Promise<GiteaWorkItem[]>((resolve) => {
+        completeList = resolve
+      })
+    )
+    mockApi.gitea.issue.mockReturnValue(
+      new Promise<GiteaIssue>((resolve) => {
+        completeIssue = resolve
+      })
+    )
+    const pendingList = store.getState().fetchGiteaWorkItems(scope)
+    const pendingIssue = store.getState().fetchGiteaIssue(scope, 1)
+    mockApi.gitea.disconnect.mockResolvedValue(undefined)
+    mockApi.gitea.status.mockResolvedValue({ connected: false })
+    await store.getState().giteaDisconnect()
+    completeList([workItem(1)])
+    completeIssue(issue(1))
+    expect(await pendingList).toEqual([])
+    expect(await pendingIssue).toBeNull()
+    expect(store.getState().giteaWorkItems).toEqual({})
+    expect(store.getState().giteaIssueDetail).toEqual({})
+  })
+
+  it('refreshes every cached list for an edited issue without dropping other repos', async () => {
+    const store = createTestStore()
+    mockApi.gitea.listWorkItems.mockResolvedValue([workItem(1)])
+    await store.getState().fetchGiteaWorkItems(scope, 'all')
+    await store.getState().fetchGiteaWorkItems(scope, 'assigned')
+    const otherScope = { repoId: 'other', repoPath: '/other' }
+    await store.getState().fetchGiteaWorkItems(otherScope, 'all')
+    mockApi.gitea.updateIssue.mockResolvedValue({ ok: true })
+    await store.getState().updateGiteaIssue(scope, 1, { state: 'closed' })
+    expect(Object.keys(store.getState().giteaWorkItems)).toEqual(['other@selected:all:all:default'])
+  })
+
   it('stores status and marks it loaded on refresh', async () => {
     const store = createTestStore()
     mockApi.gitea.status.mockResolvedValue(connectedStatus())

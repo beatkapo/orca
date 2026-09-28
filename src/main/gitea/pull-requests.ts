@@ -101,7 +101,9 @@ export async function getGiteaPullRequestDetail(
   }
   const raw = await giteaRepoGet<RawGiteaPullDetail>(
     repo,
-    `/repos/${encodedRepoPath(repo)}/pulls/${encodeURIComponent(String(prNumber))}`
+    `/repos/${encodedRepoPath(repo)}/pulls/${encodeURIComponent(String(prNumber))}`,
+    {},
+    true
   )
   if (!raw || typeof raw.number !== 'number' || !raw.html_url) {
     return null
@@ -140,7 +142,8 @@ export async function listGiteaPullRequestFiles(
   const raw = await giteaRepoGet<RawGiteaPullFile[]>(
     repo,
     `/repos/${encodedRepoPath(repo)}/pulls/${encodeURIComponent(String(prNumber))}/files`,
-    { searchParams: { limit: 100, page: 1 } }
+    { searchParams: { limit: 100, page: 1 } },
+    true
   )
   if (!Array.isArray(raw)) {
     return []
@@ -181,15 +184,13 @@ export async function getGiteaPullRequestFileContents(
     return empty
   }
   const basePath = args.oldPath ?? args.path
-  const wantOriginal = args.status !== 'added'
-  const wantModified = args.status !== 'deleted'
   const [original, modified] = await Promise.all([
-    wantOriginal
+    args.status !== 'added'
       ? giteaRepoGetText(repo, `/repos/${encodedRepoPath(repo)}/raw/${encodePath(basePath)}`, {
           searchParams: { ref: args.baseSha }
         })
       : Promise.resolve(''),
-    wantModified
+    args.status !== 'deleted'
       ? giteaRepoGetText(repo, `/repos/${encodedRepoPath(repo)}/raw/${encodePath(args.path)}`, {
           searchParams: { ref: args.headSha }
         })
@@ -214,10 +215,11 @@ export async function getGiteaPullRequestChecks(
   }
   const raw = await giteaRepoGet<RawGiteaCombinedStatusDetail>(
     repo,
-    `/repos/${encodedRepoPath(repo)}/commits/${encodeURIComponent(headSha)}/status`
+    `/repos/${encodedRepoPath(repo)}/commits/${encodeURIComponent(headSha)}/status`,
+    {},
+    true
   )
-  const statuses = raw?.statuses ?? []
-  return statuses.map((entry) => ({
+  return (raw?.statuses ?? []).map((entry) => ({
     context: entry.context?.trim() || 'status',
     state: mapCheckState(entry.status ?? entry.state),
     targetUrl: entry.target_url?.trim() || undefined,
@@ -265,7 +267,7 @@ export async function listGiteaPullRequestReviewComments(
     return []
   }
   const base = `/repos/${encodedRepoPath(repo)}/pulls/${encodeURIComponent(String(prNumber))}/reviews`
-  const reviews = await giteaRepoGet<RawGiteaReview[]>(repo, base)
+  const reviews = await giteaRepoGet<RawGiteaReview[]>(repo, base, {}, true)
   if (!Array.isArray(reviews)) {
     return []
   }
@@ -277,18 +279,21 @@ export async function listGiteaPullRequestReviewComments(
       giteaRepoGet<RawGiteaReviewComment[]>(repo, `${base}/${review.id}/comments`)
     )
   )
-  return groups
-    .flat()
-    .filter((comment): comment is RawGiteaReviewComment => Boolean(comment))
-    .filter((comment) => typeof comment.id === 'number' && typeof comment.position === 'number')
-    .map((comment) => ({
-      id: comment.id as number,
-      body: comment.body ?? '',
-      path: comment.path ?? '',
-      line: comment.position as number,
-      createdAt: comment.created_at ?? '',
-      user: mapGiteaUser(comment.user)
-    }))
+  return groups.flat().flatMap((comment) => {
+    if (!comment || typeof comment.id !== 'number' || typeof comment.position !== 'number') {
+      return []
+    }
+    return [
+      {
+        id: comment.id,
+        body: comment.body ?? '',
+        path: comment.path ?? '',
+        line: comment.position,
+        createdAt: comment.created_at ?? '',
+        user: mapGiteaUser(comment.user)
+      }
+    ]
+  })
 }
 
 // Adds a diff-anchored review comment on a file line (new-file line number).

@@ -62,6 +62,7 @@ export type GiteaIssue = {
   state: 'open' | 'closed'
   url: string
   labels: string[]
+  labelIds?: number[]
   assignees: GiteaUser[]
   author?: GiteaUser
   milestone?: string

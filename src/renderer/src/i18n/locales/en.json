@@ -3275,7 +3275,7 @@
             "missing": {
               "tui": {
                 "title": "This ZCode build has no terminal UI",
-                "description": "Orca's hooks installed correctly \u2014 the zcode on your PATH just cannot open a session. The ZCode desktop app bundles the agent runtime without its terminal UI. Install a zcode that ships the TUI, then run zcode outside Orca to confirm."
+                "description": "Orca's hooks installed correctly — the zcode on your PATH just cannot open a session. The ZCode desktop app bundles the agent runtime without its terminal UI. Install a zcode that ships the TUI, then run zcode outside Orca to confirm."
               }
             }
           },
@@ -3973,7 +3973,9 @@
             }
           },
           "tooltip": {
-            "zcode": { "mcp": "MCP" },
+            "zcode": {
+              "mcp": "MCP"
+            },
             "cedb7b99e3": "% used",
             "6d6df77f41": "No data available",
             "7f7f208060": "Monthly",
@@ -8714,7 +8716,7 @@
           "skillHint": ". After Linear is connected, usage examples stay under Settings → Linear.",
           "incompleteBannerBodyWithLinear": "Hide providers you do not use, or expand a card and finish its steps. For Linear: API access, the agent skill, and Show in Tasks.",
           "giteaLabel": "Gitea",
-          "giteaDescription": "Connect a Gitea or Forgejo server and show its issues in Tasks.",
+          "giteaDescription": "Connect a Gitea or Forgejo server and show its issues and pull requests in Tasks.",
           "connectGiteaTitle": "Connect Gitea",
           "connectGiteaDescription": "Add a Gitea or Forgejo server with a personal access token.",
           "manageGitea": "Manage servers",
@@ -12206,16 +12208,16 @@
           "integration": {
             "card": {
               "d4e5f6a7b8": "Connection failed.",
-              "069f07af1c": "{{value0}} server{{value1}} connected",
+              "069f07af1c": "Connected servers: {{value0}}",
               "31b7f980fb": "Checking Gitea access before showing setup actions.",
-              "5a8cd33300": "Browse, create, and start work from Gitea issues.",
+              "5a8cd33300": "Browse Gitea issues and pull requests, create issues, and start work.",
               "bdcb1e773f": "Add server",
               "9ce5f12a0d": "Connect Gitea",
               "3852b1fd6f": "Verified",
               "09bde44485": "Testing...",
               "2bf28d5929": "Test",
               "d0b31b4845": "Disconnect {{value0}}",
-              "f47924e554": "Each connected Gitea server stores one token, encrypted locally.",
+              "f47924e554": "Each server stores one token locally, encrypted when runtime storage supports it.",
               "c043731756": "Connect a self-hosted Gitea server with its URL and a personal access token. Credentials are stored locally and encrypted when local runtime storage supports it.",
               "9a555db81e": "Re-check"
             }
@@ -17373,12 +17375,12 @@
         "connect": {
           "dialog": {
             "d2823a1de0": "Connect Gitea server",
-            "d076a10ae3": "Use a Gitea server URL and a personal access token to browse and manage issues.",
+            "d076a10ae3": "Use a Gitea server URL and a personal access token to browse issues and review pull requests.",
             "690c1da1bb": "Gitea server URL",
             "83b75fa9b7": "https://gitea.example.com",
             "062ae1ea05": "Access token",
             "79c04f358b": "Gitea personal access token",
-            "3ecb3e1153": "Create a token under your Gitea user settings → Applications, with read/write access to issues.",
+            "3ecb3e1153": "Create a token in Gitea Settings → Applications with read:user, write:issue, and write:repository scopes. Limit access to the repositories you need.",
             "4d1f2d9f21": "Your token is stored locally and encrypted when local runtime storage supports it.",
             "7acfed1da5": "Cancel",
             "f5d526570f": "Verifying…",
@@ -18627,5 +18629,30 @@
   },
   "common": {
     "retry": "Retry"
+  },
+  "gitea": {
+    "status": {
+      "added": "Added",
+      "modified": "Modified",
+      "deleted": "Deleted",
+      "renamed": "Renamed",
+      "copied": "Copied",
+      "changed": "Changed",
+      "open": "Open",
+      "closed": "Closed",
+      "merged": "Merged",
+      "draft": "Draft",
+      "pending": "Pending",
+      "success": "Success",
+      "failure": "Failure",
+      "error": "Error",
+      "warning": "Warning",
+      "merge": "Merge",
+      "squash": "Squash and merge",
+      "rebase": "Rebase and merge"
+    },
+    "errors": {
+      "loadPullRequest": "Some pull request data could not be loaded."
+    }
   }
 }

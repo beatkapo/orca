@@ -1,17 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GiteaServerFile } from './server-store'
 
-const { store } = vi.hoisted(() => ({
-  store: {
-    file: {
-      version: 1,
-      activeServerId: null,
-      selectedServerId: null,
-      servers: []
-    } as GiteaServerFile,
-    tokens: new Map<string, string>()
+const { store } = vi.hoisted(() => {
+  const file: GiteaServerFile = {
+    version: 1,
+    activeServerId: null,
+    selectedServerId: null,
+    servers: []
   }
-}))
+  const credential: { error?: string; decryptionFails?: boolean } = {}
+  return { store: { file, tokens: new Map<string, string>(), credential } }
+})
 
 vi.mock('./server-store', () => ({
   normalizeGiteaApiBaseUrl: (value: string): string => {
@@ -31,8 +30,14 @@ vi.mock('./server-store', () => ({
     store.tokens.delete(serverId)
   },
   hasStoredToken: (serverId: string): boolean => store.tokens.has(serverId),
-  getCredentialError: (): string | undefined => undefined,
+  getCredentialError: (): string | undefined => store.credential.error,
   getServerTokens: (selection?: string | null) => {
+    if (store.credential.decryptionFails) {
+      store.credential.error = 'Could not decrypt the saved Gitea credential.'
+    }
+    if (store.credential.error) {
+      return []
+    }
     const selected = selection ?? store.file.selectedServerId ?? store.file.activeServerId
     const servers =
       selected === 'all'
@@ -50,12 +55,44 @@ import { connect, disconnect, getStatus, selectServer, testConnection } from './
 function resetStore(): void {
   store.file = { version: 1, activeServerId: null, selectedServerId: null, servers: [] }
   store.tokens.clear()
+  store.credential.error = undefined
+  store.credential.decryptionFails = false
 }
 
 describe('gitea connect', () => {
   beforeEach(() => {
     resetStore()
     vi.unstubAllGlobals()
+  })
+
+  it('reports a stored but undecryptable credential after restart', () => {
+    store.file.servers = [
+      {
+        id: 'saved',
+        baseUrl: 'https://git.example.com',
+        apiBaseUrl: 'https://git.example.com/api/v1',
+        displayName: 'Gitea',
+        account: 'tester'
+      }
+    ]
+    store.file.activeServerId = 'saved'
+    store.tokens.set('saved', 'ciphertext')
+    store.credential.decryptionFails = true
+    expect(getStatus()).toMatchObject({
+      connected: false,
+      credentialError: 'Could not decrypt the saved Gitea credential.',
+      servers: store.file.servers
+    })
+  })
+
+  it('rejects a plaintext non-loopback server before sending the token', async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await connect({ baseUrl: 'http://git.example.com', token: 'secret' })).toMatchObject({
+      ok: false
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(store.tokens.size).toBe(0)
   })
 
   it('connects, validates the token, and stores the server as active', async () => {

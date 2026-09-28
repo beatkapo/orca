@@ -51,15 +51,20 @@ async function collectAssignedOrCreated(
   const fullName = `${repo.owner}/${repo.repo}`.toLowerCase()
   const matches: RawGiteaIssue[] = []
   for (let page = 1; page <= MAX_SEARCH_PAGES && matches.length < max; page += 1) {
-    const raw = await giteaRepoGet<RawGiteaIssue[]>(repo, `/repos/issues/search`, {
-      searchParams: {
-        [filter]: 'true',
-        state: 'open',
-        owner: repo.owner,
-        limit: max,
-        page
-      }
-    })
+    const raw = await giteaRepoGet<RawGiteaIssue[]>(
+      repo,
+      `/repos/issues/search`,
+      {
+        searchParams: {
+          [filter]: 'true',
+          state: 'open',
+          owner: repo.owner,
+          limit: max,
+          page
+        }
+      },
+      true
+    )
     if (!Array.isArray(raw) || raw.length === 0) {
       break
     }
@@ -118,9 +123,14 @@ export async function listGiteaWorkItems(
       .filter((item): item is GiteaWorkItem => item !== null)
   }
 
-  const raw = await giteaRepoGet<RawGiteaIssue[]>(repo, `/repos/${encodedRepoPath(repo)}/issues`, {
-    searchParams: { state: filter === 'closed' ? 'closed' : 'open', limit: max, page: 1 }
-  })
+  const raw = await giteaRepoGet<RawGiteaIssue[]>(
+    repo,
+    `/repos/${encodedRepoPath(repo)}/issues`,
+    {
+      searchParams: { state: filter === 'closed' ? 'closed' : 'open', limit: max, page: 1 }
+    },
+    true
+  )
   if (!Array.isArray(raw)) {
     return []
   }
@@ -137,9 +147,14 @@ export async function listGiteaLabels(
   if (!repo) {
     return []
   }
-  const raw = await giteaRepoGet<RawGiteaLabel[]>(repo, `/repos/${encodedRepoPath(repo)}/labels`, {
-    searchParams: { limit: 100, page: 1 }
-  })
+  const raw = await giteaRepoGet<RawGiteaLabel[]>(
+    repo,
+    `/repos/${encodedRepoPath(repo)}/labels`,
+    {
+      searchParams: { limit: 100, page: 1 }
+    },
+    true
+  )
   if (!Array.isArray(raw)) {
     return []
   }
@@ -156,7 +171,12 @@ export async function listGiteaAssignees(
   if (!repo) {
     return []
   }
-  const raw = await giteaRepoGet<RawGiteaUser[]>(repo, `/repos/${encodedRepoPath(repo)}/assignees`)
+  const raw = await giteaRepoGet<RawGiteaUser[]>(
+    repo,
+    `/repos/${encodedRepoPath(repo)}/assignees`,
+    {},
+    true
+  )
   if (!Array.isArray(raw)) {
     return []
   }
@@ -176,7 +196,9 @@ export async function getGiteaIssue(
   }
   const raw = await giteaRepoGet<RawGiteaIssue>(
     repo,
-    `/repos/${encodedRepoPath(repo)}/issues/${encodeURIComponent(String(issueNumber))}`
+    `/repos/${encodedRepoPath(repo)}/issues/${encodeURIComponent(String(issueNumber))}`,
+    {},
+    true
   )
   if (!raw || isGiteaPullRequest(raw)) {
     return null
@@ -195,7 +217,9 @@ export async function listGiteaIssueComments(
   }
   const raw = await giteaRepoGet<RawGiteaComment[]>(
     repo,
-    `/repos/${encodedRepoPath(repo)}/issues/${encodeURIComponent(String(issueNumber))}/comments`
+    `/repos/${encodedRepoPath(repo)}/issues/${encodeURIComponent(String(issueNumber))}/comments`,
+    {},
+    true
   )
   if (!Array.isArray(raw)) {
     return []
@@ -231,7 +255,7 @@ export async function createGiteaIssue(
     return { ok: false, error: result.error }
   }
   const raw = result.data
-  if (typeof raw.id !== 'number' || typeof raw.number !== 'number') {
+  if (!raw || typeof raw.id !== 'number' || typeof raw.number !== 'number') {
     return { ok: false, error: 'Gitea did not return the created issue.' }
   }
   return { ok: true, id: raw.id, number: raw.number, url: raw.html_url ?? '' }

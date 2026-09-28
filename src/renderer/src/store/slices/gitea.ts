@@ -29,6 +29,7 @@ export type GiteaIssueScope = {
 export type GiteaSlice = {
   giteaStatus: GiteaConnectionStatus | null
   giteaStatusLoaded: boolean
+  giteaCacheGeneration: number
   giteaWorkItems: Record<string, CacheEntry<GiteaWorkItem[]>>
   giteaIssueDetail: Record<string, CacheEntry<GiteaIssue | null>>
   refreshGiteaStatus: () => Promise<GiteaConnectionStatus | null>
@@ -104,12 +105,13 @@ function requestArgs(scope: GiteaIssueScope): {
 export const createGiteaSlice: StateCreator<AppState, [], [], GiteaSlice> = (set, get) => ({
   giteaStatus: null,
   giteaStatusLoaded: false,
+  giteaCacheGeneration: 0,
   giteaWorkItems: {},
   giteaIssueDetail: {},
 
   refreshGiteaStatus: async () => {
     try {
-      const status = (await window.api.gitea.status()) as GiteaConnectionStatus
+      const status = await window.api.gitea.status()
       set({ giteaStatus: status, giteaStatusLoaded: true })
       return status
     } catch {
@@ -121,23 +123,34 @@ export const createGiteaSlice: StateCreator<AppState, [], [], GiteaSlice> = (set
   giteaConnect: async (args) => {
     const result = await window.api.gitea.connect(args)
     if (result.ok) {
+      set((state) => ({
+        giteaWorkItems: {},
+        giteaIssueDetail: {},
+        giteaCacheGeneration: state.giteaCacheGeneration + 1
+      }))
       await get().refreshGiteaStatus()
     }
     return result.ok ? { ok: true } : { ok: false, error: result.error }
   },
 
   giteaDisconnect: async (serverId) => {
+    set((state) => ({
+      giteaWorkItems: {},
+      giteaIssueDetail: {},
+      giteaCacheGeneration: state.giteaCacheGeneration + 1
+    }))
     await window.api.gitea.disconnect(serverId ? { serverId } : undefined)
     await get().refreshGiteaStatus()
   },
 
   giteaSelectServer: async (serverId) => {
-    const status = (await window.api.gitea.selectServer({ serverId })) as GiteaConnectionStatus
+    const status = await window.api.gitea.selectServer({ serverId })
     // Why: drop caches keyed by the previous selection so a server switch can't
     // serve stale data until TTL expiry.
     set({
       giteaStatus: status,
       giteaStatusLoaded: true,
+      giteaCacheGeneration: get().giteaCacheGeneration + 1,
       giteaWorkItems: {},
       giteaIssueDetail: {}
     })
@@ -158,11 +171,15 @@ export const createGiteaSlice: StateCreator<AppState, [], [], GiteaSlice> = (set
     if (isFresh(cached) && cached.data) {
       return cached.data
     }
-    const items = (await window.api.gitea.listWorkItems({
+    const generation = get().giteaCacheGeneration
+    const items = await window.api.gitea.listWorkItems({
       ...requestArgs(scope),
       filter,
       limit
-    })) as GiteaWorkItem[]
+    })
+    if (generation !== get().giteaCacheGeneration) {
+      return []
+    }
     set((state) => ({
       giteaWorkItems: evictStale({
         ...state.giteaWorkItems,
@@ -178,10 +195,14 @@ export const createGiteaSlice: StateCreator<AppState, [], [], GiteaSlice> = (set
     if (isFresh(cached)) {
       return cached.data
     }
-    const issue = (await window.api.gitea.issue({
+    const generation = get().giteaCacheGeneration
+    const issue = await window.api.gitea.issue({
       ...requestArgs(scope),
       number: issueNumber
-    })) as GiteaIssue | null
+    })
+    if (generation !== get().giteaCacheGeneration) {
+      return null
+    }
     set((state) => ({
       giteaIssueDetail: evictStale({
         ...state.giteaIssueDetail,
@@ -213,8 +234,13 @@ export const createGiteaSlice: StateCreator<AppState, [], [], GiteaSlice> = (set
       updates
     })
     if (result.ok) {
+      const prefix = `${scopeKey(scope, get().giteaStatus?.selectedServerId)}:`
       const detailKey = `${scopeKey(scope, get().giteaStatus?.selectedServerId)}#${issueNumber}`
       set((state) => ({
+        giteaCacheGeneration: state.giteaCacheGeneration + 1,
+        giteaWorkItems: Object.fromEntries(
+          Object.entries(state.giteaWorkItems).filter(([key]) => !key.startsWith(prefix))
+        ),
         giteaIssueDetail: Object.fromEntries(
           Object.entries(state.giteaIssueDetail).filter(([key]) => key !== detailKey)
         )

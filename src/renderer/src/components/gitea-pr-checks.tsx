@@ -2,6 +2,7 @@ import { CheckCircle2, CircleAlert, CircleDot, CircleX, ExternalLink } from 'luc
 import { cn } from '@/lib/utils'
 import type { GiteaPRCheck } from '../../../shared/gitea-types'
 import { translate } from '@/i18n/i18n'
+import { giteaStatusLabel } from './gitea-status-label'
 
 function stateIcon(state: GiteaPRCheck['state']): React.JSX.Element {
   switch (state) {
@@ -30,9 +31,9 @@ export function GiteaPrChecks({ checks }: { checks: GiteaPRCheck[] }): React.JSX
   }
   return (
     <div className="flex flex-col gap-1 px-3 py-3">
-      {checks.map((check, index) => (
+      {checks.map((check) => (
         <div
-          key={`${check.context}:${index}`}
+          key={check.context}
           className="flex items-center gap-2 rounded-md border border-border/50 bg-background/60 px-3 py-2"
         >
           <span className="shrink-0">{stateIcon(check.state)}</span>
@@ -44,7 +45,9 @@ export function GiteaPrChecks({ checks }: { checks: GiteaPRCheck[] }): React.JSX
               </span>
             ) : null}
           </span>
-          <span className={cn('shrink-0 text-[11px] text-muted-foreground')}>{check.state}</span>
+          <span className={cn('shrink-0 text-[11px] text-muted-foreground')}>
+            {giteaStatusLabel(check.state)}
+          </span>
           {check.targetUrl ? (
             <button
               type="button"

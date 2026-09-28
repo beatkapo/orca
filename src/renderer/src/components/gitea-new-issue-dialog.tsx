@@ -79,7 +79,7 @@ export function GiteaNewIssueDialog({
           }}
         >
           <div className="space-y-2">
-            <Label htmlFor={titleId} className="text-xs">
+            <Label htmlFor={titleId}>
               {translate('auto.components.gitea.new.issue.dialog.becfadf1df', 'Title')}
             </Label>
             <Input
@@ -91,7 +91,7 @@ export function GiteaNewIssueDialog({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor={bodyId} className="text-xs">
+            <Label htmlFor={bodyId}>
               {translate('auto.components.gitea.new.issue.dialog.6c8b731fb2', 'Description')}
             </Label>
             <textarea
@@ -112,7 +112,7 @@ export function GiteaNewIssueDialog({
             >
               {translate('auto.components.gitea.new.issue.dialog.032fd2ed27', 'Cancel')}
             </Button>
-            <Button type="submit" disabled={!title.trim() || creating} className="gap-2">
+            <Button type="submit" disabled={!title.trim() || creating}>
               {creating ? <LoaderCircle className="size-4 animate-spin" /> : null}
               {translate('auto.components.gitea.new.issue.dialog.5e1d23a112', 'Create issue')}
             </Button>

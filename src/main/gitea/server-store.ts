@@ -1,11 +1,13 @@
 import { createHash } from 'node:crypto'
+import { z } from 'zod'
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { safeStorage } from 'electron'
+import { validateGiteaApiUrl } from './api-url'
 import {
   CredentialDecryptionError,
   credentialFileHasContent,
+  writeEncryptedCredential,
   readStoredCredentialToken
 } from '../integration-credential-file'
 import type { GiteaServer, GiteaServerSelection } from '../../shared/gitea-types'
@@ -35,7 +37,7 @@ const cachedTokens = new Map<string, string>()
 const credentialErrors = new Map<string, string>()
 
 export function normalizeGiteaApiBaseUrl(value: string): string {
-  const trimmed = value.trim().replace(/\/+$/, '')
+  const trimmed = validateGiteaApiUrl(value)
   return /\/api\/v1$/i.test(trimmed) ? trimmed : `${trimmed}/api/v1`
 }
 
@@ -100,25 +102,16 @@ export function hasStoredToken(serverId: string): boolean {
 }
 
 function normalizeServer(input: unknown): GiteaServer | null {
-  if (!input || typeof input !== 'object') {
-    return null
-  }
-  const record = input as Record<string, unknown>
-  if (
-    typeof record.id !== 'string' ||
-    typeof record.baseUrl !== 'string' ||
-    typeof record.apiBaseUrl !== 'string' ||
-    typeof record.displayName !== 'string'
-  ) {
-    return null
-  }
-  return {
-    id: record.id,
-    baseUrl: record.baseUrl,
-    apiBaseUrl: record.apiBaseUrl,
-    displayName: record.displayName,
-    account: typeof record.account === 'string' ? record.account : null
-  }
+  const parsed = z
+    .object({
+      id: z.string().regex(/^[a-zA-Z0-9_-]+$/),
+      baseUrl: z.string(),
+      apiBaseUrl: z.string(),
+      displayName: z.string(),
+      account: z.string().nullable().optional()
+    })
+    .safeParse(input)
+  return parsed.success ? { ...parsed.data, account: parsed.data.account ?? null } : null
 }
 
 function readServerFileFromDisk(): GiteaServerFile {
@@ -127,7 +120,13 @@ function readServerFileFromDisk(): GiteaServerFile {
     return emptyServerFile()
   }
   try {
-    const parsed = JSON.parse(readFileSync(path, { encoding: 'utf-8' })) as Partial<GiteaServerFile>
+    const parsed = z
+      .object({
+        servers: z.array(z.unknown()).optional(),
+        activeServerId: z.string().nullable().optional(),
+        selectedServerId: z.string().nullable().optional()
+      })
+      .parse(JSON.parse(readFileSync(path, { encoding: 'utf-8' })))
     const servers = Array.isArray(parsed.servers)
       ? parsed.servers
           .map((server) => normalizeServer(server))
@@ -186,15 +185,6 @@ export function writeServerFile(file: GiteaServerFile): void {
   })
 }
 
-function writeEncryptedToken(path: string, token: string): void {
-  if (safeStorage.isEncryptionAvailable()) {
-    writeFileSync(path, safeStorage.encryptString(token), { mode: 0o600 })
-    return
-  }
-  console.warn('[gitea] safeStorage encryption unavailable — storing token in plaintext')
-  writeFileSync(path, token, { encoding: 'utf-8', mode: 0o600 })
-}
-
 export function readToken(serverId: string): string | null {
   const cached = cachedTokens.get(serverId)
   if (cached !== undefined) {
@@ -224,7 +214,7 @@ export function readToken(serverId: string): string | null {
 export function saveToken(serverId: string, token: string): void {
   ensureOrcaDir()
   ensureTokenDir()
-  writeEncryptedToken(getTokenPath(serverId), token)
+  writeEncryptedCredential('Gitea', getTokenPath(serverId), token)
   cachedTokens.set(serverId, token)
   credentialErrors.delete(serverId)
 }

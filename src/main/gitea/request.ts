@@ -1,5 +1,7 @@
 import { getServerForHost, normalizeGiteaApiBaseUrl } from './server-store'
 import type { GiteaRepoRef } from './repository-ref'
+import { validateGiteaApiUrl } from './api-url'
+import { z } from 'zod'
 import { cancelUnreadResponseBody } from '../lib/unread-response-body'
 
 // Shared Gitea REST plumbing used by both the pull-request client and the
@@ -23,7 +25,7 @@ export type GiteaReadOptions = {
 }
 
 export type GiteaWriteResult<T> =
-  | { ok: true; data: T }
+  | { ok: true; data: T | null }
   | { ok: false; error: string; status: number | null }
 
 function envValue(name: string): string | null {
@@ -73,7 +75,7 @@ function authHeaders(token: string | null): Record<string, string> {
 }
 
 export function giteaApiUrl(baseUrl: string, path: string, searchParams?: GiteaSearchParams): URL {
-  const url = new URL(`${baseUrl.replace(/\/+$/, '')}${path}`)
+  const url = new URL(`${validateGiteaApiUrl(baseUrl)}${path}`)
   if (searchParams) {
     for (const [key, value] of Object.entries(searchParams)) {
       url.searchParams.set(key, String(value))
@@ -101,6 +103,7 @@ export async function giteaGetJsonAtBase<T>(
   try {
     const response = await fetch(giteaApiUrl(baseUrl, path, options.searchParams), {
       headers: { Accept: 'application/json', ...authHeaders(options.token ?? null) },
+      redirect: 'error',
       signal: controller.signal
     })
     if (!response.ok) {
@@ -110,6 +113,7 @@ export async function giteaGetJsonAtBase<T>(
       }
       return null
     }
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The caller names this Gitea endpoint's wire shape; domain mappers validate identifiers before exposing records.
     return (await response.json()) as T
   } catch (error) {
     if (throwOnFailure) {
@@ -150,6 +154,7 @@ export async function giteaRepoGetText(
   try {
     const response = await fetch(giteaApiUrl(auth.apiBaseUrl, path, options.searchParams), {
       headers: auth.token ? { Authorization: `token ${auth.token}` } : {},
+      redirect: 'error',
       signal: controller.signal
     })
     if (!response.ok) {
@@ -166,7 +171,9 @@ export async function giteaRepoGetText(
 
 async function readGiteaError(response: Response): Promise<string> {
   try {
-    const data = (await response.json()) as { message?: string; errors?: string[] }
+    const data = z
+      .object({ message: z.string().optional(), errors: z.array(z.string()).optional() })
+      .parse(await response.json())
     const messages = [...(data.message ? [data.message] : []), ...(data.errors ?? [])].filter(
       Boolean
     )
@@ -201,6 +208,7 @@ export async function giteaRepoWrite<T>(
         ...authHeaders(auth.token)
       },
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      redirect: 'error',
       signal: controller.signal
     })
     if (!response.ok) {
@@ -208,8 +216,9 @@ export async function giteaRepoWrite<T>(
     }
     if (response.status === 204) {
       await cancelUnreadResponseBody(response)
-      return { ok: true, data: null as T }
+      return { ok: true, data: null }
     }
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The caller names the mutation endpoint's wire shape and checks required identifiers before using the response.
     return { ok: true, data: (await response.json()) as T }
   } catch {
     return { ok: false, error: 'Could not reach the Gitea server.', status: null }

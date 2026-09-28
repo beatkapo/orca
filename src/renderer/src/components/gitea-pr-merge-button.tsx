@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import type { GiteaMergeMethod } from '../../../shared/gitea-types'
 import { translate } from '@/i18n/i18n'
+import { giteaStatusLabel } from './gitea-status-label'
 
 const MERGE_METHODS: GiteaMergeMethod[] = ['merge', 'squash', 'rebase']
 
@@ -21,7 +22,7 @@ export function GiteaPrMergeButton({
     <div className="ml-auto">
       <Popover>
         <PopoverTrigger asChild>
-          <Button size="sm" disabled={merging || mergeable === false} className="gap-1">
+          <Button size="sm" disabled={merging || mergeable === false}>
             {merging ? <LoaderCircle className="size-3.5 animate-spin" /> : null}
             {mergeable === false
               ? translate('auto.components.gitea.pr.merge.button.2378ab4908', 'Conflicts')
@@ -29,17 +30,21 @@ export function GiteaPrMergeButton({
             <ChevronDown className="size-3.5" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-40 p-1">
-          {MERGE_METHODS.map((method) => (
-            <button
-              key={method}
-              type="button"
-              onClick={() => onMerge(method)}
-              className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-[12px] capitalize hover:bg-accent"
-            >
-              {method}
-            </button>
-          ))}
+        <PopoverContent align="end" className="w-40">
+          <div className="p-1">
+            <div className="p-1">
+              {MERGE_METHODS.map((method) => (
+                <button
+                  key={giteaStatusLabel(method)}
+                  type="button"
+                  onClick={() => onMerge(method)}
+                  className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-[12px] capitalize hover:bg-accent"
+                >
+                  {giteaStatusLabel(method)}
+                </button>
+              ))}
+            </div>
+          </div>
         </PopoverContent>
       </Popover>
     </div>

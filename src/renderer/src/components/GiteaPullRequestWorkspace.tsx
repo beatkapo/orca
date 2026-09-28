@@ -1,7 +1,4 @@
-/* oxlint-disable react-doctor/no-adjust-state-on-prop-change -- Why: PR detail,
-   files, checks, and comments are loaded from Gitea IPC for the selected pull
-   request, so local state resets when the selection prop changes. */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { ArrowRight, ExternalLink, GitPullRequest, LoaderCircle, Send, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { VisuallyHidden } from 'radix-ui'
@@ -11,19 +8,13 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
-import type {
-  GiteaComment,
-  GiteaMergeMethod,
-  GiteaPRCheck,
-  GiteaPRFile,
-  GiteaPRReviewComment,
-  GiteaPullRequestDetail,
-  GiteaWorkItem
-} from '../../../shared/gitea-types'
+import type { GiteaMergeMethod, GiteaWorkItem } from '../../../shared/gitea-types'
 import type { Repo } from '../../../shared/repo-types'
 import type { GiteaWorkspaceSelection } from './GiteaIssueWorkspace'
 import { scoped } from './gitea-pr-request-scope'
 import { translate } from '@/i18n/i18n'
+import { giteaStatusLabel } from './gitea-status-label'
+import { useGiteaPrResources } from './use-gitea-pr-resources'
 
 // On Windows the custom window controls (minimize/close) float over the
 // top-right corner, so the header action buttons must clear that strip.
@@ -37,7 +28,7 @@ type GiteaPullRequestWorkspaceProps = {
   onClose: () => void
 }
 
-export function GiteaPullRequestWorkspace({
+function GiteaPullRequestWorkspaceContent({
   selection,
   onUse,
   onClose
@@ -48,88 +39,26 @@ export function GiteaPullRequestWorkspace({
     (settings?.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
 
   const [tab, setTab] = useState<Tab>('conversation')
-  const [detail, setDetail] = useState<GiteaPullRequestDetail | null>(null)
-  const [files, setFiles] = useState<GiteaPRFile[]>([])
-  const [checks, setChecks] = useState<GiteaPRCheck[]>([])
-  const [comments, setComments] = useState<GiteaComment[]>([])
-  const [reviewComments, setReviewComments] = useState<GiteaPRReviewComment[]>([])
-  const [loading, setLoading] = useState(false)
   const [sideBySide, setSideBySide] = useState(true)
   const [commentDraft, setCommentDraft] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [merging, setMerging] = useState(false)
-  const requestRef = useRef(0)
 
   const item = selection?.item ?? null
   const repo = selection?.repo ?? null
   const scope = selection?.scope ?? null
 
-  useEffect(() => {
-    if (!selection || !item || !scope) {
-      return
-    }
-    requestRef.current += 1
-    const requestId = requestRef.current
-    setTab('conversation')
-    setDetail(null)
-    setFiles([])
-    setChecks([])
-    setComments([])
-    setReviewComments([])
-    setCommentDraft('')
-    setLoading(true)
-    void Promise.all([
-      window.api.gitea.prDetail(
-        scoped(scope, { number: item.number })
-      ) as Promise<GiteaPullRequestDetail | null>,
-      window.api.gitea.prFiles(scoped(scope, { number: item.number })) as Promise<GiteaPRFile[]>,
-      window.api.gitea.issueComments(scoped(scope, { number: item.number })) as Promise<
-        GiteaComment[]
-      >,
-      window.api.gitea.prReviewComments(scoped(scope, { number: item.number })) as Promise<
-        GiteaPRReviewComment[]
-      >
-    ])
-      .then(([prDetail, prFiles, prComments, prReviewComments]) => {
-        if (requestId !== requestRef.current) {
-          return
-        }
-        setDetail(prDetail)
-        setFiles(prFiles)
-        setComments(prComments)
-        setReviewComments(prReviewComments)
-        if (prDetail?.headSha) {
-          void (
-            window.api.gitea.prChecks(scoped(scope, { headSha: prDetail.headSha })) as Promise<
-              GiteaPRCheck[]
-            >
-          )
-            .then((result) => {
-              if (requestId === requestRef.current) {
-                setChecks(result)
-              }
-            })
-            .catch(() => {
-              // Why: keep checks state consistent and surface the failure.
-              if (requestId === requestRef.current) {
-                setChecks([])
-                toast.error(
-                  translate(
-                    'auto.components.GiteaPullRequestWorkspace.c2d3e4f5a6',
-                    'Failed to load PR checks.'
-                  )
-                )
-              }
-            })
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (requestId === requestRef.current) {
-          setLoading(false)
-        }
-      })
-  }, [selection, item, scope])
+  const {
+    detail,
+    setDetail,
+    files,
+    checks,
+    comments,
+    setComments,
+    reviewComments,
+    setReviewComments,
+    loading
+  } = useGiteaPrResources(selection)
 
   const handleSubmitComment = useCallback(async (): Promise<void> => {
     if (!scope || !item || submitting) {
@@ -147,11 +76,8 @@ export function GiteaPullRequestWorkspace({
       if (!result.ok) {
         throw new Error(result.error)
       }
-      setComments((prev) => [
-        ...prev,
-        { id: Date.now(), body, createdAt: new Date().toISOString() }
-      ])
       setCommentDraft('')
+      setComments(await window.api.gitea.issueComments(scoped(scope, { number: item.number })))
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -164,7 +90,7 @@ export function GiteaPullRequestWorkspace({
     } finally {
       setSubmitting(false)
     }
-  }, [commentDraft, item, scope, submitting])
+  }, [commentDraft, item, scope, submitting, setComments])
 
   const handleMerge = useCallback(
     async (method: GiteaMergeMethod): Promise<void> => {
@@ -193,7 +119,7 @@ export function GiteaPullRequestWorkspace({
         setMerging(false)
       }
     },
-    [item, merging, scope]
+    [item, merging, scope, setDetail]
   )
 
   const handleAddReviewComment = useCallback(
@@ -208,9 +134,9 @@ export function GiteaPullRequestWorkspace({
         if (!result.ok) {
           throw new Error(result.error)
         }
-        const refreshed = (await window.api.gitea.prReviewComments(
+        const refreshed = await window.api.gitea.prReviewComments(
           scoped(scope, { number: item.number })
-        )) as GiteaPRReviewComment[]
+        )
         setReviewComments(refreshed)
         return true
       } catch (error) {
@@ -225,7 +151,7 @@ export function GiteaPullRequestWorkspace({
         return false
       }
     },
-    [item, scope]
+    [item, scope, setReviewComments]
   )
 
   const state = detail?.state ?? (item?.state === 'merged' ? 'merged' : item?.state) ?? 'open'
@@ -252,7 +178,7 @@ export function GiteaPullRequestWorkspace({
       <SheetContent
         side="right"
         showCloseButton={false}
-        className="w-[min(96vw,1040px)] p-0 sm:max-w-[1040px]"
+        className="w-[min(96vw,1040px)] sm:max-w-[1040px]"
         onOpenAutoFocus={(event) => event.preventDefault()}
       >
         <VisuallyHidden.Root asChild>
@@ -289,7 +215,11 @@ export function GiteaPullRequestWorkspace({
                 >
                   <X className="size-4" />
                 </Button>
-                <Button onClick={() => onUse(repo, item)} className="shrink-0 gap-2" size="sm">
+                <Button
+                  onClick={() => onUse(repo, { ...item, title: detail?.title ?? item.title })}
+                  className="shrink-0"
+                  size="sm"
+                >
                   {translate(
                     'auto.components.GiteaPullRequestWorkspace.f88c7cf08c',
                     'Start workspace'
@@ -327,7 +257,7 @@ export function GiteaPullRequestWorkspace({
                             : 'bg-muted text-muted-foreground'
                       )}
                     >
-                      {state}
+                      {giteaStatusLabel(state)}
                     </span>
                     {loading ? <LoaderCircle className="size-3 animate-spin" /> : null}
                   </div>
@@ -400,7 +330,7 @@ export function GiteaPullRequestWorkspace({
                   <Button
                     onClick={() => void handleSubmitComment()}
                     disabled={!commentDraft.trim() || submitting}
-                    className="self-end gap-2"
+                    className="self-end"
                   >
                     {submitting ? (
                       <LoaderCircle className="size-4 animate-spin" />
@@ -417,4 +347,14 @@ export function GiteaPullRequestWorkspace({
       </SheetContent>
     </Sheet>
   )
+}
+
+export function GiteaPullRequestWorkspace(
+  props: GiteaPullRequestWorkspaceProps
+): React.JSX.Element {
+  const selection = props.selection
+  const key = selection
+    ? `${selection.repo.id}:${selection.item.number}:${JSON.stringify(selection.scope)}`
+    : 'closed'
+  return <GiteaPullRequestWorkspaceContent key={key} {...props} />
 }
