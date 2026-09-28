@@ -4,11 +4,11 @@ import type {
 } from './document-terminal-shape'
 
 /**
- * The eight seams between the document and whatever is hosting it, as the document's own
- * defaults, and the root its elements are read from. The document reads the seams at nine places:
- * `postToHost` twice, `createTerminal`, `createUnicode11Addon`, `createWebglAddon`,
- * `installErrorReporter`, `paintDocumentBackground`, `installHostTransport` and `hasEngine` once
- * each; the root is read through one accessor, at the ten element reads.
+ * The ten seams between the document and whatever is hosting it, as the document's own
+ * defaults, and the root its elements are read from. `postToHost` is read twice; `createTerminal`,
+ * the two addon builders, `installErrorReporter`, `paintDocumentBackground`, `installHostTransport`,
+ * `hasEngine` and `observeViewport` once each; `viewportRect` at every size bound and client-point
+ * mapping. The root is read through one accessor, at the ten element reads.
  *
  * Inside the WebView the host is React Native and the engine is an IIFE that hangs its
  * constructors off `window`; on the page the host is the component that mounted these modules and
@@ -19,6 +19,19 @@ import type {
 
 /** What a thrown value can be here: an Error-shaped object, a string, or nothing. */
 export type TerminalEngineError = string | null | undefined | { message?: unknown }
+
+/** The box the document's grid is shown in: client coordinates of its top-left, and its size. */
+export type TerminalDocumentViewportRect = {
+  left: number
+  top: number
+  width: number
+  height: number
+  /** The host is `display:none` and the size is the last one it had; a fit waits for it to show. */
+  hidden?: boolean
+}
+
+/** What the host reports: a new box, or the same box back from being hidden. */
+export type TerminalViewportChange = 'resized' | 'shown'
 
 /** The document's runtime error reporter, taking the window error handler's own arguments. */
 export type TerminalDocumentErrorReporter = (
@@ -32,8 +45,11 @@ export type TerminalDocumentErrorReporter = (
 /** A frame from the host, as its transport delivers it: JSON text from a bridge, or the object. */
 export type TerminalDocumentHostFrame = string | Record<string, unknown> | undefined
 
+/** How a document starts, as its view mounted. */
+export type TerminalDocumentStart = { textScale: number; shown: boolean }
+
 /**
- * The eight host seams, kept apart from the state because the host sets them once when it builds
+ * The ten host seams, kept apart from the state because the host sets them once when it builds
  * the scope, before the start sequence runs, and no module writes them afterwards.
  */
 export type TerminalDocumentHostSeams = {
@@ -47,12 +63,24 @@ export type TerminalDocumentHostSeams = {
   createWebglAddon: () => TerminalDocumentWebglAddon | null
   /** `host-notify`: installs the document's runtime error reporter with the host. */
   installErrorReporter: (report: TerminalDocumentErrorReporter) => () => void
+  /** `host-notify`: the host's capture buffer, which a report quotes and the reporter appends to. */
+  capturedEngineErrors: () => string[]
   /** `terminal-theme`: paints the terminal's background behind the grid. */
   paintDocumentBackground: (background: string) => void
   /** `message-bridge`: installs the host's transport for the frames it sends, handing back its removal. */
   installHostTransport: (receive: (frame: TerminalDocumentHostFrame) => void) => () => void
   /** `message-bridge`: whether the engine is here, which is what readiness is reported on. */
   hasEngine: () => boolean
+  /**
+   * How the document starts, as its view mounted: the app's text scale, which the terminal built
+   * before ready lays out at, and whether it was shown. Only a shown document builds before ready;
+   * every terminal is a WebGL context, and a page or app holds about sixteen.
+   */
+  start: () => TerminalDocumentStart
+  /** Every fit, pan, scroll and overlay bound, and every client point mapped into the grid. */
+  viewportRect: () => TerminalDocumentViewportRect
+  /** `fit-scale`: calls back when that box changes size or is shown again, handing back its removal. */
+  observeViewport: (onChange: (change: TerminalViewportChange) => void) => () => void
   /**
    * Where this document's elements are: the node its markup was planted in, or null for the page
    * the document is running in.
@@ -66,7 +94,7 @@ export type TerminalDocumentHostSeams = {
    * Null rather than `document` as the default, because this is the one seam whose value is data:
    * a default of `document` is read when the scope is built rather than when an element is, and
    * the rule for every seam above it is that the window read happens at the call. The accessor
-   * resolves it, so the read stays where the other eight are.
+   * resolves it, so the read stays where the other ten are.
    */
   root: ParentNode | null
 }
@@ -75,7 +103,7 @@ export type TerminalDocumentHostSeams = {
  * What a host may hand the document instead of a window read.
  *
  * Every seam has a default, so a host names only the ones it owns differently: inside the WebView
- * that is none of them, and the page names all eight. Absent and present-but-undefined mean the same
+ * that is none of them, and the page names all eleven. Absent and present-but-undefined mean the same
  * thing, which is why the scope's spread filters rather than trusting key order.
  */
 export type TerminalDocumentHost = Partial<TerminalDocumentHostSeams>
@@ -98,6 +126,20 @@ declare global {
     Unicode11Addon?: { Unicode11Addon: new () => TerminalDocumentWebglAddon }
     WebglAddon?: { WebglAddon?: new () => TerminalDocumentWebglAddon }
     Terminal?: unknown
+    /**
+     * The shell's capture buffer, which its `<head>` opens before the engine script runs.
+     *
+     * It stays a global there because it is older than any document: an engine that throws while it
+     * loads has to be captured by something the document has not started yet, and the first report
+     * quotes it. The document reaches it through a seam, so a page's mount holds its own instead.
+     */
+    __engineErrors?: string[]
+    /**
+     * The WebView page writes these ahead of the document script: the text scale its view mounted
+     * at, and whether that view was shown then.
+     */
+    __orcaTerminalTextScale?: unknown
+    __orcaTerminalShown?: unknown
   }
   const Terminal: new (options: Record<string, unknown>) => TerminalDocumentTerminal
 }
@@ -170,6 +212,12 @@ export function installWindowHostTransport(receive: (frame: TerminalDocumentHost
   }
 }
 
+/** The shell's buffer, which its `<head>` has already declared by the time the document runs. */
+export function windowCapturedEngineErrors() {
+  window.__engineErrors = window.__engineErrors ?? []
+  return window.__engineErrors
+}
+
 /**
  * Whether the engine is here, as the WebView can know it: the engine is an IIFE that hangs
  * `Terminal` off `window`, and a script tag that failed to load leaves it undefined, which is the
@@ -177,11 +225,37 @@ export function installWindowHostTransport(receive: (frame: TerminalDocumentHost
  *
  * On the page the engine is an import that already resolved by the time the document is built, so
  * the page answers yes rather than reading a global it never writes.
+ *
+ * `!== undefined` rather than a `typeof` guard: the global is declared optional, so the lint rule
+ * that forbids the guard is right that there is nothing to guard against here.
  */
 export function windowHasEngine() {
-  // `!== undefined` rather than a `typeof` guard: the global is declared optional, so the lint rule
-  // that forbids the guard is right that there is nothing to guard against here.
   return window.Terminal !== undefined
+}
+
+export function windowStart(): TerminalDocumentStart {
+  const scale = window.__orcaTerminalTextScale
+  return {
+    textScale: typeof scale === 'number' && scale > 0 ? scale : 1,
+    shown: window.__orcaTerminalShown !== false
+  }
+}
+
+/**
+ * The WebView's viewport: there the window is the terminal frame. On the page the window is the
+ * whole page, taller than the frame by the header and dock, so the page answers with its host.
+ */
+export function windowViewportRect(): TerminalDocumentViewportRect {
+  return { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight }
+}
+
+/** The WebView's frame changes size exactly when its window does. */
+export function observeWindowViewport(onChange: (change: TerminalViewportChange) => void) {
+  const listener = () => onChange('resized')
+  window.addEventListener('resize', listener)
+  return function () {
+    window.removeEventListener('resize', listener)
+  }
 }
 
 /**

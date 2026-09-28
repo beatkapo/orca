@@ -3,6 +3,7 @@ import type {
   AgentJournalItemBody,
   AgentJournalItemIdentity,
   AgentJournalMessageItem,
+  AgentJournalProducerLinkage,
   AgentJournalResetReason,
   AgentSessionJournalIdentity
 } from '../../../shared/agent-session-journal-types'
@@ -39,7 +40,11 @@ export type JournalAppendResult = {
   revision: number
 }
 
-export type JournalItemAppendOptions = { fence: number; observedAt?: number; recovered?: true }
+export type JournalItemAppendOptions = AgentJournalProducerLinkage & {
+  fence: number
+  observedAt?: number
+  recovered?: true
+}
 export type JournalTombstoneInput = { fence: number }
 
 export type JournalLifecycleBatchInput = {
@@ -54,6 +59,8 @@ export type JournalSubmissionInput = {
   payloadFingerprint: string
   body: AgentJournalMessageItem
   fence: number
+  /** The send is accepted now and handed over later, by a `dispatch{pending}` row. */
+  handoverRecorded?: true
 }
 
 export type JournalItemAppendInput = {
